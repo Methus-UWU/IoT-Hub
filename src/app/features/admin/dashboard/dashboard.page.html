@@ -1,0 +1,183 @@
+<div class="min-h-full bg-slate-50 px-4 py-6 text-slate-900 sm:px-6 lg:px-8">
+  <header class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+    <div>
+      <p class="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Overview</p>
+      <h1 class="text-2xl font-semibold tracking-tight text-slate-950">Dashboard</h1>
+      <p class="mt-1 max-w-2xl text-sm text-slate-500">Platform overview and live infrastructure health.</p>
+    </div>
+
+    <div
+      class="inline-flex w-fit items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-700"
+      aria-live="polite"
+    >
+      <span class="relative flex h-2 w-2" aria-hidden="true">
+        <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+        <span class="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
+      </span>
+      @if (store.lastUpdated(); as updated) {
+        <span>Updated {{ updated | date: 'HH:mm:ss' }}</span>
+      } @else {
+        <span>Connecting...</span>
+      }
+    </div>
+  </header>
+
+  @if (store.error()) {
+    <div role="alert" class="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">
+      {{ store.error() }}
+    </div>
+  }
+
+  @if (store.loading() && !store.snapshot()) {
+    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5" aria-hidden="true">
+      @for (placeholder of [1, 2, 3, 4, 5]; track placeholder) {
+        <div class="h-32 animate-pulse rounded-2xl border border-slate-200 bg-white"></div>
+      }
+    </div>
+  } @else if (store.snapshot(); as snapshot) {
+    <section aria-labelledby="quick-stats-heading">
+      <div class="mb-3 flex items-center justify-between gap-3">
+        <h2 id="quick-stats-heading" class="text-xs font-semibold uppercase tracking-wide text-slate-500">
+          Quick Stats
+        </h2>
+      </div>
+
+      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <app-stat-card
+          title="Total Users"
+          icon="users"
+          [value]="(snapshot.platform.totalUsers | number) ?? ''"
+          [caption]="(snapshot.platform.suspendedUsers | number) + ' suspended'"
+        />
+        <app-stat-card
+          title="Online Devices"
+          icon="devices"
+          [live]="true"
+          [value]="(snapshot.platform.onlineDevices | number) ?? ''"
+          [caption]="'of ' + (snapshot.platform.totalDevices | number) + ' total'"
+        />
+        <app-stat-card
+          title="Total Projects"
+          icon="projects"
+          [value]="(snapshot.platform.totalProjects | number) ?? ''"
+        />
+        <app-stat-card
+          title="Total Documents"
+          icon="documents"
+          [value]="(snapshot.platform.totalDocuments | number) ?? ''"
+        />
+        <app-stat-card
+          title="AI Requests Today"
+          icon="ai"
+          [live]="true"
+          [value]="(snapshot.platform.aiRequestsToday | number) ?? ''"
+        />
+      </div>
+    </section>
+
+    <div class="mt-6 grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.65fr)] xl:items-start">
+      <section class="flex flex-col" aria-labelledby="resources-heading">
+        <div class="mb-3 flex items-center justify-between gap-3">
+          <h2 id="resources-heading" class="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Server Metrics
+          </h2>
+        </div>
+
+        <div
+          #resourceCard
+          class="flex flex-col rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/70 sm:p-5"
+        >
+          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            @for (metric of metricSummaries(); track metric.id) {
+              <button
+                type="button"
+                class="group flex min-h-24 items-start gap-3 rounded-xl border p-3 text-left transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"
+                [class]="
+                  selectedMetric() === metric.id
+                    ? 'border-slate-300 bg-white shadow-sm'
+                    : 'border-slate-100 bg-slate-50/80 hover:border-slate-200 hover:bg-slate-100/70'
+                "
+                [attr.aria-pressed]="selectedMetric() === metric.id"
+                (click)="selectMetric(metric.id)"
+              >
+                <span
+                  class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+                  [class]="metric.iconClasses"
+                  aria-hidden="true"
+                >
+                  <app-metric-icon [kind]="metric.icon" class="h-5 w-5" />
+                </span>
+                <span class="min-w-0">
+                  <span class="block text-xs font-medium text-slate-500">{{ metric.label }}</span>
+                  <span class="mt-1 block text-xl font-semibold tracking-tight" [class]="metric.valueClasses">
+                    {{ metric.value }}
+                  </span>
+                  @if (metric.caption) {
+                    <span class="mt-0.5 block truncate text-xs text-slate-500">{{ metric.caption }}</span>
+                  }
+                </span>
+              </button>
+            }
+          </div>
+
+          <div class="mt-5">
+            <app-line-chart
+              [series]="chartSeries()"
+              [labels]="historyLabels()"
+              [max]="chartMax()"
+              [normalize]="false"
+              [formatValue]="chartFormatter()"
+            />
+          </div>
+
+          @if (snapshot.detail; as detail) {
+            <dl class="mt-5 grid grid-cols-2 gap-3 border-t border-slate-100 pt-4 sm:grid-cols-4">
+              <div class="rounded-xl bg-slate-50 px-3 py-2.5">
+                <dt class="text-xs font-medium text-slate-500">Uptime</dt>
+                <dd class="mt-1 text-sm font-semibold text-slate-950">{{ detail.uptimeSeconds | uptime }}</dd>
+              </div>
+              <div class="rounded-xl bg-slate-50 px-3 py-2.5">
+                <dt class="text-xs font-medium text-slate-500">Load Average</dt>
+                <dd class="mt-1 text-sm font-semibold text-slate-950">
+                  {{ detail.loadAverage[0] }} / {{ detail.loadAverage[1] }} / {{ detail.loadAverage[2] }}
+                </dd>
+              </div>
+              <div class="rounded-xl bg-slate-50 px-3 py-2.5">
+                <dt class="text-xs font-medium text-slate-500">Processes</dt>
+                <dd class="mt-1 text-sm font-semibold text-slate-950">{{ detail.processCount }}</dd>
+              </div>
+              <div class="rounded-xl bg-slate-50 px-3 py-2.5">
+                <dt class="text-xs font-medium text-slate-500">Containers</dt>
+                <dd class="mt-1 text-sm font-semibold text-slate-950">
+                  {{ detail.dockerContainersRunning }} / {{ detail.dockerContainersTotal }}
+                </dd>
+              </div>
+            </dl>
+          }
+        </div>
+      </section>
+
+      <section class="flex flex-col" aria-labelledby="services-heading">
+        <h2 id="services-heading" class="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+          Service Health
+        </h2>
+        <div
+          class="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-sm shadow-slate-200/70"
+          [style.height.px]="resourceCardHeight()"
+        >
+          <ul class="scrollbar-thin min-h-0 flex-1 overflow-y-auto">
+            @for (service of snapshot.services; track service.name) {
+              <li class="flex items-center justify-between gap-3 rounded-xl px-3 py-3 text-sm hover:bg-slate-50">
+                <div class="min-w-0">
+                  <p class="truncate font-semibold text-slate-800">{{ service.name }}</p>
+                  <p class="mt-0.5 text-xs text-slate-500">Uptime {{ service.uptimeSeconds | uptime }}</p>
+                </div>
+                <app-status-badge [label]="service.state" [tone]="serviceTones[service.state]" />
+              </li>
+            }
+          </ul>
+        </div>
+      </section>
+    </div>
+  }
+</div>

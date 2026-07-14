@@ -1,0 +1,298 @@
+<div class="flex h-full min-h-[calc(100vh-4rem)] flex-col bg-slate-50 text-slate-900 md:min-h-full">
+  <header class="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 sm:px-6">
+    <app-dropdown
+      [options]="models"
+      [value]="selectedModel()"
+      label="AI model"
+      (valueChange)="selectedModel.set($event)"
+    />
+
+    <div class="flex items-center gap-1.5">
+      <button
+        type="button"
+        disabled
+        aria-disabled="true"
+        title="Assistant settings — coming soon"
+        class="flex h-8 w-8 cursor-not-allowed items-center justify-center rounded-full text-slate-300"
+      >
+        <span class="sr-only">Assistant settings (coming soon)</span>
+        <svg viewBox="0 0 24 24" fill="none" class="h-4.5 w-4.5" aria-hidden="true">
+          <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.6" />
+          <path
+            d="M12 3.5v2m0 13v2m8.5-8.5h-2m-13 0h-2m13.9-6.4-1.4 1.4M6.5 17.5l-1.4 1.4m0-13.4 1.4 1.4M17.5 17.5l1.4 1.4"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+          />
+        </svg>
+      </button>
+      <button
+        type="button"
+        (click)="startNewChat()"
+        aria-label="Start new chat"
+        class="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 lg:hidden"
+      >
+        <svg viewBox="0 0 24 24" fill="none" class="h-4.5 w-4.5" aria-hidden="true">
+          <path d="M12 5v14m-7-7h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="flex min-h-0 flex-1">
+    <div class="flex min-w-0 flex-1 flex-col overflow-hidden">
+      @if (!messages().length) {
+        <div class="flex flex-1 flex-col items-center justify-center gap-6 px-4">
+          <button
+            type="button"
+            (click)="focusInput()"
+            aria-label="Start typing your question"
+            class="group relative h-28 w-28 cursor-text"
+          >
+            <span
+              class="absolute inset-0 rounded-full bg-linear-to-br from-gray-400 to-gray-200 opacity-30 blur-xl transition-opacity duration-300 group-hover:opacity-50"
+              aria-hidden="true"
+            ></span>
+            <span
+              class="absolute inset-0 animate-spin rounded-full transition-transform duration-300 group-hover:scale-105 [background:conic-gradient(from_0deg,#4f46e5,transparent_35%,#ffffff,transparent_65%,#4f46e5)]"
+              style="animation-duration: 3s"
+              aria-hidden="true"
+            ></span>
+            <span class="absolute inset-2 rounded-full bg-slate-50" aria-hidden="true"></span>
+          </button>
+
+          <p class="text-lg font-medium text-slate-900">Good to see you, {{ userName }}.</p>
+
+          <div class="flex flex-wrap justify-center gap-2 px-4">
+            @for (suggestion of suggestions; track suggestion) {
+              <button
+                type="button"
+                (click)="useSuggestion(suggestion)"
+                class="rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-medium text-slate-600 shadow-sm transition-colors hover:border-gray-300 hover:bg-gray-100 hover:text-gray-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              >
+                {{ suggestion }}
+              </button>
+            }
+          </div>
+        </div>
+      } @else {
+        <div class="scrollbar-thin flex-1 overflow-y-auto px-4 py-6 sm:px-6" role="log" aria-live="polite" aria-label="Conversation">
+          <div class="mx-auto flex max-w-2xl flex-col gap-5">
+            @for (message of messages(); track $index) {
+              @if (message.role === 'user') {
+                <div class="flex justify-end">
+                  <div class="max-w-[80%] rounded-2xl bg-primary px-4 py-2 text-sm text-white">{{ message.text }}</div>
+                </div>
+              } @else {
+                <div class="flex items-start gap-3">
+                  <div class="relative mt-0.5 h-6 w-6 shrink-0" aria-hidden="true">
+                    <div class="absolute inset-0 rounded-full [background:conic-gradient(from_0deg,#4f46e5,transparent_35%,#ffffff,transparent_65%,#4f46e5)]"></div>
+                    <div class="absolute inset-0.5 rounded-full bg-slate-50"></div>
+                  </div>
+                  <p class="max-w-[80%] pt-0.5 text-sm text-slate-700">{{ message.text }}</p>
+                </div>
+              }
+            }
+            @if (isThinking()) {
+              <div class="flex items-center gap-3">
+                <div class="relative h-6 w-6 shrink-0" aria-hidden="true">
+                  <div
+                    class="absolute inset-0 animate-spin rounded-full [background:conic-gradient(from_0deg,#4f46e5,transparent_35%,#ffffff,transparent_65%,#4f46e5)]"
+                    style="animation-duration: 1.1s"
+                  ></div>
+                  <div class="absolute inset-0.5 rounded-full bg-slate-50"></div>
+                </div>
+                <span class="text-xs text-slate-400">Thinking…</span>
+              </div>
+            }
+          </div>
+        </div>
+      }
+
+      <div class="px-4 pb-6 sm:px-6">
+        <div
+          class="mx-auto flex max-w-2xl items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition-colors focus-within:border-primary/40 focus-within:ring-4 focus-within:ring-primary/10"
+        >
+          <label class="sr-only" for="ai-chat-input">Ask the AI assistant</label>
+          <input
+            #chatInput
+            id="ai-chat-input"
+            type="text"
+            [value]="inputValue()"
+            (input)="onInput($event)"
+            (keydown.enter)="sendMessage()"
+            placeholder="Ask me anything..."
+            class="flex-1 bg-transparent text-sm text-slate-900 placeholder-slate-400 outline-none"
+          />
+          <button
+            type="button"
+            (click)="sendMessage()"
+            [disabled]="!inputValue().trim() || isThinking()"
+            aria-label="Send message"
+            class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-white transition-colors hover:bg-primary-dark disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+          >
+            <svg viewBox="0 0 24 24" fill="none" class="h-4 w-4" aria-hidden="true">
+              <path
+                d="M4 12h16m0 0-6-6m6 6-6 6"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <aside class="hidden w-72 shrink-0 flex-col border-l border-slate-200 bg-white lg:flex">
+      <div class="p-3">
+        <button
+          type="button"
+          (click)="startNewChat()"
+          class="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+        >
+          <svg viewBox="0 0 24 24" fill="none" class="h-4 w-4" aria-hidden="true">
+            <path d="M12 5v14m-7-7h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+          </svg>
+          New Chat
+        </button>
+      </div>
+
+      <div class="px-3 pb-2">
+        <div class="relative">
+          <svg viewBox="0 0 24 24" fill="none" class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true">
+            <circle cx="11" cy="11" r="6.5" stroke="currentColor" stroke-width="1.7" />
+            <path d="m16 16 4 4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
+          </svg>
+          <label class="sr-only" for="chat-search">Search chats</label>
+          <input
+            id="chat-search"
+            type="text"
+            [value]="searchQuery()"
+            (input)="onSearch($event)"
+            placeholder="Search..."
+            class="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm text-slate-900 placeholder-slate-400 outline-none transition-colors focus:border-primary/40 focus:bg-white focus:ring-4 focus:ring-primary/10"
+          />
+        </div>
+      </div>
+
+      <nav class="scrollbar-thin flex-1 space-y-4 overflow-y-auto px-3 pb-4 pt-2" aria-label="Chat history">
+        @if (starredChats().length) {
+          <div>
+            <p class="px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">Starred</p>
+            <div class="space-y-0.5">
+              @for (chat of starredChats(); track chat.id) {
+                <ng-container [ngTemplateOutlet]="chatRow" [ngTemplateOutletContext]="{ $implicit: chat }" />
+              }
+            </div>
+          </div>
+        }
+
+        @if (visibleRecentChats().length) {
+          <div>
+            <p class="px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">Recent</p>
+            <div class="space-y-0.5">
+              @for (chat of visibleRecentChats(); track chat.id) {
+                <ng-container [ngTemplateOutlet]="chatRow" [ngTemplateOutletContext]="{ $implicit: chat }" />
+              }
+            </div>
+          </div>
+        }
+
+        @if (!hasResults()) {
+          <p class="px-3 py-6 text-center text-sm text-slate-400">No chats match "{{ searchQuery() }}".</p>
+        }
+      </nav>
+    </aside>
+  </div>
+</div>
+
+<ng-template #chatRow let-chat>
+  <div
+    class="group relative flex items-center rounded-lg pr-1 transition-colors"
+    [class.bg-slate-100]="chat.id === activeId()"
+    [class.hover:bg-slate-50]="chat.id !== activeId() && renamingId() !== chat.id"
+  >
+    @if (renamingId() === chat.id) {
+      <input
+        #renameInput
+        type="text"
+        [value]="renameValue()"
+        (input)="renameValue.set($any($event.target).value)"
+        (click)="$event.stopPropagation()"
+        (keydown.enter)="commitRename()"
+        (keydown.escape)="cancelRename()"
+        (blur)="commitRename()"
+        aria-label="Rename chat"
+        class="min-w-0 flex-1 rounded-lg border border-primary/40 bg-white px-2.5 py-1.5 text-sm text-slate-900 outline-none ring-4 ring-primary/10"
+      />
+    } @else {
+      <button
+        type="button"
+        (click)="selectConversation(chat.id)"
+        [attr.aria-current]="chat.id === activeId() ? 'true' : null"
+        class="min-w-0 flex-1 truncate rounded-lg px-3 py-2 text-left text-sm text-slate-700 outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+      >
+        {{ chat.title }}
+      </button>
+      <button
+        type="button"
+        (click)="toggleMenu(chat.id, $event)"
+        aria-haspopup="menu"
+        [attr.aria-expanded]="openMenuId() === chat.id"
+        aria-label="Chat options"
+        class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-slate-400 opacity-0 transition-opacity hover:bg-slate-200/70 hover:text-slate-600 focus-visible:opacity-100 group-hover:opacity-100"
+        [class.opacity-100]="openMenuId() === chat.id"
+      >
+        <svg viewBox="0 0 24 24" fill="currentColor" class="h-4 w-4" aria-hidden="true">
+          <circle cx="12" cy="5.5" r="1.6" />
+          <circle cx="12" cy="12" r="1.6" />
+          <circle cx="12" cy="18.5" r="1.6" />
+        </svg>
+      </button>
+    }
+
+    @if (openMenuId() === chat.id) {
+      <div
+        role="menu"
+        class="absolute right-1 top-9 z-20 w-44 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg shadow-slate-900/10"
+      >
+        <button
+          type="button"
+          role="menuitem"
+          (click)="toggleStar(chat.id, $event)"
+          class="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm text-slate-700 transition-colors hover:bg-slate-50"
+        >
+          <svg viewBox="0 0 24 24" [attr.fill]="chat.starred ? 'currentColor' : 'none'" class="h-4 w-4 text-amber-500" aria-hidden="true">
+            <path d="m12 4 2.35 4.76 5.25.76-3.8 3.7.9 5.23L12 16.9l-4.7 2.47.9-5.23-3.8-3.7 5.25-.76L12 4Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
+          </svg>
+          {{ chat.starred ? 'Remove Starred' : 'Add to Starred' }}
+        </button>
+        <button
+          type="button"
+          role="menuitem"
+          (click)="startRename(chat.id, $event)"
+          class="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm text-slate-700 transition-colors hover:bg-slate-50"
+        >
+          <svg viewBox="0 0 24 24" fill="none" class="h-4 w-4 text-slate-500" aria-hidden="true">
+            <path d="M4 20h4L18.5 9.5a2 2 0 0 0-2.83-2.83L5 17v3Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
+            <path d="m14 8 2 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+          </svg>
+          Rename
+        </button>
+        <button
+          type="button"
+          role="menuitem"
+          (click)="deleteConversation(chat.id, $event)"
+          class="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm text-red-600 transition-colors hover:bg-red-50"
+        >
+          <svg viewBox="0 0 24 24" fill="none" class="h-4 w-4" aria-hidden="true">
+            <path d="M5 7h14M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7m2 0-.6 11a2 2 0 0 1-2 1.9H7.6a2 2 0 0 1-2-1.9L5 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          Delete
+        </button>
+      </div>
+    }
+  </div>
+</ng-template>

@@ -1,0 +1,12 @@
+<div class="min-h-full bg-gray-50 px-4 py-6 sm:px-6 lg:px-8">
+  <header class="mb-6">
+    <h1 class="text-xl font-semibold text-gray-900">Plans</h1>
+    <p class="text-sm text-gray-500">Configure Free, Pro, and Max plan limits, and review quota usage across the platform.</p>
+  </header>
+
+  <section class="grid grid-cols-1 gap-4 lg:grid-cols-3" aria-label="Plan tiers">
+    @for (plan of store.plans(); track plan.tier) {
+      <app-plan-card [plan]="plan" (save)="onSave(plan.tier, $event)" />
+    }
+  </section>
+</div>
