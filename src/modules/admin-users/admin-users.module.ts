@@ -2,11 +2,12 @@ import { Module } from '@nestjs/common';
 
 import { AdminRoleGuard } from '../../common/guards/admin-role.guard';
 import { AuthModule } from '../auth/auth.module';
+import { UsersModule } from '../users/users.module';
 import { AdminUsersController } from './admin-users.controller';
 import { AdminUsersService } from './admin-users.service';
 
 @Module({
-  imports: [AuthModule],
+  imports: [AuthModule, UsersModule],
   controllers: [AdminUsersController],
   providers: [AdminUsersService, AdminRoleGuard],
 })

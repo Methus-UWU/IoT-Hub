@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { cpus, freemem, loadavg, totalmem, uptime } from 'node:os';
 
-import { PrismaService } from '../../prisma/prisma.service';
+import { SessionRepository } from '../auth/session.repository';
+import { UserRepository } from '../users/user.repository';
 
 /**
  * Builds the read-only context attached to admin AI requests.
@@ -14,15 +15,16 @@ import { PrismaService } from '../../prisma/prisma.service';
  */
 @Injectable()
 export class SystemContextService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly users: UserRepository,
+    private readonly sessions: SessionRepository,
+  ) {}
 
   async build(): Promise<string> {
     const [userCountResult, activeSessionCountResult] =
       await Promise.allSettled([
-        this.prisma.db.user.count(),
-        this.prisma.db.session.count({
-          where: { revokeAt: null, expireAt: { gt: new Date() } },
-        }),
+        this.users.count(),
+        this.sessions.countActive(),
       ]);
 
     const totalMemory = totalmem();

@@ -9,7 +9,15 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { randomUUID } from 'node:crypto';
 
-import { PrismaService } from '../../prisma/prisma.service';
+import { UserProfile, UserRepository } from '../users/user.repository';
+import { RoleRepository } from '../users/role.repository';
+import {
+  ACCESS_TOKEN_LIFETIME,
+  PASSWORD_HASH_ROUNDS,
+  REFRESH_TOKEN_HASH_ROUNDS,
+  REFRESH_TOKEN_LIFETIME,
+  REFRESH_TOKEN_LIFETIME_MS,
+} from './auth.constants';
 import {
   ChangePasswordDto,
   CheckExistDto,
@@ -17,10 +25,7 @@ import {
   SignUpDto,
   UpdateProfileDto,
 } from './dto';
-
-const ACCESS_TOKEN_LIFETIME = '15m';
-const REFRESH_TOKEN_LIFETIME = '7d';
-const REFRESH_TOKEN_LIFETIME_MS = 7 * 24 * 60 * 60 * 1000;
+import { SessionRepository } from './session.repository';
 
 interface RequestMetadata {
   ip?: string;
@@ -41,40 +46,44 @@ interface TokenPair {
 @Injectable()
 export class AuthService {
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly users: UserRepository,
+    private readonly roles: RoleRepository,
+    private readonly sessions: SessionRepository,
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
   ) {}
 
   async login(body: LoginDto, metadata: RequestMetadata): Promise<TokenPair> {
-    const user = await this.prisma.db.user.findUnique({
-      where: { email: body.email.toLowerCase() },
-      include: { role: true },
-    });
+    const user = await this.users.findCredentialsByEmail(
+      body.email.toLowerCase(),
+    );
 
+    // One response for every failure mode, so the endpoint cannot be used to
+    // discover which addresses have accounts or which accounts are suspended.
     if (
       !user ||
       !user.isActive ||
-      !(await bcrypt.compare(body.password, user.password))
+      !(await bcrypt.compare(body.password, user.passwordHash))
     ) {
       throw new UnauthorizedException('Email or password is incorrect');
     }
 
     const sessionId = randomUUID();
     const tokens = await this.createTokenPair(
-      { id: user.id, email: user.email, role: user.role.name },
+      { id: user.id, email: user.email, role: user.roleName },
       sessionId,
     );
 
-    await this.prisma.db.session.create({
-      data: {
-        id: sessionId,
-        userId: user.id,
-        ip: metadata.ip,
-        agentDevice: metadata.userAgent,
-        refreshToken: await bcrypt.hash(tokens.refreshToken, 10),
-        expireAt: new Date(Date.now() + REFRESH_TOKEN_LIFETIME_MS),
-      },
+    await this.sessions.create({
+      id: sessionId,
+      userId: user.id,
+      ip: metadata.ip,
+      agentDevice: metadata.userAgent,
+      refreshTokenHash: await bcrypt.hash(
+        tokens.refreshToken,
+        REFRESH_TOKEN_HASH_ROUNDS,
+      ),
+      expireAt: new Date(Date.now() + REFRESH_TOKEN_LIFETIME_MS),
     });
 
     return tokens;
@@ -98,18 +107,14 @@ export class AuthService {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
-    const session = await this.prisma.db.session.findUnique({
-      where: { id: payload.sid },
-      include: { user: { include: { role: true } } },
-    });
-
+    const session = await this.sessions.findByIdWithUser(payload.sid);
     const validSession =
       session &&
       session.userId === payload.sub &&
       session.user.isActive &&
       !session.revokeAt &&
       session.expireAt.getTime() > Date.now() &&
-      (await bcrypt.compare(refreshToken, session.refreshToken));
+      (await bcrypt.compare(refreshToken, session.refreshTokenHash));
 
     if (!validSession) {
       throw new UnauthorizedException('Refresh session is no longer valid');
@@ -119,19 +124,19 @@ export class AuthService {
       {
         id: session.user.id,
         email: session.user.email,
-        role: session.user.role.name,
+        role: session.user.roleName,
       },
       session.id,
     );
 
-    await this.prisma.db.session.update({
-      where: { id: session.id },
-      data: {
-        ip: metadata.ip,
-        agentDevice: metadata.userAgent,
-        refreshToken: await bcrypt.hash(tokens.refreshToken, 10),
-        expireAt: new Date(Date.now() + REFRESH_TOKEN_LIFETIME_MS),
-      },
+    await this.sessions.rotate(session.id, {
+      ip: metadata.ip,
+      agentDevice: metadata.userAgent,
+      refreshTokenHash: await bcrypt.hash(
+        tokens.refreshToken,
+        REFRESH_TOKEN_HASH_ROUNDS,
+      ),
+      expireAt: new Date(Date.now() + REFRESH_TOKEN_LIFETIME_MS),
     });
 
     return tokens;
@@ -149,12 +154,7 @@ export class AuthService {
         },
       );
 
-      if (payload.sid) {
-        await this.prisma.db.session.updateMany({
-          where: { id: payload.sid, revokeAt: null },
-          data: { revokeAt: new Date() },
-        });
-      }
+      if (payload.sid) await this.sessions.revoke(payload.sid);
     } catch {
       // An invalid cookie still gets cleared by the controller.
     }
@@ -163,55 +163,40 @@ export class AuthService {
   async signUp(body: SignUpDto): Promise<void> {
     const username = body.username.trim();
     const email = body.email.trim().toLowerCase();
-    const existing = await this.prisma.db.user.findFirst({
-      where: { OR: [{ username }, { email }] },
-    });
 
-    if (existing) {
+    const existingId = await this.users.findIdByUsernameOrEmail(
+      username,
+      email,
+    );
+    if (existingId) {
       throw new ConflictException('Username or email already exists');
     }
 
-    const role = await this.prisma.db.role.findUnique({
-      where: { name: 'user' },
-    });
+    const role = await this.roles.findByName('user');
     if (!role) {
       throw new ConflictException('Default user role is not configured');
     }
 
-    await this.prisma.db.user.create({
-      data: {
-        username,
-        email,
-        password: await bcrypt.hash(body.password, 10),
-        roleId: role.id,
-      },
+    await this.users.create({
+      username,
+      email,
+      passwordHash: await bcrypt.hash(body.password, PASSWORD_HASH_ROUNDS),
+      roleId: role.id,
     });
   }
 
   async checkExists(body: CheckExistDto): Promise<{ exists: boolean }> {
     const value = body.value.trim();
-    const user = await this.prisma.db.user.findFirst({
-      where:
-        body.field === 'email'
-          ? { email: value.toLowerCase() }
-          : { username: value },
-      select: { id: true },
-    });
+    const exists =
+      body.field === 'email'
+        ? await this.users.existsByEmail(value.toLowerCase())
+        : await this.users.existsByUsername(value);
 
-    return { exists: Boolean(user) };
+    return { exists };
   }
 
-  async getMe(userId: string) {
-    const user = await this.prisma.db.user.findUnique({
-      where: { id: userId },
-      select: {
-        id: true,
-        username: true,
-        email: true,
-        isActive: true,
-        role: { select: { name: true } },
-      },
-    });
+  async getMe(userId: string): Promise<UserProfile> {
+    const user = await this.users.findProfileById(userId);
 
     if (!user || !user.isActive) {
       throw new UnauthorizedException();
@@ -220,32 +205,19 @@ export class AuthService {
     return user;
   }
 
-  async updateMe(userId: string, body: UpdateProfileDto) {
+  async updateMe(userId: string, body: UpdateProfileDto): Promise<UserProfile> {
     const username = body.username.trim();
     const email = body.email.trim().toLowerCase();
-    const duplicate = await this.prisma.db.user.findFirst({
-      where: {
-        id: { not: userId },
-        OR: [{ username }, { email }],
-      },
-      select: { id: true },
-    });
 
-    if (duplicate) {
+    const duplicateId = await this.users.findOtherIdByUsernameOrEmail(userId, {
+      username,
+      email,
+    });
+    if (duplicateId) {
       throw new ConflictException('Username or email already exists');
     }
 
-    return this.prisma.db.user.update({
-      where: { id: userId },
-      data: { username, email },
-      select: {
-        id: true,
-        username: true,
-        email: true,
-        isActive: true,
-        role: { select: { name: true } },
-      },
-    });
+    return this.users.updateProfile(userId, { username, email });
   }
 
   async changePassword(
@@ -253,36 +225,24 @@ export class AuthService {
     sessionId: string | undefined,
     body: ChangePasswordDto,
   ): Promise<void> {
-    const user = await this.prisma.db.user.findUnique({
-      where: { id: userId },
-      select: { password: true },
-    });
+    const passwordHash = await this.users.findPasswordHashById(userId);
 
-    if (!user || !(await bcrypt.compare(body.currentPassword, user.password))) {
+    if (
+      !passwordHash ||
+      !(await bcrypt.compare(body.currentPassword, passwordHash))
+    ) {
       throw new BadRequestException('Current password is incorrect');
     }
 
-    if (await bcrypt.compare(body.newPassword, user.password)) {
+    if (await bcrypt.compare(body.newPassword, passwordHash)) {
       throw new BadRequestException('New password must be different');
     }
 
-    const updatePassword = this.prisma.db.user.update({
-      where: { id: userId },
-      data: { password: await bcrypt.hash(body.newPassword, 10) },
-    });
-
-    if (!sessionId) {
-      await updatePassword;
-      return;
-    }
-
-    await this.prisma.db.$transaction([
-      updatePassword,
-      this.prisma.db.session.updateMany({
-        where: { userId, id: { not: sessionId }, revokeAt: null },
-        data: { revokeAt: new Date() },
-      }),
-    ]);
+    await this.users.changePassword(
+      userId,
+      await bcrypt.hash(body.newPassword, PASSWORD_HASH_ROUNDS),
+      sessionId,
+    );
   }
 
   private async createTokenPair(
