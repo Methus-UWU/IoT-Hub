@@ -1,0 +1,10 @@
+# Dependencies and build output belong to the sub-projects, which carry their
+# own .gitignore files.
+node_modules/
+dist/
+.env
+.env.local
+
+# OS and editor
+.DS_Store
+Thumbs.db
