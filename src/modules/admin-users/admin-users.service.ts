@@ -108,18 +108,17 @@ export class AdminUsersService {
 
     const shouldRevokeSessions =
       body.status === 'suspended' || passwordHash !== undefined;
-    const updated =
-      shouldRevokeSessions
-        ? (
-            await this.prisma.db.$transaction([
-              updateUser,
-              this.prisma.db.session.updateMany({
-                where: { userId: id, revokeAt: null },
-                data: { revokeAt: new Date() },
-              }),
-            ])
-          )[0]
-        : await updateUser;
+    const updated = shouldRevokeSessions
+      ? (
+          await this.prisma.db.$transaction([
+            updateUser,
+            this.prisma.db.session.updateMany({
+              where: { userId: id, revokeAt: null },
+              data: { revokeAt: new Date() },
+            }),
+          ])
+        )[0]
+      : await updateUser;
 
     return this.serialize(updated);
   }

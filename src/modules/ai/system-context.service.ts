@@ -1,16 +1,17 @@
 import { Injectable } from '@nestjs/common';
-import {
-  cpus,
-  freemem,
-  hostname,
-  loadavg,
-  platform,
-  totalmem,
-  uptime,
-} from 'node:os';
+import { cpus, freemem, loadavg, totalmem, uptime } from 'node:os';
 
 import { PrismaService } from '../../prisma/prisma.service';
 
+/**
+ * Builds the read-only context attached to admin AI requests.
+ *
+ * Security boundary: the payload is an explicit allowlist of aggregate values,
+ * never a projection of the environment or of any configuration object. Adding a
+ * field here sends it to a third-party provider, so anything identifying the host
+ * or carrying a credential must not be added. `hostname()` and `platform()` were
+ * removed for that reason.
+ */
 @Injectable()
 export class SystemContextService {
   constructor(private readonly prisma: PrismaService) {}
@@ -30,8 +31,6 @@ export class SystemContextService {
       capturedAt: new Date().toISOString(),
       runtime: {
         environment: process.env.NODE_ENV ?? 'development',
-        host: hostname(),
-        platform: platform(),
         cpuCores: cpus().length,
         loadAverage: loadavg().map((value) => Number(value.toFixed(2))),
         systemUptimeSeconds: Math.round(uptime()),

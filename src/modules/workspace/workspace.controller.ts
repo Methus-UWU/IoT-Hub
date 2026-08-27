@@ -10,30 +10,32 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import type { Request } from 'express';
 
+import { THROTTLE_OVERRIDES } from '../../common/config/security.config';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import type { AccessTokenPayload } from '../auth/strategies/jwt.strategy';
 import {
-  BuildWorkspaceDto,
   SaveWorkspaceFileDto,
-  SerialMonitorDto,
-  SerialOutputDto,
   WorkspaceFilePathDto,
 } from './dto/workspace.dto';
-import { WorkspaceAccessGuard } from './workspace-access.guard';
-import { WorkspaceBuildService } from './workspace-build.service';
-import { WorkspaceDeviceService } from './workspace-device.service';
+import { WorkspaceFirmwareService } from './workspace-firmware.service';
 import { WorkspaceService } from './workspace.service';
 
 type AuthenticatedRequest = Request & { user: AccessTokenPayload };
 
+/**
+ * Every route requires a valid access token. Files are additionally scoped to the
+ * authenticated user id, which is the current ownership boundary until the
+ * workspace membership model lands.
+ */
 @Controller('projects/:projectId/workspace')
-@UseGuards(WorkspaceAccessGuard)
+@UseGuards(JwtAuthGuard)
 export class WorkspaceController {
   constructor(
     private readonly workspace: WorkspaceService,
-    private readonly builds: WorkspaceBuildService,
-    private readonly devices: WorkspaceDeviceService,
+    private readonly firmware: WorkspaceFirmwareService,
   ) {}
 
   @Get('files')
@@ -78,55 +80,33 @@ export class WorkspaceController {
 
   @Get('toolchain')
   toolchainStatus() {
-    return this.builds.toolchainStatus();
+    return this.firmware.toolchainStatus();
   }
 
+  @Throttle(THROTTLE_OVERRIDES.build)
   @Post('build')
-  build(
-    @Req() request: AuthenticatedRequest,
-    @Param('projectId') projectId: string,
-    @Body() body: BuildWorkspaceDto,
-  ) {
-    return this.builds.run(request.user.sub, projectId, body.target, body.port);
+  build() {
+    return this.firmware.build();
   }
 
   @Get('devices')
   listDevices() {
-    return this.devices.listDevices();
+    return this.firmware.listDevices();
   }
 
+  @Throttle(THROTTLE_OVERRIDES.build)
   @Post('serial/start')
-  startSerialMonitor(
-    @Req() request: AuthenticatedRequest,
-    @Param('projectId') projectId: string,
-    @Body() body: SerialMonitorDto,
-  ) {
-    return this.devices.startMonitor(
-      request.user.sub,
-      projectId,
-      body.port,
-      body.baud,
-    );
+  startSerialMonitor() {
+    return this.firmware.startMonitor();
   }
 
   @Get('serial/output')
-  serialOutput(
-    @Req() request: AuthenticatedRequest,
-    @Param('projectId') projectId: string,
-    @Query() query: SerialOutputDto,
-  ) {
-    return this.devices.monitorOutput(
-      request.user.sub,
-      projectId,
-      query.cursor,
-    );
+  serialOutput() {
+    return this.firmware.monitorOutput();
   }
 
   @Post('serial/stop')
-  stopSerialMonitor(
-    @Req() request: AuthenticatedRequest,
-    @Param('projectId') projectId: string,
-  ) {
-    return this.devices.stopMonitor(request.user.sub, projectId);
+  stopSerialMonitor() {
+    return this.firmware.stopMonitor();
   }
 }

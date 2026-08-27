@@ -1,16 +1,4 @@
-import {
-  IsIn,
-  IsInt,
-  IsOptional,
-  IsString,
-  Matches,
-  MaxLength,
-  Max,
-  Min,
-} from 'class-validator';
-import { Type } from 'class-transformer';
-
-const DEVICE_PORT_PATTERN = /^[a-zA-Z0-9._:/-]+$/;
+import { IsString, MaxLength } from 'class-validator';
 
 export class WorkspaceFilePathDto {
   @IsString()
@@ -24,34 +12,6 @@ export class SaveWorkspaceFileDto extends WorkspaceFilePathDto {
   content!: string;
 }
 
-export class BuildWorkspaceDto {
-  @IsOptional()
-  @IsIn(['build', 'upload'])
-  target: 'build' | 'upload' = 'build';
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(120)
-  @Matches(DEVICE_PORT_PATTERN)
-  port?: string;
-}
-
-export class SerialMonitorDto {
-  @IsString()
-  @MaxLength(120)
-  @Matches(DEVICE_PORT_PATTERN)
-  port!: string;
-
-  @Type(() => Number)
-  @IsInt()
-  @Min(300)
-  @Max(4_000_000)
-  baud = 115_200;
-}
-
-export class SerialOutputDto {
-  @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  cursor = 0;
-}
+// Build, serial-monitor, and device-port DTOs were removed together with the
+// in-process PlatformIO execution they validated. They return in Phase 4 as the
+// request contract of the isolated build worker.

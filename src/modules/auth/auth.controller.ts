@@ -10,6 +10,12 @@ import {
   UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
+
+import {
+  THROTTLE_OVERRIDES,
+  isProduction,
+} from '../../common/config/security.config';
 import { AuthService } from './auth.service';
 import {
   ChangePasswordDto,
@@ -37,7 +43,11 @@ function refreshCookieOptions(): CookieOptions {
 function refreshCookieBaseOptions(): CookieOptions {
   return {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    // Fails closed: the cookie is Secure unless a developer explicitly opts out
+    // for local HTTP, and production ignores that opt-out entirely. Keying this
+    // off NODE_ENV alone sent refresh tokens in clear text whenever NODE_ENV was
+    // simply unset.
+    secure: isProduction() || process.env.ALLOW_INSECURE_COOKIES !== 'true',
     sameSite: 'lax',
     path: '/api/auth',
   };
@@ -55,6 +65,7 @@ function getRefreshToken(req: Request): string | undefined {
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  @Throttle(THROTTLE_OVERRIDES.auth)
   @Post('login')
   async login(
     @Body() body: LoginDto,
@@ -74,6 +85,7 @@ export class AuthController {
   }
 
   // sign up method: user can register with username, email, password and personal info
+  @Throttle(THROTTLE_OVERRIDES.auth)
   @Post('register')
   async register(@Body() body: SignUpDto) {
     return this.authService.signUp(body);
@@ -87,6 +99,7 @@ export class AuthController {
   }
 
   // refresh token method: user can refresh access token by providing a valid refresh token in cookie, and it will return a new access token and refresh token
+  @Throttle(THROTTLE_OVERRIDES.auth)
   @Post('refresh')
   async refresh(
     @Req() req: Request,
@@ -112,6 +125,7 @@ export class AuthController {
   }
 
   // check exist method: user can check if a username or email already exists in the database, it will return true if exists and false if not
+  @Throttle(THROTTLE_OVERRIDES.auth)
   @Get('availability')
   async checkExists(@Query() body: CheckExistDto) {
     return this.authService.checkExists(body);
@@ -135,6 +149,7 @@ export class AuthController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Throttle(THROTTLE_OVERRIDES.auth)
   @Patch('me/password')
   async changePassword(
     @Req() req: AuthenticatedRequest,
@@ -144,6 +159,7 @@ export class AuthController {
   }
 
   // forgot password method: user can request a password reset by providing their email, it will send a password reset link to the email if the email exists in the database
+  @Throttle(THROTTLE_OVERRIDES.auth)
   @Post('forgot_password')
   async forgotPassword() {
     // return this.authService.forgotPassword(body.email);

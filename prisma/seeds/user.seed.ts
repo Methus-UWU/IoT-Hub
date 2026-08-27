@@ -13,7 +13,12 @@ interface SeedUserSpec {
 }
 
 const SEED_USERS: SeedUserSpec[] = [
-  { key: 'ADMIN', username: 'admin', email: 'admin@localhost', roleName: 'admin' },
+  {
+    key: 'ADMIN',
+    username: 'admin',
+    email: 'admin@localhost',
+    roleName: 'admin',
+  },
   { key: 'USER', username: 'user', email: 'user@localhost', roleName: 'user' },
 ];
 
@@ -47,7 +52,11 @@ function resolveCredentials(spec: SeedUserSpec): {
   }
 
   // url-safe, 24 bytes of entropy — never persisted anywhere except as a bcrypt hash.
-  return { email, password: randomBytes(24).toString('base64url'), generated: true };
+  return {
+    email,
+    password: randomBytes(24).toString('base64url'),
+    generated: true,
+  };
 }
 
 export async function seedUsers(prisma: PrismaClient) {
@@ -62,7 +71,8 @@ export async function seedUsers(prisma: PrismaClient) {
     }
 
     const { email, password, generated } = resolveCredentials(spec);
-    const username = process.env[`SEED_${spec.key}_USERNAME`]?.trim() || spec.username;
+    const username =
+      process.env[`SEED_${spec.key}_USERNAME`]?.trim() || spec.username;
     const existing = await prisma.user.findUnique({
       where: { email },
       select: { id: true },
@@ -75,7 +85,9 @@ export async function seedUsers(prisma: PrismaClient) {
         where: { id: existing.id },
         data: { username, roleId: role.id },
       });
-      console.log(`↺ Seed user ${email} already exists — password left unchanged`);
+      console.log(
+        `↺ Seed user ${email} already exists — password left unchanged`,
+      );
       continue;
     }
 
@@ -92,7 +104,9 @@ export async function seedUsers(prisma: PrismaClient) {
       console.log(
         `✅ Created ${email} with a generated development password: ${password}`,
       );
-      console.log('   Store it now — it is not recoverable and is not written to disk.');
+      console.log(
+        '   Store it now — it is not recoverable and is not written to disk.',
+      );
     } else {
       console.log(`✅ Created ${email} using the configured seed password`);
     }

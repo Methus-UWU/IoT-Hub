@@ -1,6 +1,8 @@
 import { Body, Controller, Get, Post, Res, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import type { Response } from 'express';
 
+import { THROTTLE_OVERRIDES } from '../../common/config/security.config';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { AdminRoleGuard } from '../../common/guards/admin-role.guard';
 import { AiService } from './ai.service';
@@ -16,6 +18,7 @@ export class AiController {
     return this.aiService.listProviders();
   }
 
+  @Throttle(THROTTLE_OVERRIDES.ai)
   @Post('chat')
   chat(
     @Body() body: AiChatDto,
