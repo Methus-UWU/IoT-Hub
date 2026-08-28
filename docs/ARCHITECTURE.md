@@ -436,7 +436,7 @@ workspace produce the same 404, so ids cannot be enumerated.
 | Phase | Status |
 | --- | --- |
 | 4 — Build isolation | **Blocked** on the infrastructure choice in ADR-002 |
-| 5 — Project files and Storage | Ready to start |
+| 5 — Project files and Storage | **Backend complete**; Angular IDE not yet switched over |
 | 6 — Realtime | Ready to start |
 | 7 — Domain migration | Ready to start, beginning with projects |
 
@@ -444,3 +444,44 @@ Workspace files still live on the API filesystem, keyed by user id. That is the 
 piece of the old ownership model and is what Phase 5 replaces with `project_files`
 rows plus Supabase Storage objects, at which point the workspace routes switch from
 "scoped by user id" to a `requireWorkspaceRole` check.
+
+## Phase 5 — backend delivered
+
+Project files are database rows, not paths on the API host. Migration
+`20260828020000_projects_and_project_files` adds `projects` and `project_files` with
+RLS, quota `CHECK` constraints, and a unique `(project_id, path)` index.
+
+Content lives in a `TEXT` column rather than Supabase Storage — see
+`docs/adr/ADR-004-project-file-storage.md`. These are small source files written by
+an autosaving editor, and keeping them in Postgres makes a save one atomic,
+versioned statement instead of a two-phase write that can leave a row pointing at a
+missing object. Storage remains the right home for build artifacts, which arrive
+with Phase 4.
+
+The path-safety layer was carried over **unchanged** into `project-file-path.ts` and
+is now enforced twice: in the service, and again as a database `CHECK` constraint.
+Both were verified against the live database.
+
+Verified end to end over HTTP against Supabase:
+
+| Property | Result |
+| --- | --- |
+| Cross-workspace read | 404 `WORKSPACE_NOT_FOUND` |
+| Project reached through a workspace it does not belong to | 404 `PROJECT_NOT_FOUND` |
+| Unauthenticated request | 401 |
+| Path traversal | 400 `INVALID_FILE_PATH` |
+| Stale write | 409 `FILE_VERSION_CONFLICT` |
+| Batch autosave | saved per file, conflicts reported separately |
+
+### What remains for Phase 5
+
+The Angular IDE still calls the deprecated `/api/projects/:projectId/workspace/*`
+endpoints, which read the API filesystem and scope by user id.
+
+Switching it over is entangled with the projects domain (Phase 7, first item): route
+ids are currently localStorage slugs such as `smart-greenhouse`, and they have to
+become real project UUIDs served by the API before the new endpoints can be called
+at all. `ProjectsApiService` is in place on the client and ready for that work.
+
+The old filesystem endpoints stay until then, per the rule that legacy is removed
+only after its replacement is working — not before.
