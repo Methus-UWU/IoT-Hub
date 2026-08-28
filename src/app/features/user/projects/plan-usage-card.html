@@ -1,0 +1,19 @@
+<aside class="usage-card" aria-labelledby="usage-heading">
+  <div class="usage-header">
+    <div>
+      <h2 id="usage-heading">Free plan usage</h2>
+      <p>Current billing cycle</p>
+    </div>
+    <button type="button">Upgrade</button>
+  </div>
+
+  <div class="usage-metrics">
+    @for (metric of metrics(); track metric.label) {
+      <div class="usage-row">
+        <span class="usage-ring" [style.--usage]="metric.percent + '%'" aria-hidden="true"></span>
+        <span class="usage-label">{{ metric.label }}</span>
+        <span class="usage-value"><strong>{{ metric.value }}</strong><i>/</i>{{ metric.limit }}</span>
+      </div>
+    }
+  </div>
+</aside>
