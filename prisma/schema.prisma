@@ -112,8 +112,9 @@ model Project {
   workspaceId String    @map("workspace_id") @db.Uuid
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
-  files      ProjectFile[]
-  components ProjectComponent[]
+  files       ProjectFile[]
+  components  ProjectComponent[]
+  connections ProjectConnection[]
 
   @@unique([workspaceId, slug])
   @@index([workspaceId])
@@ -214,7 +215,41 @@ model ProjectComponent {
   projectId String  @map("project_id") @db.Uuid
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
+  outgoing ProjectConnection[] @relation("ConnectionFrom")
+  incoming ProjectConnection[] @relation("ConnectionTo")
+
   @@index([projectId])
   @@map("project_components")
+  @@schema("public")
+}
+
+/// A wire between two component pins.
+///
+/// Endpoints are pins, never coordinates, so moving a component preserves its
+/// wires. Only hand-placed bends are stored; the rest of the path is routed at
+/// render time.
+model ProjectConnection {
+  id        String   @id @default(uuid()) @db.Uuid
+  fromPinId String   @map("from_pin_id")
+  toPinId   String   @map("to_pin_id")
+  color     String   @default("#2563eb")
+  kind      String   @default("signal")
+  waypoints Json     @default("[]")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  projectId String  @map("project_id") @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  fromComponentId String           @map("from_component_id") @db.Uuid
+  fromComponent   ProjectComponent @relation("ConnectionFrom", fields: [fromComponentId], references: [id], onDelete: Cascade)
+
+  toComponentId String           @map("to_component_id") @db.Uuid
+  toComponent   ProjectComponent @relation("ConnectionTo", fields: [toComponentId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([fromComponentId])
+  @@index([toComponentId])
+  @@map("project_connections")
   @@schema("public")
 }

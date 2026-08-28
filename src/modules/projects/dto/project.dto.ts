@@ -3,9 +3,11 @@ import {
   ArrayMaxSize,
   ArrayMinSize,
   IsArray,
+  IsIn,
   IsInt,
   IsNumber,
   IsObject,
+  IsUUID,
   Max,
   IsOptional,
   IsString,
@@ -154,4 +156,64 @@ export class UpdateComponentDto {
   @IsOptional()
   @IsObject()
   state?: Record<string, unknown>;
+}
+
+export class ConnectionEndpointDto {
+  @IsUUID()
+  componentId!: string;
+
+  /** Pin name inside the component definition, e.g. 'GPIO23'. */
+  @IsString()
+  @MinLength(1)
+  @MaxLength(64)
+  pinId!: string;
+}
+
+export class WaypointDto {
+  @Type(() => Number)
+  @IsNumber()
+  @Min(-100000)
+  @Max(100000)
+  x!: number;
+
+  @Type(() => Number)
+  @IsNumber()
+  @Min(-100000)
+  @Max(100000)
+  y!: number;
+}
+
+export class CreateConnectionDto {
+  @ValidateNested()
+  @Type(() => ConnectionEndpointDto)
+  from!: ConnectionEndpointDto;
+
+  @ValidateNested()
+  @Type(() => ConnectionEndpointDto)
+  to!: ConnectionEndpointDto;
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^#[0-9a-fA-F]{6}$/)
+  color?: string;
+
+  @IsOptional()
+  @IsIn(['power', 'ground', 'signal'])
+  kind?: 'power' | 'ground' | 'signal';
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(24)
+  @ValidateNested({ each: true })
+  @Type(() => WaypointDto)
+  waypoints?: WaypointDto[];
+}
+
+/** Replaces every manual bend. An empty array resets to automatic routing. */
+export class UpdateWaypointsDto {
+  @IsArray()
+  @ArrayMaxSize(24)
+  @ValidateNested({ each: true })
+  @Type(() => WaypointDto)
+  waypoints!: WaypointDto[];
 }

@@ -20,13 +20,16 @@ import {
 import { AuthorizationService } from '../authorization/authorization.service';
 import {
   CreateComponentDto,
+  CreateConnectionDto,
   CreateProjectDto,
   ProjectFilePathDto,
   SaveProjectFileDto,
   SaveProjectFilesDto,
   UpdateComponentDto,
+  UpdateWaypointsDto,
 } from './dto/project.dto';
 import { ProjectComponentsService } from './project-components.service';
+import { ProjectConnectionsService } from './project-connections.service';
 import { ProjectFilesService } from './project-files.service';
 import { ProjectsService } from './projects.service';
 
@@ -48,6 +51,7 @@ export class ProjectsController {
     private readonly projects: ProjectsService,
     private readonly files: ProjectFilesService,
     private readonly components: ProjectComponentsService,
+    private readonly connections: ProjectConnectionsService,
     private readonly authorization: AuthorizationService,
   ) {}
 
@@ -222,6 +226,78 @@ export class ProjectsController {
     );
     await this.projects.requireInWorkspace(workspaceId, projectId);
     await this.components.remove(projectId, componentId);
+    return { deleted: true };
+  }
+
+  // ----------------------------------------------------------- connections
+
+  @Get(':projectId/connections')
+  async listConnections(
+    @Req() request: AuthenticatedRequest,
+    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+  ) {
+    await this.authorization.requireWorkspaceRole(
+      request.user.id,
+      workspaceId,
+      'viewer',
+    );
+    await this.projects.requireInWorkspace(workspaceId, projectId);
+    return this.connections.list(projectId);
+  }
+
+  @Post(':projectId/connections')
+  async addConnection(
+    @Req() request: AuthenticatedRequest,
+    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Body() body: CreateConnectionDto,
+  ) {
+    await this.authorization.requireWorkspaceRole(
+      request.user.id,
+      workspaceId,
+      'editor',
+    );
+    await this.projects.requireInWorkspace(workspaceId, projectId);
+    return this.connections.add(request.user.id, projectId, body);
+  }
+
+  /** Manual bend points. An empty array resets the wire to automatic routing. */
+  @Patch(':projectId/connections/:connectionId')
+  async updateConnection(
+    @Req() request: AuthenticatedRequest,
+    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('connectionId', ParseUUIDPipe) connectionId: string,
+    @Body() body: UpdateWaypointsDto,
+  ) {
+    await this.authorization.requireWorkspaceRole(
+      request.user.id,
+      workspaceId,
+      'editor',
+    );
+    await this.projects.requireInWorkspace(workspaceId, projectId);
+    return this.connections.setWaypoints(
+      projectId,
+      connectionId,
+      body.waypoints,
+    );
+  }
+
+  @Delete(':projectId/connections/:connectionId')
+  async removeConnection(
+    @Req() request: AuthenticatedRequest,
+    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('connectionId', ParseUUIDPipe) connectionId: string,
+  ) {
+    await this.authorization.requireWorkspaceRole(
+      request.user.id,
+      workspaceId,
+      'editor',
+    );
+    await this.projects.requireInWorkspace(workspaceId, projectId);
+    await this.connections.remove(projectId, connectionId);
     return { deleted: true };
   }
 

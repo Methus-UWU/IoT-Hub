@@ -163,3 +163,56 @@ export abstract class ProjectComponentRepository {
     board: CreateComponentInput,
   ): Promise<{ project: Project; component: ProjectComponent }>;
 }
+
+export interface ConnectionEndpoint {
+  componentId: string;
+  pinId: string;
+}
+
+export interface ProjectConnection {
+  id: string;
+  from: ConnectionEndpoint;
+  to: ConnectionEndpoint;
+  color: string;
+  kind: 'power' | 'ground' | 'signal';
+  /** Hand-placed bends only; the router computes the rest of the path. */
+  waypoints: { x: number; y: number }[];
+}
+
+export interface CreateConnectionInput {
+  from: ConnectionEndpoint;
+  to: ConnectionEndpoint;
+  color?: string;
+  kind?: 'power' | 'ground' | 'signal';
+  waypoints?: { x: number; y: number }[];
+}
+
+export abstract class ProjectConnectionRepository {
+  abstract list(projectId: string): Promise<ProjectConnection[]>;
+
+  abstract count(projectId: string): Promise<number>;
+
+  abstract create(
+    projectId: string,
+    input: CreateConnectionInput,
+  ): Promise<ProjectConnection>;
+
+  /** Replaces the manual bend points of one wire. */
+  abstract updateWaypoints(
+    projectId: string,
+    connectionId: string,
+    waypoints: { x: number; y: number }[],
+  ): Promise<ProjectConnection | null>;
+
+  abstract delete(projectId: string, connectionId: string): Promise<boolean>;
+
+  /**
+   * True when both endpoints name components that exist in this project.
+   * Checked before insert so a wire cannot be created against another project's
+   * component id.
+   */
+  abstract endpointsBelongToProject(
+    projectId: string,
+    componentIds: readonly string[],
+  ): Promise<boolean>;
+}
