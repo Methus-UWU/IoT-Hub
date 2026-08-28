@@ -3,6 +3,7 @@ import { firstValueFrom } from 'rxjs';
 
 import {
   ProjectsApiService,
+  ProjectUsageReport,
   RemoteComponent,
 } from '../../../../../core/services/projects-api.service';
 import { WorkspaceContextService } from '../../../../../core/services/workspace-context.service';
@@ -65,6 +66,13 @@ export class ProjectCanvasService {
     string,
     { x?: number; y?: number; rotation?: number }
   >();
+
+  /** Device and connection counts against the plan, for the toolbar. */
+  async usage(projectId: string): Promise<ProjectUsageReport | null> {
+    const workspaceId = await this.workspaceId();
+    if (!workspaceId) return null;
+    return firstValueFrom(this.api.projectUsage(workspaceId, projectId));
+  }
 
   async load(projectId: string): Promise<CanvasComponent[]> {
     const workspaceId = await this.workspaceId();

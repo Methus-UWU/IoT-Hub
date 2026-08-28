@@ -169,6 +169,12 @@
       <span>Status</span
       ><strong>{{ simulationRunning() ? 'Simulation online' : 'Ready to simulate' }}</strong>
     </div>
+    @for (metric of projectUsage(); track metric.label) {
+      <div>
+        <span>{{ metric.label }}</span>
+        <strong>{{ metric.used }} / {{ metric.unlimited ? '∞' : metric.limit }}</strong>
+      </div>
+    }
     <div class="wire-mode-cell">
       <span>Wires</span>
       <button

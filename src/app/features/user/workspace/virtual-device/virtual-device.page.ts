@@ -232,6 +232,10 @@ export class VirtualDevicePage {
   protected readonly usesPersistedLayout = signal(false);
   /** Plan refusal from the server, shown instead of the device silently vanishing. */
   protected readonly componentLimitMessage = signal<string | null>(null);
+  /** Live plan usage for this project, refreshed after the layout is written. */
+  protected readonly projectUsage = signal<
+    readonly { label: string; used: number; limit: number; unlimited: boolean }[]
+  >([]);
   /**
    * Wire-edit mode.
    *
@@ -667,6 +671,7 @@ export class VirtualDevicePage {
       if (instances.length === 0) return;
 
       this.usesPersistedLayout.set(true);
+      void this.refreshUsage();
       this.deviceInstances.set(instances);
       this.placements.set(placements);
       this.deviceStates.set(states);
@@ -1803,6 +1808,26 @@ export class VirtualDevicePage {
     return instance.instanceId;
   }
 
+  /** Reads the plan counts. Display only — the API still decides every write. */
+  private async refreshUsage(): Promise<void> {
+    const projectId = this.persistedProjectId;
+    if (!projectId) return;
+
+    try {
+      const report = await this.canvasPersistence.usage(projectId);
+      this.projectUsage.set(
+        report?.metrics.map((metric) => ({
+          label: metric.label,
+          used: metric.used,
+          limit: metric.limit,
+          unlimited: metric.unlimited,
+        })) ?? [],
+      );
+    } catch {
+      this.projectUsage.set([]);
+    }
+  }
+
   private async persistNewComponent(
     localId: string,
     definitionId: DeviceKind,
@@ -1816,7 +1841,10 @@ export class VirtualDevicePage {
         x: origin.x,
         y: origin.y,
       });
-      if (created) this.adoptServerId(localId, created.id);
+      if (created) {
+        this.adoptServerId(localId, created.id);
+        void this.refreshUsage();
+      }
     } catch (error) {
       const refusal = asComponentLimitRefusal(error);
       this.componentLimitMessage.set(

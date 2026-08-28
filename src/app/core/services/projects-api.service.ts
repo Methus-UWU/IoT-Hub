@@ -36,6 +36,21 @@ export interface RemoteComponent {
   state: Record<string, unknown>;
 }
 
+export interface UsageMetricDto {
+  key: string;
+  label: string;
+  used: number;
+  limit: number;
+  unlimited: boolean;
+  percent: number;
+  unit?: string;
+}
+
+export interface ProjectUsageReport {
+  plan: { code: string; name: string };
+  metrics: UsageMetricDto[];
+}
+
 export interface RemoteProject {
   id: string;
   workspaceId: string;
@@ -102,6 +117,16 @@ export class ProjectsApiService {
   /** Boards a project can start from. One list, served by the backend. */
   listBoards(): Observable<BoardDefinition[]> {
     return this.http.get<BoardDefinition[]>(`${environment.apiUrl}boards`);
+  }
+
+  /** Device and connection counts against the plan's per-project ceilings. */
+  projectUsage(
+    workspaceId: string,
+    projectId: string,
+  ): Observable<ProjectUsageReport> {
+    return this.http.get<ProjectUsageReport>(
+      `${this.projectUrl(workspaceId, projectId)}/usage`,
+    );
   }
 
   listComponents(
