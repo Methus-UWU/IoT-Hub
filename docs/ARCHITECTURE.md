@@ -436,9 +436,9 @@ workspace produce the same 404, so ids cannot be enumerated.
 | Phase | Status |
 | --- | --- |
 | 4 — Build isolation | **Blocked** on the infrastructure choice in ADR-002 |
-| 5 — Project files and Storage | **Backend complete**; Angular IDE not yet switched over |
-| 6 — Realtime | Ready to start |
-| 7 — Domain migration | Ready to start, beginning with projects |
+| 5 — Project files and Storage | Backend complete; Angular IDE not yet switched over |
+| 6 — Realtime | Not started |
+| 7 — Domain migration | Projects, components, and connections done; other domains not started |
 
 Workspace files still live on the API filesystem, keyed by user id. That is the last
 piece of the old ownership model and is what Phase 5 replaces with `project_files`

@@ -220,3 +220,68 @@ confirm the id exists.
 `/api/projects/:projectId/workspace/*` still serves files from the API filesystem
 and is scoped by user id rather than by workspace membership. It is superseded by
 the endpoints above and is removed once the Angular IDE is switched over.
+
+---
+
+# Project Canvas Endpoints (2026-08-28)
+
+## Plan and usage
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| GET | `/api/me/usage` | Account usage: projects, storage, build minutes, AI credits |
+| GET | `/api/workspaces/:wid/projects/:pid/usage` | Devices and connections against the per-project ceilings |
+| GET | `/api/boards` | Boards a project can be created with |
+
+Usage endpoints are **display only**. A limit is enforced by the refusal on the
+write it guards, never by the client having read a number first.
+
+## Components
+
+| Method | Path | Required role |
+| --- | --- | --- |
+| GET | `/api/workspaces/:wid/projects/:pid/components` | `viewer` |
+| POST | `/api/workspaces/:wid/projects/:pid/components` | `editor` |
+| PATCH | `/api/workspaces/:wid/projects/:pid/components/:cid` | `editor` |
+| DELETE | `/api/workspaces/:wid/projects/:pid/components/:cid` | `editor` |
+
+`POST` accepts `{ definitionId, label?, x?, y?, rotation?, state? }`. Omitting the
+position lets the server choose a free grid cell instead of stacking every new
+component at the same coordinates.
+
+`definitionId` names a catalog entry in the frontend — the definition describes
+what an ESP32 is, the row describes where one sits in a project. It is not a
+foreign key, because the catalog is code rather than a table.
+
+## Connections
+
+| Method | Path | Required role |
+| --- | --- | --- |
+| GET | `/api/workspaces/:wid/projects/:pid/connections` | `viewer` |
+| POST | `/api/workspaces/:wid/projects/:pid/connections` | `editor` |
+| PATCH | `/api/workspaces/:wid/projects/:pid/connections/:cid` | `editor` |
+| DELETE | `/api/workspaces/:wid/projects/:pid/connections/:cid` | `editor` |
+
+`POST` accepts `{ from: { componentId, pinId }, to: { componentId, pinId },
+color?, kind?, waypoints? }`.
+
+Endpoints are pins, never coordinates, so moving a component preserves its wires.
+`A → B` and `B → A` are the same connection: the unique index orders the pair
+before comparing, which is what an electrical node actually is.
+
+`PATCH` replaces the manual bend points. **An empty array resets the wire to
+automatic routing** — only hand-placed bends are stored, and the rest of the path
+is computed at render time so a routing improvement reaches existing projects.
+
+Deleting a component cascades to its wires, so a connection never points at a
+component that no longer exists.
+
+### Additional error codes
+
+`COMPONENT_LIMIT_REACHED`, `CONNECTION_LIMIT_REACHED`, `COMPONENT_NOT_FOUND`,
+`CONNECTION_NOT_FOUND`, `CONNECTION_ALREADY_EXISTS`, `CONNECTION_SELF_LOOP`,
+`BOARD_NOT_FOUND`, `TOO_MANY_WAYPOINTS`, `INVALID_WAYPOINT`,
+`SUBSCRIPTION_MISSING`.
+
+Limit refusals carry `limit`, `used`, and `planCode` alongside the message, so the
+client can explain the ceiling instead of failing generically.
