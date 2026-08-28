@@ -346,8 +346,8 @@ Updated 2026-08-28.
 | --- | --- |
 | 0 — Security containment | **Complete** |
 | 1 — Data access foundation | **Complete** |
-| 2 — Supabase foundation | **Blocked** — no Supabase project exists; hosting model undecided (ADR-003 D1) |
-| 3 — Authentication and authorization | **Blocked** — account migration strategy undecided (ADR-003 D2) |
+| 2 — Supabase foundation | **Complete** — Supabase Cloud; config boundary, schema, and RLS in place |
+| 3 — Authentication and authorization | **Complete** — Supabase Auth with email, Google, GitHub; database-resolved authorization |
 | 4 — Build isolation | **Blocked** — isolation mechanism undecided (ADR-002) |
 | 5 — Project files and Storage | Not started; depends on Phase 2 |
 | 6 — Realtime | Not started; depends on Phase 2 |
@@ -406,3 +406,41 @@ The error envelope from `docs/API.md` **is** implemented, in the global exceptio
 filter. The success envelope (`{ data, meta }`) is not yet applied, because changing
 response shapes without versioning would break the frontend immediately; it belongs
 with item 1.
+
+## Phase 2 — delivered
+
+Supabase Cloud is the platform. `SupabaseConfig` is the single configuration
+boundary and distinguishes the browser-safe publishable key from the RLS-bypassing
+secret key, which only `SupabaseAdminService` holds. Migration
+`20260828000000_supabase_auth_and_workspaces` adds the workspace ownership model,
+RLS policies, and the sign-up trigger as raw SQL inside a Prisma migration, keeping
+one migration history as ADR-001 requires.
+
+## Phase 3 — delivered
+
+Authentication is Supabase Auth (email/password, Google, GitHub). The platform holds
+no password, issues no token, and tracks no session.
+
+Authorization stayed in NestJS and became centralized. `AuthorizationService` is the
+only place a role is compared, and every answer is read from the database rather
+than from a token claim, so a demotion or suspension takes effect on the next
+request. `SupabaseAuthGuard` establishes identity and deliberately grants nothing —
+a forged `role` claim is ignored, and a test asserts it.
+
+Ownership is now explicit: `workspaces` and `workspace_members`, with roles
+`owner | admin | developer | editor | viewer`. A non-member and a non-existent
+workspace produce the same 404, so ids cannot be enumerated.
+
+## Remaining phases
+
+| Phase | Status |
+| --- | --- |
+| 4 — Build isolation | **Blocked** on the infrastructure choice in ADR-002 |
+| 5 — Project files and Storage | Ready to start |
+| 6 — Realtime | Ready to start |
+| 7 — Domain migration | Ready to start, beginning with projects |
+
+Workspace files still live on the API filesystem, keyed by user id. That is the last
+piece of the old ownership model and is what Phase 5 replaces with `project_files`
+rows plus Supabase Storage objects, at which point the workspace routes switch from
+"scoped by user id" to a `requireWorkspaceRole` check.

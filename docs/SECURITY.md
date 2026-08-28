@@ -282,3 +282,70 @@ These cannot be performed from the repository and are the operator's responsibil
 | Expired and revoked sessions are never purged | Phase 3 |
 | `GET /api/admin/users` is unpaginated | Phase 7 |
 | No anti-CSRF token beyond `SameSite=Lax` | Phase 3 |
+
+---
+
+# Supabase Auth Cutover (Phases 2–3)
+
+Updated 2026-08-28. Decisions and rationale: `docs/adr/ADR-003-supabase-auth-migration.md`.
+
+## What changed
+
+The platform no longer stores passwords, issues tokens, or tracks sessions. The
+`sessions` table and `users.password` are dropped by migration
+`20260828000000_supabase_auth_and_workspaces`, and `public.users` becomes a profile
+row keyed by `auth.users.id`.
+
+| Control | Where it now lives |
+| --- | --- |
+| Registration, login, logout, refresh | Supabase Auth, called from Angular |
+| Email verification, password reset, MFA | Supabase Auth |
+| Google and GitHub sign-in | Supabase Auth (PKCE) |
+| Token verification | `SupabaseAuthGuard`, against the project JWKS |
+| Platform admin check | `AuthorizationService.requirePlatformAdmin`, from the database |
+| Workspace permission | `AuthorizationService.requireWorkspaceRole`, from the database |
+| Account suspension | Supabase ban **and** the `is_active` profile flag |
+| RLS | Enabled on `users`, `workspaces`, `workspace_members`, `roles` |
+
+Findings closed by this cutover: A1, A2, A4, A5, A6, A7, A9, S11, S12, S13, and A3
+(Turnstile removed rather than left as a decorative control).
+
+## Secret handling
+
+| Key | Holder | Rule |
+| --- | --- | --- |
+| `SUPABASE_PUBLISHABLE_KEY` (anon) | Angular bundle and API | Browser-safe. Grants nothing on its own; RLS decides what its bearer may read |
+| `SUPABASE_SECRET_KEY` (service_role) | API only, inside `SupabaseAdminService` | **Bypasses RLS.** Never in Angular, never logged, never in a build worker's environment |
+
+`SupabaseAdminService` is the only holder of the secret key in the API. Privileged
+operations go through named methods on it rather than through clients constructed at
+call sites, so there is one file to audit.
+
+## Setup required before this runs
+
+1. **Supabase Dashboard → Project Settings → API**: copy the publishable key into
+   `src/environments/environment*.ts` (`supabasePublishableKey`) together with
+   `supabaseUrl`, and the secret key into the backend `SUPABASE_SECRET_KEY`.
+2. **Dashboard → Connect → ORMs**: point `DATABASE_URL` at the Supabase session
+   pooler, then run `npx prisma migrate deploy`.
+3. **Dashboard → Authentication → Providers**: enable Google and GitHub, and set each
+   provider's callback to `https://<project-ref>.supabase.co/auth/v1/callback`.
+4. **Dashboard → Authentication → URL Configuration**: add `<app-origin>/auth/callback`
+   to the redirect allowlist.
+5. **Dashboard → Authentication → Attack Protection**: enable CAPTCHA. This replaces
+   the removed Turnstile widget, whose token was never verified by anything.
+6. **Grant the first administrator** after signing up:
+   `UPDATE users SET role_id = (SELECT id FROM roles WHERE name = 'admin') WHERE email = '<address>';`
+
+Until steps 1 and 2 are done the API starts and logs which keys are missing, and
+every authenticated route answers `503 AUTH_NOT_CONFIGURED` — it fails closed rather
+than open.
+
+## Superseded manual actions
+
+`JWT_ACCESS_SECRET` and `JWT_REFRESH_SECRET` are no longer read by any code and can
+be deleted from the environment; the platform issues no tokens. The earlier
+instruction to change the password on `admin1` and `user1` is also moot under the
+start-clean decision, **provided the legacy local database is never exposed** — it
+still contains those accounts with the leaked password. Drop that database, or
+change the passwords in it, once nothing depends on it.

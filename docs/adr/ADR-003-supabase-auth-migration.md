@@ -1,6 +1,6 @@
 # ADR-003: Supabase Auth Adoption and Existing Account Migration
 
-- Status: **Proposed — blocked on decisions by the platform owner**
+- Status: **Accepted** (decided 2026-08-28 by the platform owner; implemented)
 - Date: 2026-08-28
 - Related: `docs/SECURITY.md`, `docs/ARCHITECTURE.md` (Phase 3), `docs/LEGACY_AUDIT.md` (Q2, Q7)
 
@@ -36,7 +36,7 @@ option is chosen.
 
 ## Decisions Required
 
-### D1. Hosting model
+### D1. Hosting model — DECIDED: Supabase Cloud
 
 Supabase Cloud or self-hosted Supabase. This affects cost, RLS operations,
 connection pooling behaviour (PgBouncer transaction mode breaks prepared
@@ -44,7 +44,7 @@ statements), where build workers run, and who holds the service-role key. No
 Supabase project exists yet — the current database is plain PostgreSQL with only
 `public`, and none of Supabase's `auth`, `storage`, or `realtime` schemas.
 
-### D2. Existing account migration
+### D2. Existing account migration — DECIDED: Option C, start clean
 
 | Option | Description | Consequence |
 | --- | --- | --- |
@@ -57,7 +57,7 @@ throwaway, in which case C. bcrypt hashes can in principle be imported into
 `auth.users.encrypted_password`, but doing so would carry the leaked password
 forward for `admin1` and `user1`, so a forced reset is the right call either way.
 
-### D3. Role and membership model at cutover
+### D3. Role and membership model at cutover — DECIDED: both, see below
 
 The current model is one `role_id` per user with two roles. The target is workspace
 membership with `owner | admin | developer | editor | viewer`. Whether the platform
@@ -110,3 +110,72 @@ Per the workspace authorization model in the migration brief:
 Blocked. Phase 3 cannot start until D1 and D2 are answered, because both change what
 the schema and the cutover script must do, and getting them wrong risks locking a
 real administrator out of a live system.
+
+---
+
+# Decision Record (2026-08-28)
+
+The platform owner answered the open questions:
+
+- **D1 — Hosting: Supabase Cloud.** A project already exists; `SUPABASE_URL` is set
+  in the backend environment.
+- **D2 — Accounts: start clean (Option C).** The three accounts in the legacy local
+  database are throwaway test users created to reach the admin console. They are not
+  migrated. The legacy PostgreSQL database is left untouched rather than deleted, so
+  the decision remains reversible.
+- **D3 — Roles: both models coexist.** The platform `admin` role on `users.role_id`
+  continues to gate the admin console. Workspace membership governs everything a
+  user owns. They answer different questions and are evaluated by the same service.
+- **Sign-in methods: email/password, Google, and GitHub.**
+
+## As Implemented
+
+| Concern | Owner |
+| --- | --- |
+| Registration, login, logout, session refresh | Supabase Auth, called directly from Angular |
+| Email verification, password reset, MFA | Supabase Auth |
+| OAuth with Google and GitHub | Supabase Auth (PKCE), returning to `/auth/callback` |
+| Token verification | NestJS `SupabaseAuthGuard`, via the project JWKS |
+| Platform and workspace authorization | NestJS `AuthorizationService`, resolved from the database |
+| Profile record, roles, workspaces | `public` schema, owned by this application |
+
+### Key design points
+
+**No signing secret in the API.** Tokens are verified against the project's
+published JWKS rather than a shared secret, so leaking the API's configuration
+cannot be used to mint a token. `jose` caches and rotates the key set.
+
+**The guard grants nothing.** `SupabaseAuthGuard` establishes identity and reads no
+role. A forged `role` claim in a token is ignored, and there is a test for exactly
+that. Every privilege comes from `AuthorizationService`, which reads the database on
+each call — so a demotion or suspension takes effect on the next request rather than
+at the next token refresh, closing audit finding S11.
+
+**Not-a-member and does-not-exist are the same answer.** `requireWorkspaceRole`
+raises 404 in both cases, so error codes cannot be used to enumerate workspace ids.
+
+**Profiles are created by the database, not the application.** The
+`on_auth_user_created` trigger creates the profile row and a personal workspace in
+the same transaction as the `auth.users` insert, whichever provider was used. A
+half-initialised account is therefore not a state the application has to repair.
+
+**Suspension is applied in both systems, banning first.** The profile flag stops
+this API immediately; the Supabase ban stops the session being refreshed and blocks
+Storage and Realtime. Ban first, so a Supabase failure cannot leave a suspension
+half-applied in the permissive direction.
+
+**Password change re-authenticates.** Supabase's `updateUser()` accepts a new
+password on the strength of the session alone, which would let a hijacked session
+take over an account silently. The client re-signs in with the current password
+first. Accounts created through Google or GitHub have no password to verify and are
+directed to the reset flow.
+
+**Cloudflare Turnstile was removed, not preserved.** Its token was sent to the API
+and never verified, and sign-in no longer passes through the API at all. Bot
+protection belongs in Supabase under Authentication → Attack Protection, where it is
+enforced. Leaving the widget in place would have implied a control that did not
+exist.
+
+**No cookie handling remains.** The refresh cookie, `cookie-parser`, and the
+`ALLOW_INSECURE_COOKIES` switch are gone with the tokens they carried, which also
+retires audit findings S12 and S13.
