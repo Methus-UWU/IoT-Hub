@@ -197,3 +197,37 @@ Known schema issues to address in the Phase 2 migration:
   constraint meaningless and it costs an index. Drop it additively.
 - Expired and revoked sessions are never purged. Needs a retention job.
 - No `updated_at` on `sessions`.
+
+## Applied to Supabase (2026-08-28)
+
+Three migrations applied to the Supabase Cloud project via the session pooler
+(port 5432 — the transaction pooler on 6543 cannot run Prisma migrations).
+
+Verified after applying:
+
+- RLS enabled on `users`, `workspaces`, `workspace_members`, `roles`, with 8 policies.
+- Triggers live on `auth.users`: `on_auth_user_created`, `on_auth_user_email_changed`.
+- `users.id → auth.users.id` foreign key present, `users.password` gone.
+- Roles `admin` and `user` seeded.
+- Sign-up trigger tested end to end inside a rolled-back transaction: profile and
+  personal workspace created with the member as `owner`, username derived from OAuth
+  metadata, email change mirrored onto the profile.
+
+### Defect found and fixed during that test
+
+`workspaces.owner_id` was `ON DELETE RESTRICT` while `users.id` cascaded from
+`auth.users`. Because the sign-up trigger gives every user a personal workspace,
+**deleting any account failed** — from the API, the Supabase admin API, and the
+dashboard alike.
+
+Cascading workspaces would have been worse: a shared workspace would have been
+destroyed along with its owner, taking other members' work with it.
+
+Migration `20260828010000_workspace_owner_succession` adds a `BEFORE DELETE` trigger
+on `public.users` that settles ownership first — handing each owned workspace to its
+most senior remaining member, or deleting it when there is none. The `RESTRICT`
+constraint stays as a safety net that should now never fire.
+
+Both paths are covered by the rolled-back verification: a sole-member workspace is
+removed with its owner; a shared workspace survives and its editor is promoted to
+owner.
