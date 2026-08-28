@@ -51,6 +51,15 @@ export interface ProjectUsageReport {
   metrics: UsageMetricDto[];
 }
 
+export interface RemoteConnection {
+  id: string;
+  from: { componentId: string; pinId: string };
+  to: { componentId: string; pinId: string };
+  color: string;
+  kind: 'power' | 'ground' | 'signal';
+  waypoints: { x: number; y: number }[];
+}
+
 export interface RemoteProject {
   id: string;
   workspaceId: string;
@@ -185,6 +194,55 @@ export class ProjectsApiService {
     );
   }
 
+  listConnections(
+    workspaceId: string,
+    projectId: string,
+  ): Observable<RemoteConnection[]> {
+    return this.http.get<RemoteConnection[]>(
+      this.connectionsUrl(workspaceId, projectId),
+    );
+  }
+
+  addConnection(
+    workspaceId: string,
+    projectId: string,
+    body: {
+      from: { componentId: string; pinId: string };
+      to: { componentId: string; pinId: string };
+      color?: string;
+      kind?: 'power' | 'ground' | 'signal';
+      waypoints?: { x: number; y: number }[];
+    },
+  ): Observable<RemoteConnection> {
+    return this.http.post<RemoteConnection>(
+      this.connectionsUrl(workspaceId, projectId),
+      body,
+    );
+  }
+
+  /** Replaces every manual bend. An empty array resets to automatic routing. */
+  updateConnectionWaypoints(
+    workspaceId: string,
+    projectId: string,
+    connectionId: string,
+    waypoints: { x: number; y: number }[],
+  ): Observable<RemoteConnection> {
+    return this.http.patch<RemoteConnection>(
+      this.connectionUrl(workspaceId, projectId, connectionId),
+      { waypoints },
+    );
+  }
+
+  deleteConnection(
+    workspaceId: string,
+    projectId: string,
+    connectionId: string,
+  ): Observable<{ deleted: true }> {
+    return this.http.delete<{ deleted: true }>(
+      this.connectionUrl(workspaceId, projectId, connectionId),
+    );
+  }
+
   listProjects(workspaceId: string): Observable<RemoteProject[]> {
     return this.http.get<RemoteProject[]>(this.projectsUrl(workspaceId));
   }
@@ -267,6 +325,22 @@ export class ProjectsApiService {
     return this.http.delete<{ path: string; deleted: true }>(
       `${this.projectUrl(workspaceId, projectId)}/file`,
       { params: new HttpParams().set('path', path) },
+    );
+  }
+
+  private connectionsUrl(workspaceId: string, projectId: string): string {
+    return this.projectUrl(workspaceId, projectId) + '/connections';
+  }
+
+  private connectionUrl(
+    workspaceId: string,
+    projectId: string,
+    connectionId: string,
+  ): string {
+    return (
+      this.connectionsUrl(workspaceId, projectId) +
+      '/' +
+      encodeURIComponent(connectionId)
     );
   }
 

@@ -117,11 +117,21 @@ function simplify(points: readonly Point[]): Point[] {
     const previous = result[index - 1];
     const current = result[index];
     const next = result[index + 1];
-    const collinear =
-      (previous.x === current.x && current.x === next.x) ||
-      (previous.y === current.y && current.y === next.y);
 
-    if (collinear) result.splice(index, 1);
+    // A point is redundant only when the path passes straight *through* it.
+    // Three points can share a coordinate while the path doubles back — a pin
+    // that must exit upward before descending, for example — and dropping the
+    // middle one there would erase the stub and send the wire straight through
+    // whatever the detour existed to avoid.
+    const onVertical = previous.x === current.x && current.x === next.x;
+    const onHorizontal = previous.y === current.y && current.y === next.y;
+    const passesThrough = onVertical
+      ? (current.y - previous.y) * (next.y - current.y) > 0
+      : onHorizontal
+        ? (current.x - previous.x) * (next.x - current.x) > 0
+        : false;
+
+    if (passesThrough) result.splice(index, 1);
     else index++;
   }
 

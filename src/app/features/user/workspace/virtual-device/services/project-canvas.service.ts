@@ -40,6 +40,11 @@ export function asComponentLimitRefusal(
   };
 }
 
+/** Namespaces a connection in the shared timer map, away from component ids. */
+function wireKey(connectionId: string): string {
+  return `wire:${connectionId}`;
+}
+
 /** How long a drag must settle before the move is written. */
 const SAVE_DEBOUNCE_MS = 400;
 
@@ -65,6 +70,10 @@ export class ProjectCanvasService {
   private readonly pendingPatches = new Map<
     string,
     { x?: number; y?: number; rotation?: number }
+  >();
+  private readonly pendingWaypoints = new Map<
+    string,
+    { x: number; y: number }[]
   >();
 
   /** Device and connection counts against the plan, for the toolbar. */
@@ -140,6 +149,108 @@ export class ProjectCanvasService {
     await Promise.all(ids.map((id) => this.flush(projectId, id)));
   }
 
+  async loadConnections(projectId: string): Promise<CanvasConnection[]> {
+    const workspaceId = await this.workspaceId();
+    if (!workspaceId) return [];
+
+    const remote = await firstValueFrom(
+      this.api.listConnections(workspaceId, projectId),
+    );
+    return remote.map((connection) => ({
+      id: connection.id,
+      from: connection.from,
+      to: connection.to,
+      color: connection.color,
+      kind: connection.kind,
+      waypoints: connection.waypoints,
+    }));
+  }
+
+  async addConnection(
+    projectId: string,
+    input: Omit<CanvasConnection, 'id'>,
+  ): Promise<CanvasConnection | null> {
+    const workspaceId = await this.workspaceId();
+    if (!workspaceId) return null;
+
+    const created = await firstValueFrom(
+      this.api.addConnection(workspaceId, projectId, input),
+    );
+    return {
+      id: created.id,
+      from: created.from,
+      to: created.to,
+      color: created.color,
+      kind: created.kind,
+      waypoints: created.waypoints,
+    };
+  }
+
+  /**
+   * Queues a bend-point change.
+   *
+   * Dragging a bend emits a position every frame, exactly like moving a
+   * component, so it shares the same debounce rather than writing each frame.
+   */
+  queueWaypoints(
+    projectId: string,
+    connectionId: string,
+    waypoints: { x: number; y: number }[],
+  ): void {
+    const key = wireKey(connectionId);
+    this.pendingWaypoints.set(connectionId, waypoints);
+
+    const existing = this.pendingSaves.get(key);
+    if (existing) clearTimeout(existing);
+
+    this.pendingSaves.set(
+      key,
+      setTimeout(() => {
+        void this.flushWaypoints(projectId, connectionId);
+      }, SAVE_DEBOUNCE_MS),
+    );
+  }
+
+  async removeConnection(
+    projectId: string,
+    connectionId: string,
+  ): Promise<void> {
+    const key = wireKey(connectionId);
+    const timer = this.pendingSaves.get(key);
+    if (timer) clearTimeout(timer);
+    this.pendingSaves.delete(key);
+    this.pendingWaypoints.delete(connectionId);
+
+    const workspaceId = await this.workspaceId();
+    if (!workspaceId) return;
+
+    await firstValueFrom(
+      this.api.deleteConnection(workspaceId, projectId, connectionId),
+    );
+  }
+
+  private async flushWaypoints(
+    projectId: string,
+    connectionId: string,
+  ): Promise<void> {
+    const waypoints = this.pendingWaypoints.get(connectionId);
+    this.pendingWaypoints.delete(connectionId);
+    this.pendingSaves.delete(wireKey(connectionId));
+    if (!waypoints) return;
+
+    const workspaceId = await this.workspaceId();
+    if (!workspaceId) return;
+
+    await firstValueFrom(
+      this.api.updateConnectionWaypoints(
+        workspaceId,
+        projectId,
+        connectionId,
+        waypoints,
+      ),
+    );
+  }
+
   async remove(projectId: string, componentId: string): Promise<void> {
     // Drop any queued move first: writing a position for a component that is
     // about to be deleted would fail and log a spurious error.
@@ -188,5 +299,30 @@ function toCanvasComponent(remote: RemoteComponent): CanvasComponent {
     y: remote.y,
     rotation: remote.rotation,
     state: remote.state,
+  };
+}
+
+export interface CanvasConnection {
+  /** Server id, used directly as the wire id on the canvas. */
+  id: string;
+  from: { componentId: string; pinId: string };
+  to: { componentId: string; pinId: string };
+  color: string;
+  kind: 'power' | 'ground' | 'signal';
+  waypoints: { x: number; y: number }[];
+}
+
+/** Raised when the plan's per-project connection ceiling refuses a wire. */
+export function asConnectionLimitRefusal(
+  error: unknown,
+): ComponentLimitRefusal | null {
+  const body = (error as { error?: { error?: Record<string, unknown> } })?.error
+    ?.error;
+  if (!body || body['code'] !== 'CONNECTION_LIMIT_REACHED') return null;
+
+  return {
+    message: typeof body['message'] === 'string' ? body['message'] : '',
+    limit: typeof body['limit'] === 'number' ? body['limit'] : 0,
+    used: typeof body['used'] === 'number' ? body['used'] : 0,
   };
 }

@@ -28,6 +28,8 @@ import {
 import {
   ProjectCanvasService,
   asComponentLimitRefusal,
+  asConnectionLimitRefusal,
+  type CanvasConnection,
 } from './services/project-canvas.service';
 import {
   BOARD_PINS,
@@ -675,7 +677,7 @@ export class VirtualDevicePage {
       this.deviceInstances.set(instances);
       this.placements.set(placements);
       this.deviceStates.set(states);
-      this.connections.set([]);
+      await this.restorePersistedConnections(projectId, new Set(Object.keys(placements)));
     } catch {
       this.layoutLoadFailed.set(true);
     }
@@ -1546,6 +1548,13 @@ export class VirtualDevicePage {
         this.removeWiresAndPruneJunctions(this.connections(), new Set([wireId])),
       );
       this.selectedWireId.set(null);
+      const projectId = this.persistedProjectId;
+      if (projectId) {
+        void this.canvasPersistence
+          .removeConnection(projectId, wireId)
+          .then(() => this.refreshUsage())
+          .catch(() => undefined);
+      }
       return;
     }
     const deviceId = this.selectedDeviceId();
@@ -1808,6 +1817,138 @@ export class VirtualDevicePage {
     return instance.instanceId;
   }
 
+  /**
+   * Restores the project's wires.
+   *
+   * A wire whose component was skipped — because its definition is not in this
+   * build — is skipped too, so the canvas never holds a wire pointing at a part
+   * it cannot draw.
+   */
+  private async restorePersistedConnections(
+    projectId: string,
+    knownComponentIds: ReadonlySet<string>,
+  ): Promise<void> {
+    const stored = await this.canvasPersistence.loadConnections(projectId);
+
+    const restored = stored
+      .filter(
+        (connection) =>
+          knownComponentIds.has(connection.from.componentId) &&
+          knownComponentIds.has(connection.to.componentId),
+      )
+      .map((connection) => ({
+        id: connection.id,
+        start: {
+          type: 'device' as const,
+          deviceId: connection.from.componentId,
+          pinId: connection.from.pinId,
+        },
+        end: {
+          type: 'device' as const,
+          deviceId: connection.to.componentId,
+          pinId: connection.to.pinId,
+        },
+        waypoints: connection.waypoints.map((point) => ({ ...point })),
+        color: connection.color,
+        kind: connection.kind,
+      }));
+
+    this.connections.set(restored);
+  }
+
+  /**
+   * Maps a canvas endpoint onto the stored form.
+   *
+   * Only device pins can be stored: the fixed demo board and junctions have no
+   * rows behind them, so a wire touching either is kept on the canvas but not
+   * written. Returning null is how the caller learns that.
+   */
+  private storableEndpoint(
+    endpoint: WireEndpoint,
+  ): { componentId: string; pinId: string } | null {
+    return endpoint.type === 'device'
+      ? { componentId: endpoint.deviceId, pinId: endpoint.pinId }
+      : null;
+  }
+
+  private async persistNewConnection(
+    connection: WireConnection,
+  ): Promise<void> {
+    const projectId = this.persistedProjectId;
+    if (!projectId) return;
+
+    const from = this.storableEndpoint(connection.start);
+    const to = this.storableEndpoint(connection.end);
+    if (!from || !to) {
+      this.componentLimitMessage.set(
+        'This wire is not saved: junction taps are not stored yet.',
+      );
+      return;
+    }
+
+    try {
+      const created = await this.canvasPersistence.addConnection(projectId, {
+        from,
+        to,
+        color: connection.color,
+        kind: connection.kind,
+        waypoints: connection.waypoints
+          .filter((waypoint) => !waypoint.junctionId)
+          .map((waypoint) => ({ x: waypoint.x, y: waypoint.y })),
+      } as Omit<CanvasConnection, 'id'>);
+
+      if (created) {
+        this.adoptConnectionId(connection.id, created.id);
+        void this.refreshUsage();
+      }
+    } catch (error) {
+      const refusal = asConnectionLimitRefusal(error);
+      this.componentLimitMessage.set(
+        refusal ? refusal.message : 'Could not save this connection',
+      );
+      // Drop it rather than leaving a wire the project does not contain.
+      this.connections.update((connections) =>
+        connections.filter((wire) => wire.id !== connection.id),
+      );
+      if (this.selectedWireId() === connection.id) this.selectedWireId.set(null);
+    }
+  }
+
+  /**
+   * Queues the wire's bends for writing.
+   *
+   * Read after the signal update on the next tick, so the queued set is the one
+   * the user actually sees rather than the value from before the edit.
+   */
+  private queueWaypointSave(wireId: string): void {
+    const projectId = this.persistedProjectId;
+    if (!projectId) return;
+
+    queueMicrotask(() => {
+      const wire = this.connections().find((item) => item.id === wireId);
+      if (!wire) return;
+
+      this.canvasPersistence.queueWaypoints(
+        projectId,
+        wireId,
+        wire.waypoints
+          .filter((waypoint) => !waypoint.junctionId)
+          .map((waypoint) => ({ x: waypoint.x, y: waypoint.y })),
+      );
+    });
+  }
+
+  /** Re-keys a new wire onto the id the server assigned. */
+  private adoptConnectionId(localId: string, serverId: string): void {
+    if (localId === serverId) return;
+    this.connections.update((connections) =>
+      connections.map((wire) =>
+        wire.id === localId ? { ...wire, id: serverId } : wire,
+      ),
+    );
+    if (this.selectedWireId() === localId) this.selectedWireId.set(serverId);
+  }
+
   /** Reads the plan counts. Display only — the API still decides every write. */
   private async refreshUsage(): Promise<void> {
     const projectId = this.persistedProjectId;
@@ -2052,6 +2193,9 @@ export class VirtualDevicePage {
     this.selectedDeviceId.set(null);
     this.boardSelected.set(false);
     this.inspectorOpen.set(true);
+
+    // The wire is on the canvas already; the write swaps in the server's id.
+    void this.persistNewConnection(connection);
   }
 
   private connectionSource(connection: WireConnection): Point | null {
@@ -2102,6 +2246,7 @@ export class VirtualDevicePage {
       });
       return;
     }
+    this.queueWaypointSave(wireId);
     this.connections.update((connections) =>
       connections.map((wire) =>
         wire.id === wireId
