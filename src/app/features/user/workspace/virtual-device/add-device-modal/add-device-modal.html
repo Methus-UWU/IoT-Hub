@@ -1,0 +1,242 @@
+<div class="modal-overlay" role="presentation" (pointerdown)="onBackdropPointerDown($event)">
+  <section
+    #dialog
+    class="add-device-modal"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="add-device-title"
+    aria-describedby="add-device-subtitle"
+    (keydown)="onDialogKeydown($event)"
+  >
+    <header class="modal-header">
+      <div class="modal-title">
+        <h2 id="add-device-title">เพิ่มอุปกรณ์</h2>
+        <p id="add-device-subtitle">เลือกอุปกรณ์ที่ต้องการวางบนพื้นที่ทำงาน</p>
+      </div>
+      <button
+        type="button"
+        class="close-button"
+        aria-label="ปิดหน้าต่างเพิ่มอุปกรณ์"
+        (click)="closeDialog()"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="m6.5 6.5 11 11M17.5 6.5l-11 11"></path>
+        </svg>
+      </button>
+    </header>
+
+    <div class="filter-row">
+      <div class="search-field">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="11" cy="11" r="6.5"></circle>
+          <path d="m16 16 4 4"></path>
+        </svg>
+        <label class="sr-only" for="add-device-search">ค้นหาอุปกรณ์</label>
+        <input
+          #searchInput
+          id="add-device-search"
+          type="search"
+          autocomplete="off"
+          placeholder="ค้นหาชื่อ รุ่น หรือหมวดหมู่"
+          [value]="query()"
+          (input)="updateQuery($event)"
+        />
+        @if (query()) {
+          <button type="button" aria-label="ล้างคำค้นหา" (click)="clearQuery()">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m7 7 10 10M17 7 7 17"></path>
+            </svg>
+          </button>
+        }
+      </div>
+
+      <div class="quick-filters" role="group" aria-label="ตัวกรองอุปกรณ์">
+        @for (filter of quickFilters; track filter.id) {
+          <button
+            type="button"
+            class="category-chip"
+            [class.category-chip-active]="activeFilter() === filter.id"
+            [attr.aria-pressed]="activeFilter() === filter.id"
+            (click)="selectFilter(filter.id)"
+          >
+            @if (filter.id === 'favorites') {
+              <svg class="chip-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="m12 3.2 2.7 5.5 6.1.9-4.4 4.3 1 6.1-5.4-2.9L6.6 20l1-6.1-4.4-4.3 6.1-.9L12 3.2Z"
+                ></path>
+              </svg>
+            } @else if (filter.id === 'recently-used') {
+              <svg class="chip-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="8.5"></circle>
+                <path d="M12 7.5V12l3.2 2"></path>
+              </svg>
+            }
+            <span>{{ filter.label }}</span>
+            <small>{{ filterCounts().get(filter.id) ?? 0 }}</small>
+          </button>
+        }
+      </div>
+
+      <app-custom-select
+        class="category-select"
+        ariaLabel="หมวดหมู่อุปกรณ์"
+        [options]="categoryOptions()"
+        [value]="activeCategory()"
+        [compact]="true"
+        [textWeight]="'normal'"
+        [menuWidth]="196"
+        (valueChange)="updateCategory($event)"
+      />
+
+      <p class="result-count" role="status" aria-live="polite" aria-atomic="true">
+        {{ resultAnnouncement() }}
+      </p>
+    </div>
+
+    <div class="modal-body">
+      @if (visibleDevices().length === 0) {
+        <div class="empty-state">
+          <span class="empty-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <circle cx="11" cy="11" r="6.5"></circle>
+              <path d="m16 16 4 4M8.8 11h4.4"></path>
+            </svg>
+          </span>
+          <h3>
+            @if (query().trim()) {
+              ไม่พบอุปกรณ์สำหรับ “{{ query().trim() }}”
+            } @else {
+              ยังไม่มีอุปกรณ์ในหมวดหมู่นี้
+            }
+          </h3>
+          <p>{{ emptyMessage() }}</p>
+          <button type="button" class="ghost-button" (click)="resetLibrary()">
+            ล้างคำค้นหาและตัวกรอง
+          </button>
+        </div>
+      } @else {
+        <ul class="device-grid">
+          @for (device of visibleDevices(); track device.id; let index = $index) {
+            <li class="device-cell">
+              <button
+                type="button"
+                class="device-card"
+                [class.device-card-selected]="selectedQuantity(device.id) > 0"
+                [attr.data-device-card]="device.id"
+                [attr.tabindex]="focusedDevice()?.id === device.id ? 0 : -1"
+                [attr.aria-pressed]="selectedQuantity(device.id) > 0"
+                [attr.aria-label]="
+                  'เลือก ' +
+                  device.name +
+                  ', ' +
+                  device.model +
+                  ', ' +
+                  device.category +
+                  ', ' +
+                  device.pinCount +
+                  ' ขา'
+                "
+                (click)="toggleDeviceSelection(device.id)"
+                (focus)="focusDevice(device.id)"
+                (keydown)="onGridKeydown($event, index, device.id)"
+              >
+                <span class="thumbnail-frame">
+                  <app-device-thumbnail [kind]="device.id" />
+                  @if (selectedQuantity(device.id) > 0) {
+                    <span class="selected-check" aria-hidden="true">
+                      <svg viewBox="0 0 24 24"><path d="m5 12.5 4 4L19 7"></path></svg>
+                    </span>
+                  }
+                </span>
+                <span class="device-copy">
+                  <strong class="device-name">{{ device.name }}</strong>
+                  <span class="device-model">{{ device.model }}</span>
+                  <span class="device-meta">
+                    <span class="device-category">{{ device.category }}</span>
+                    <span class="device-pins">{{ device.pinCount }} ขา</span>
+                  </span>
+                  @if (device.badges.length) {
+                    <span class="device-badges">
+                      @for (badge of device.badges; track badge) {
+                        <span class="device-badge">{{ badge }}</span>
+                      }
+                    </span>
+                  }
+                </span>
+              </button>
+              @if (selectedQuantity(device.id) > 0) {
+                <div class="quantity-stepper" role="group" aria-label="จำนวน {{ device.name }}">
+                  <button
+                    type="button"
+                    [attr.aria-label]="'ลดจำนวน ' + device.name + ' หนึ่งชิ้น'"
+                    (click)="decrementDevice($event, device.id)"
+                  >
+                    −
+                  </button>
+                  <output [attr.aria-label]="'เลือกแล้ว ' + selectedQuantity(device.id) + ' ชิ้น'">
+                    {{ selectedQuantity(device.id) }}
+                  </output>
+                  <button
+                    type="button"
+                    [attr.aria-label]="'เพิ่ม ' + device.name + ' อีกหนึ่งชิ้น'"
+                    (click)="incrementDevice($event, device.id)"
+                  >
+                    +
+                  </button>
+                </div>
+              }
+              <button
+                type="button"
+                class="favorite-button"
+                [class.favorite-button-active]="isFavorite(device.id)"
+                [title]="isFavorite(device.id) ? 'นำออกจากรายการโปรด' : 'เพิ่มในรายการโปรด'"
+                [attr.aria-label]="
+                  (isFavorite(device.id) ? 'นำ ' : 'เพิ่ม ') +
+                  device.name +
+                  (isFavorite(device.id) ? ' ออกจากรายการโปรด' : ' ในรายการโปรด')
+                "
+                [attr.aria-pressed]="isFavorite(device.id)"
+                (click)="toggleFavorite($event, device.id)"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    d="m12 3.2 2.7 5.5 6.1.9-4.4 4.3 1 6.1-5.4-2.9L6.6 20l1-6.1-4.4-4.3 6.1-.9L12 3.2Z"
+                  ></path>
+                </svg>
+              </button>
+            </li>
+          }
+        </ul>
+      }
+    </div>
+
+    <footer class="modal-footer">
+      @if (selectedDevices()[0]; as device) {
+        <div class="footer-summary">
+          <span class="footer-thumb"><app-device-thumbnail [kind]="device.id" /></span>
+          <span class="footer-copy">
+            <strong>
+              @if (selectedDevices().length === 1) {
+                {{ device.name }} × {{ selectedQuantity(device.id) }}
+              } @else {
+                เลือกแล้ว {{ selectedTotal() }} อุปกรณ์
+              }
+            </strong>
+            <small>{{ device.category }} · {{ device.interfaceLabel }}</small>
+          </span>
+        </div>
+        <div class="footer-actions">
+          <p class="footer-hint">อุปกรณ์แต่ละชิ้นจะถูกวางแยกกัน</p>
+          <button type="button" class="primary-button" (click)="addSelectedDevices()">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 5v14M5 12h14"></path>
+            </svg>
+            เพิ่ม {{ selectedTotal() }} อุปกรณ์
+          </button>
+        </div>
+      } @else {
+        <p class="footer-hint">เลือกอุปกรณ์เพื่อดูรายละเอียด</p>
+      }
+    </footer>
+  </section>
+</div>

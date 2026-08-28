@@ -1,0 +1,437 @@
+/*
+ * Canvas-level artwork: the development board, interactive pins and wires.
+ * Per-component illustrations live in device-art/device-art.css so that the
+ * canvas and the Add Device thumbnails always draw the same part.
+ */
+
+.board,
+.hardware,
+.placement-ghost {
+  filter: drop-shadow(0 1px 2px rgb(15 23 42 / 14%));
+}
+
+.board path,
+.board rect,
+.board circle {
+  vector-effect: non-scaling-stroke;
+}
+
+/* ---------- wires ---------- */
+
+.wire {
+  opacity: 0.85;
+  stroke-width: 2.4;
+}
+
+.wire-selected {
+  opacity: 1;
+  stroke-width: 3;
+}
+
+.wire-preview {
+  opacity: 0.82;
+  stroke-dasharray: 8 6;
+  pointer-events: none;
+}
+
+.pending-wire-waypoint {
+  fill: #fff;
+  stroke: #16a34a;
+  stroke-width: 2;
+  pointer-events: none;
+  vector-effect: non-scaling-stroke;
+}
+
+.wire-control-guide {
+  fill: none;
+  stroke: #60a5fa;
+  stroke-width: 1.5;
+  stroke-dasharray: 5 4;
+  opacity: 0.85;
+  pointer-events: none;
+  vector-effect: non-scaling-stroke;
+}
+
+.wire-control {
+  cursor: move;
+  outline: none;
+}
+
+.wire-control-hit {
+  fill: transparent;
+  pointer-events: all;
+}
+
+.wire-control-handle {
+  fill: #fff;
+  stroke: #2563eb;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.wire-control:hover .wire-control-handle,
+.wire-control:focus-visible .wire-control-handle {
+  fill: #dbeafe;
+  stroke: #1d4ed8;
+}
+
+.wire-waypoint-control .wire-control-handle {
+  fill: #dcfce7;
+  stroke: #16a34a;
+}
+
+.wire-waypoint-control:hover .wire-control-handle,
+.wire-waypoint-control:focus-visible .wire-control-handle {
+  fill: #bbf7d0;
+  stroke: #15803d;
+}
+
+/* ---------- ESP32 DevKit board ---------- */
+
+.esp-pcb {
+  fill: #202428;
+  stroke: #101214;
+  stroke-width: 2;
+}
+
+.pin-rail {
+  fill: #171a1d;
+}
+
+.pcb-mount-hole {
+  fill: #f5f5f5;
+  stroke: #52525b;
+  stroke-width: 2;
+}
+
+.esp-module {
+  fill: #30363b;
+  stroke: #171a1d;
+  stroke-width: 2;
+}
+
+.esp-antenna {
+  fill: none;
+  stroke: #687078;
+  stroke-width: 5;
+  stroke-linejoin: round;
+}
+
+.esp-shield {
+  fill: #8f979d;
+  stroke: #5d656b;
+  stroke-width: 2;
+}
+
+.board-title {
+  fill: #fff;
+  font-size: 24px;
+  font-weight: 750;
+}
+
+.board-subtitle,
+.board-silkscreen,
+.runtime-label {
+  fill: #f4f4f5;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.board-subtitle {
+  font-size: 11px;
+}
+
+.runtime-label {
+  font-size: 6px;
+  letter-spacing: 0.04em;
+}
+
+.board-silkscreen {
+  font-size: 6.5px;
+  letter-spacing: 0.05em;
+}
+
+.esp-chip-logo {
+  fill: none;
+  stroke: #697177;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.esp-chip-logo circle {
+  fill: #697177;
+  stroke: none;
+}
+
+.pcb-trace {
+  fill: none;
+  stroke: #3e474d;
+  stroke-width: 2;
+}
+
+.main-chip,
+.small-ic {
+  fill: #252a2e;
+  stroke: #0f1113;
+  stroke-width: 2;
+}
+
+.chip-legs {
+  fill: none;
+  stroke: #a8afb4;
+  stroke-width: 3;
+}
+
+.ic-pin-one {
+  fill: #a8afb4;
+}
+
+.crystal {
+  fill: #a9b0b5;
+  stroke: #646b70;
+  stroke-width: 1.5;
+}
+
+.smd-row {
+  fill: #d6b84a;
+  stroke: none;
+}
+
+.status-led {
+  fill: #71717a;
+  stroke: #3f3f46;
+  stroke-width: 1.5;
+}
+
+.status-led-on {
+  fill: #22c55e;
+  stroke: #15803d;
+}
+
+.board-button rect {
+  fill: #3f464b;
+  stroke: #737b81;
+  stroke-width: 2;
+}
+
+.board-button circle {
+  fill: #17191b;
+  stroke: #090a0b;
+  stroke-width: 2;
+}
+
+.board-button text {
+  fill: #f4f4f5;
+  font-size: 8px;
+  font-weight: 700;
+}
+
+.usb-shell {
+  fill: #c4c9cd;
+  stroke: #737b81;
+  stroke-width: 2;
+}
+
+.usb-mouth {
+  fill: #2a2e31;
+}
+
+.usb-contacts {
+  fill: none;
+  stroke: #d6b84a;
+  stroke-width: 2;
+}
+
+/* ---------- interactive pins ---------- */
+
+/* Keep neighbouring hit targets disjoint. Overlapping targets make the later
+   SVG node steal hover from the pin under the pointer, so labels appear to
+   jump back and forth while crossing a header row. Hit circles never paint. */
+.board-pin-hit,
+.device-pin-hit {
+  fill: transparent;
+  stroke: none;
+  pointer-events: all;
+}
+
+/* ESP32 pin styling remains intentionally unchanged. */
+.board-pin circle.pin-header-base {
+  fill: #8b6817;
+  stroke: #5f4610;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.board-pin circle.pin-contact {
+  fill: #d6aa2f;
+  stroke: #edc85a;
+  stroke-width: 0.65;
+  vector-effect: non-scaling-stroke;
+  transition: fill 120ms ease;
+}
+
+/* Device endpoints are deliberately quieter because declarative artwork
+   already contains its physical headers, leads and breadboard holes. */
+.device-pin .pin-header-base {
+  fill: rgb(17 20 24 / 0.36);
+  stroke: rgb(5 6 7 / 0.46);
+  stroke-width: 0.8;
+  vector-effect: non-scaling-stroke;
+  transition:
+    fill 120ms ease,
+    stroke 120ms ease,
+    opacity 120ms ease;
+}
+
+.device-pin .pin-contact {
+  fill: #9a8050;
+  stroke: none;
+  opacity: 0.72;
+  vector-effect: non-scaling-stroke;
+  transition:
+    fill 120ms ease,
+    opacity 120ms ease;
+}
+
+.board-pin:hover .pin-contact,
+.board-pin:focus-visible .pin-contact,
+.board-pin.pin-connected .pin-contact,
+.device-pin:hover .pin-contact,
+.device-pin:focus-visible .pin-contact {
+  fill: #facc15;
+  opacity: 1;
+}
+
+/* A connected point gets a thin cool ring, never a large yellow beacon. */
+.device-pin.pin-connected .pin-header-base {
+  stroke: #4f8fdc;
+  stroke-width: 1.5;
+}
+
+.device-pin.pin-connected .pin-contact {
+  fill: #7fb0e8;
+  opacity: 1;
+}
+
+.hardware-selected .device-pin.pin-essential .pin-header-base {
+  fill: #171b20;
+  stroke: #6f7882;
+}
+
+.device-pin.pin-pending .pin-header-base {
+  fill: #173c2a;
+  stroke: #22c55e;
+  stroke-width: 2;
+}
+
+.board-pin.pin-pending circle.pin-header-base {
+  fill: #16a34a;
+  stroke: #166534;
+  stroke-width: 2.5;
+}
+
+/* Legal targets become clear only during an active wiring operation. */
+.device-pin.pin-compatible .pin-header-base {
+  fill: #163a29;
+  stroke: #4ade80;
+  stroke-width: 1.75;
+}
+
+.device-pin.pin-compatible .pin-contact {
+  fill: #86efac;
+  opacity: 1;
+}
+
+.board-pin-compatible circle.pin-header-base {
+  fill: #14532d;
+  stroke: #22c55e;
+  stroke-width: 2;
+}
+
+.board-pin-compatible circle.pin-contact {
+  fill: #86efac;
+}
+
+/* Selecting a wire reveals only its two electrical endpoints. */
+.device-pin.pin-wire-selected .pin-header-base,
+.board-pin.pin-wire-selected .pin-header-base {
+  fill: #ecfdf5;
+  stroke: #16a34a;
+  stroke-width: 2;
+  opacity: 1;
+}
+
+.device-pin.pin-wire-selected .pin-contact,
+.board-pin.pin-wire-selected .pin-contact {
+  fill: #22c55e;
+  stroke: #15803d;
+  stroke-width: 0.6;
+  opacity: 1;
+}
+
+/* Connection dots stay out of the finished diagram. They appear only while a
+   wire is being created or while the exact pin is hovered/focused. The larger
+   transparent hit target remains interactive at all times. */
+.circuit-canvas:not(.wiring-active)
+  .device-pin:not(.pin-wire-selected):not(:hover):not(:focus-visible)
+  .pin-header-base,
+.circuit-canvas:not(.wiring-active)
+  .device-pin:not(.pin-wire-selected):not(:hover):not(:focus-visible)
+  .pin-contact {
+  opacity: 0;
+}
+
+.board-pin text {
+  fill: #fff;
+  stroke: #202428;
+  stroke-width: 1.6px;
+  paint-order: stroke fill;
+  font-size: 7px;
+  font-weight: 700;
+  pointer-events: none;
+  vector-effect: non-scaling-stroke;
+}
+
+/* Progressive disclosure: no pin-name wallpaper at rest. On selection only
+   power/ground/reset and pins on small parts remain; hover always reveals the
+   exact target. */
+.device-pin .pin-label {
+  fill: #f8fafc;
+  stroke: #161a1f;
+  stroke-width: 2.5px;
+  paint-order: stroke fill;
+  font-family: 'SFMono-Regular', 'Consolas', monospace;
+  font-size: 7.5px;
+  font-weight: 700;
+  opacity: 0;
+  pointer-events: none;
+  vector-effect: non-scaling-stroke;
+}
+
+.hardware-selected .pin-essential .pin-label,
+.device-pin:hover .pin-label,
+.device-pin:focus-visible .pin-label,
+.pin-pending .pin-label {
+  opacity: 0.92;
+}
+
+.device-pin.pin-wire-selected .pin-label {
+  fill: #15803d;
+  stroke: #f8fafc;
+  stroke-width: 3px;
+  opacity: 1;
+}
+
+/* Hardware with PCB silkscreen labels does not need the outlined canvas label. */
+.device-pin.pin-art-only .pin-label {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .board-pin circle.pin-contact,
+  .device-pin .pin-contact {
+    transition: none;
+  }
+}

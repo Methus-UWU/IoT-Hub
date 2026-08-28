@@ -1,0 +1,1195 @@
+<div class="simulator-editor">
+  <header class="editor-topbar">
+    <div class="topbar-tools">
+      <button
+        type="button"
+        class="nav-start"
+        [class.nav-start-running]="simulationRunning()"
+        [attr.aria-pressed]="simulationRunning()"
+        (click)="toggleSimulation()"
+      >
+        <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+          @if (simulationRunning()) {
+            <rect x="5" y="5" width="10" height="10" rx="1.5" fill="currentColor" />
+          } @else {
+            <path d="m7 4.7 8.3 5.3L7 15.3V4.7Z" fill="currentColor" />
+          }
+        </svg>
+        <span>{{ simulationRunning() ? 'Stop' : 'Start' }}</span>
+      </button>
+      <button
+        #addPartTrigger
+        type="button"
+        class="nav-action"
+        aria-label="Add a device"
+        aria-haspopup="dialog"
+        [attr.aria-expanded]="partsOpen()"
+        title="Add device (A)"
+        (click)="toggleParts($event)"
+      >
+        <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+          <path
+            d="M10 4v12M4 10h12"
+            stroke="currentColor"
+            stroke-width="1.7"
+            stroke-linecap="round"
+          />
+        </svg>
+        <span>Add device</span>
+      </button>
+      <button
+        type="button"
+        [disabled]="!selectedDeviceId()"
+        aria-label="Rotate selected part"
+        title="Rotate (R)"
+        (click)="rotateSelected()"
+      >
+        <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+          <path
+            d="M15.4 8A6 6 0 1 0 16 12m-.6-4V4m0 4h-4"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
+      </button>
+      <button
+        type="button"
+        [disabled]="!selectedDeviceId() && !selectedWireId()"
+        aria-label="Delete selected part or wire"
+        title="Delete"
+        (click)="deleteSelection()"
+      >
+        <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+          <path
+            d="M4.5 6h11M8 3.5h4M6.5 6l.6 10h5.8l.6-10"
+            stroke="currentColor"
+            stroke-width="1.4"
+            stroke-linecap="round"
+          />
+        </svg>
+      </button>
+      <button
+        type="button"
+        [class.tool-active]="showGrid()"
+        [attr.aria-pressed]="showGrid()"
+        aria-label="Toggle grid and snapping"
+        title="Grid and snap (G)"
+        (click)="toggleGrid()"
+      >
+        <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+          <path
+            d="M4 4h12v12H4zM8 4v12m4-12v12M4 8h12M4 12h12"
+            stroke="currentColor"
+            stroke-width="1.1"
+          />
+        </svg>
+      </button>
+      <span class="nav-divider"></span>
+      <button
+        type="button"
+        aria-label="Zoom out"
+        title="Zoom out (Ctrl -)"
+        [disabled]="!canZoomOut()"
+        (click)="zoomOut()"
+      >
+        <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+          <path d="M5 10h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+        </svg>
+      </button>
+      <span class="nav-zoom">{{ (zoom() * 100).toFixed(0) }}%</span>
+      <button
+        type="button"
+        aria-label="Zoom in"
+        title="Zoom in (Ctrl +)"
+        [disabled]="!canZoomIn()"
+        (click)="zoomIn()"
+      >
+        +
+      </button>
+      <button type="button" aria-label="Fit diagram" title="Fit diagram (F)" (click)="fitCanvas()">
+        <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+          <path
+            d="M7 4H4v3m9-3h3v3M7 16H4v-3m9 3h3v-3"
+            stroke="currentColor"
+            stroke-width="1.4"
+            stroke-linecap="round"
+          />
+        </svg>
+      </button>
+      <span class="nav-divider"></span>
+      <button
+        type="button"
+        [class.tool-active]="serialOpen()"
+        aria-label="Toggle serial monitor"
+        title="Serial monitor"
+        (click)="toggleSerial()"
+      >
+        <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+          <path
+            d="m5 6 3 4-3 4m5 0h5"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
+      </button>
+      <button
+        type="button"
+        aria-label="Reset diagram"
+        title="Reset diagram"
+        (click)="resetDiagram()"
+      >
+        <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+          <path
+            d="M15.5 7A6 6 0 1 0 16 12m-.5-5V3m0 4h-4"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <section class="summary-row" aria-label="Virtual device summary">
+    <div>
+      <span>Board</span><strong>{{ project()?.board ?? 'ESP32 DevKit V1' }}</strong>
+    </div>
+    <div>
+      <span>Components</span><strong>{{ visibleDevices().length }} placed</strong>
+    </div>
+    <div>
+      <span>Connections</span><strong>{{ visibleConnections().length }} wires</strong>
+    </div>
+    <div>
+      <span>Status</span
+      ><strong>{{ simulationRunning() ? 'Simulation online' : 'Ready to simulate' }}</strong>
+    </div>
+    <div class="wire-mode-cell">
+      <span>Wires</span>
+      <button
+        type="button"
+        class="wire-mode-toggle"
+        [class.wire-mode-active]="wireEditing()"
+        [attr.aria-pressed]="wireEditing()"
+        title="When off, wires never intercept clicks meant for a device"
+        (click)="toggleWireEditing()"
+      >
+        {{ wireEditing() ? 'Editing wires' : 'Locked' }}
+      </button>
+    </div>
+  </section>
+
+  @if (componentLimitMessage(); as limitMessage) {
+    <div class="canvas-alert" role="alert">
+      <p>{{ limitMessage }}</p>
+      <button type="button" (click)="componentLimitMessage.set(null)">Dismiss</button>
+    </div>
+  }
+  @if (layoutLoadFailed()) {
+    <div class="canvas-alert" role="alert">
+      <p>Could not load the saved layout for this project.</p>
+    </div>
+  }
+
+  <div class="editor-body">
+    <nav class="tool-rail" aria-label="Diagram tools">
+      <div class="parts-heading">
+        <span><small>Components</small><strong>Device list</strong></span>
+        <button
+          type="button"
+          class="add-part-button"
+          aria-label="Add a device"
+          aria-haspopup="dialog"
+          [attr.aria-expanded]="partsOpen()"
+          title="Add device (A)"
+          (click)="toggleParts($event)"
+        >
+          <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <path
+              d="M10 4v12M4 10h12"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+            />
+          </svg>
+        </button>
+      </div>
+      <div class="part-list">
+        @for (device of visibleDevices(); track device.instanceId) {
+          <button
+            type="button"
+            [class.part-active]="selectedDeviceId() === device.instanceId"
+            [attr.aria-pressed]="selectedDeviceId() === device.instanceId"
+            (click)="selectDevice(device.instanceId)"
+          >
+            <span class="part-icon">{{ device.name.slice(0, 2).toUpperCase() }}</span>
+            <span
+              ><strong>{{ device.name }}</strong
+              ><small>{{ device.model }}</small></span
+            >
+            <i aria-hidden="true"></i>
+          </button>
+        }
+      </div>
+      <div class="parts-tools" aria-label="Selected part tools">
+        <button
+          type="button"
+          [disabled]="!selectedDeviceId()"
+          title="Rotate (R)"
+          aria-label="Rotate selected part"
+          (click)="rotateSelected()"
+        >
+          R
+        </button>
+        <button
+          type="button"
+          [class.tool-active]="showGrid()"
+          [attr.aria-pressed]="showGrid()"
+          title="Grid and snap (G)"
+          aria-label="Toggle grid and snapping"
+          (click)="toggleGrid()"
+        >
+          G
+        </button>
+        <button
+          type="button"
+          [disabled]="!selectedDeviceId() && !selectedWireId()"
+          title="Delete"
+          aria-label="Delete selected part or wire"
+          (click)="deleteSelection()"
+        >
+          <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <path
+              d="M4.5 6h11M8 3.5h4M6.5 6l.6 10h5.8l.6-10"
+              stroke="currentColor"
+              stroke-width="1.4"
+              stroke-linecap="round"
+            />
+          </svg>
+        </button>
+      </div>
+      <div class="wire-legend">
+        <strong>Wire colors</strong><span><i class="legend-power"></i>Power</span
+        ><span><i class="legend-ground"></i>Ground</span
+        ><span><i class="legend-signal"></i>Signal</span>
+      </div>
+    </nav>
+
+    <main class="canvas-workspace">
+      <div class="canvas-toolbar">
+        <div>
+          <strong>Wiring canvas</strong
+          ><span>{{ project()?.name ?? 'IoT project' }} - ESP32 layout</span>
+        </div>
+        <span class="verified-chip">
+          <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <path
+              d="m5 10 3 3 7-7"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+          All connections valid
+        </span>
+      </div>
+
+      @if (placingDevice(); as placing) {
+        <div class="wiring-notice" role="status">
+          <span class="pulse-dot"></span>
+          Placing <strong>{{ placing.name }}</strong>
+          <span>Click on the canvas to drop it - Esc to cancel</span>
+        </div>
+      } @else if (pendingPin(); as pending) {
+        <div class="wiring-notice" role="status">
+          <span class="pulse-dot"></span>
+          Wiring from <strong>{{ wireEndpointLabel(pending) }}</strong>
+          <span>
+            Click canvas to add bend ({{ pendingWireWaypoints().length }}), click a compatible pin
+            to finish - Esc to cancel
+          </span>
+        </div>
+      }
+
+      <div
+        #canvasViewport
+        class="canvas-viewport"
+        [class.canvas-panning]="panning()"
+        [class.canvas-placing]="placingDeviceId()"
+        [style.background-image]="gridImage()"
+        [style.background-size]="gridSize()"
+        [style.background-position]="gridPosition()"
+        role="region"
+        tabindex="0"
+        aria-label="Virtual device canvas. Drag to pan, scroll to move, and use Control plus or Control minus to zoom."
+        (pointerdown)="beginCanvasPan($event)"
+        (pointermove)="handleCanvasPointerMove($event)"
+        (keydown)="handleCanvasZoomKeydown($event)"
+        (wheel)="handleCanvasWheel($event)"
+        (auxclick)="$event.preventDefault()"
+      >
+        <svg
+          #canvasSvg
+          class="circuit-canvas"
+          [class.wiring-active]="pendingPin()"
+          [style.transform]="canvasTransform()"
+          viewBox="0 0 1000 720"
+          role="application"
+          aria-label="Interactive ESP32 circuit editor. Select parts to move them and select pins to create wires."
+        >
+          <g class="wire-layer" [class.wire-editing]="wireEditing()">
+            @for (connection of visibleConnections(); track connection.id) {
+              <path
+                class="wire-hit"
+                [attr.d]="wirePath(connection)"
+                (pointerdown)="handleWirePointerDown($event, connection.id)"
+                (dblclick)="addWireBend($event, connection.id)"
+              />
+              @if (wireHighlighted(connection)) {
+                <path class="wire-halo" [attr.d]="wirePath(connection)" />
+              }
+              <path
+                class="wire"
+                [class.wire-selected]="wireHighlighted(connection)"
+                [class.wire-flagged]="wireFlagged(connection.id)"
+                [attr.d]="wirePath(connection)"
+                [style.stroke]="connection.color"
+                (pointerdown)="handleWirePointerDown($event, connection.id)"
+                (dblclick)="addWireBend($event, connection.id)"
+              />
+            }
+            @if (pendingPin()) {
+              <path
+                class="wire wire-preview"
+                [attr.d]="wirePreviewPath()"
+                [style.stroke]="pendingWireColor()"
+              />
+              @for (waypoint of pendingWireWaypoints(); track $index) {
+                <circle
+                  class="pending-wire-waypoint"
+                  [attr.cx]="waypoint.x"
+                  [attr.cy]="waypoint.y"
+                  r="3"
+                />
+              }
+            }
+            @for (junction of junctionPoints(); track junction.id) {
+              <circle
+                class="wire-junction"
+                [class.wire-junction-power]="junction.kind === 'power'"
+                [class.wire-junction-ground]="junction.kind === 'ground'"
+                [class.wire-junction-selected]="junctionOnSelectedWire(junction.id)"
+                [attr.cx]="junction.x"
+                [attr.cy]="junction.y"
+                r="6"
+                role="button"
+                tabindex="0"
+                [attr.aria-label]="'Wire junction ' + junction.id"
+                (pointerdown)="selectJunction($event, junction.id)"
+                (keydown.enter)="selectJunction($event, junction.id)"
+              />
+            }
+          </g>
+
+          <!--
+            The built-in demo board. Hidden once a project's own components are
+            loaded, otherwise the project's saved ESP32 and this fixed one would
+            both be on the canvas.
+          -->
+          @if (!usesPersistedLayout()) {
+          <g
+            class="board hardware"
+            [class.hardware-selected]="boardSelected()"
+            [attr.transform]="boardTransform()"
+            role="group"
+            tabindex="0"
+            aria-label="ESP32 board. Drag or use the arrow keys to move."
+            (pointerdown)="beginBoardDrag($event)"
+            (keydown)="handleBoardKeydown($event)"
+          >
+            <rect class="selection-box" x="406" y="124" width="228" height="458" rx="8" />
+            <rect class="esp-pcb" x="414" y="132" width="212" height="428" rx="11" />
+            <circle class="pcb-mount-hole" cx="443" cy="149" r="3.5" />
+            <circle class="pcb-mount-hole" cx="597" cy="149" r="3.5" />
+            <rect class="pin-rail" x="418" y="157" width="16" height="372" rx="4" />
+            <rect class="pin-rail" x="606" y="157" width="16" height="372" rx="4" />
+
+            <rect class="esp-module" x="450" y="146" width="140" height="166" rx="5" />
+            <path class="esp-antenna" d="M462 164h19v16h19v-16h19v16h19v-16h40v35H462z" />
+            <rect class="esp-shield" x="462" y="196" width="116" height="100" rx="4" />
+            <text x="520" y="236" text-anchor="middle" class="board-title">ESP32</text>
+            <text x="520" y="252" text-anchor="middle" class="board-subtitle">WROOM-32</text>
+            <g class="esp-chip-logo" transform="translate(520 274) scale(.43)">
+              <path d="M-31 19A38 38 0 0 1 18-31" />
+              <path d="M-23 22A30 30 0 0 1 22-23" />
+              <path d="M-14 22A21 21 0 0 1 22-14" />
+              <path d="M-30 20a38 38 0 0 0 49 9" />
+              <circle cx="-14" cy="17" r="5" />
+            </g>
+
+            <path class="pcb-trace" d="M447 334h42v18h62v-18h42M462 472v-36h31M578 472v-38h-31" />
+            <rect class="main-chip" x="486" y="354" width="68" height="64" rx="5" />
+            <path
+              class="chip-legs"
+              d="M482 362h-9m9 12h-9m9 12h-9m9 12h-9m85-36h9m-9 12h9m-9 12h9m-9 12h9"
+            />
+            <circle class="ic-pin-one" cx="497" cy="366" r="2.5" />
+            <rect class="small-ic" x="452" y="386" width="22" height="34" rx="3" />
+            <rect class="small-ic" x="566" y="386" width="22" height="34" rx="3" />
+            <rect class="crystal" x="453" y="438" width="30" height="13" rx="3" />
+            <rect class="crystal" x="557" y="438" width="30" height="13" rx="3" />
+            <path
+              class="smd-row"
+              d="M449 326h11v6h-11zm17 0h11v6h-11zm97 0h11v6h-11zm17 0h11v6h-11zM480 463h10v6h-10zm16 0h10v6h-10zm38 0h10v6h-10zm16 0h10v6h-10z"
+            />
+
+            <g class="board-status">
+              <circle
+                cx="456"
+                cy="358"
+                r="5"
+                [attr.class]="simulationRunning() ? 'status-led status-led-on' : 'status-led'"
+              />
+              <text x="456" y="347" text-anchor="middle" class="runtime-label">
+                {{ simulationRunning() ? 'RUN' : 'STOP' }}
+              </text>
+            </g>
+
+            <g class="board-button">
+              <rect x="449" y="482" width="34" height="34" rx="5" />
+              <circle cx="466" cy="499" r="8" />
+              <text x="466" y="529" text-anchor="middle">EN</text>
+            </g>
+            <g class="board-button">
+              <rect x="557" y="482" width="34" height="34" rx="5" />
+              <circle cx="574" cy="499" r="8" />
+              <text x="574" y="529" text-anchor="middle">BOOT</text>
+            </g>
+
+            <path class="usb-shell" d="M486 512h68v48h-9v14h-50v-14h-9z" />
+            <rect class="usb-mouth" x="496" y="525" width="48" height="27" rx="4" />
+            <path class="usb-contacts" d="M506 525v10m10-10v10m10-10v10m10-10v10" />
+            <text x="520" y="478" text-anchor="middle" class="board-silkscreen">ESP32 DEVKIT</text>
+
+            @for (pin of boardPins; track pin.id) {
+              <g
+                class="board-pin"
+                [class.board-pin-target]="pendingPin()"
+                [class.board-pin-compatible]="boardPinCompatible(pin)"
+                [class.pin-connected]="boardPinConnected(pin.id)"
+                [class.pin-pending]="boardPinPending(pin.id)"
+                [class.pin-wire-selected]="boardPinOnSelectedWire(pin.id)"
+                role="button"
+                tabindex="0"
+                [attr.aria-label]="
+                  'Start or complete a wire at ESP32 ' + pin.label + '. ' + pin.detail
+                "
+                (pointerdown)="selectBoardPin($event, pin.id)"
+                (keydown.enter)="selectBoardPin($event, pin.id)"
+              >
+                <circle class="board-pin-hit" [attr.cx]="pin.x" [attr.cy]="pin.y" r="10" />
+                <circle class="pin-header-base" [attr.cx]="pin.x" [attr.cy]="pin.y" r="6" />
+                <circle class="pin-contact" [attr.cx]="pin.x" [attr.cy]="pin.y" r="4.4" />
+                <text
+                  [attr.x]="boardPinTextX(pin)"
+                  [attr.y]="pin.y"
+                  [attr.transform]="boardPinTextTransform(pin)"
+                  text-anchor="middle"
+                  dominant-baseline="middle"
+                >
+                  {{ boardPinSilkscreen(pin) }}
+                </text>
+                <title>{{ pin.label }} - {{ pin.detail }}</title>
+              </g>
+            }
+          </g>
+          }
+
+          @for (device of visibleDevices(); track device.instanceId) {
+            <g
+              class="hardware"
+              [class.hardware-selected]="selectedDeviceId() === device.instanceId"
+              [class.hardware-flagged]="deviceFlagged(device.instanceId)"
+              [attr.transform]="deviceTransform(device)"
+              role="button"
+              tabindex="0"
+              [attr.aria-label]="
+                device.name + '. Drag freely to move, press R to rotate, Delete to remove.'
+              "
+              (pointerdown)="beginDeviceDrag($event, device.instanceId)"
+              (keydown)="handleDeviceKeydown($event, device.instanceId)"
+            >
+              <rect
+                class="selection-box"
+                x="-8"
+                y="-8"
+                [attr.width]="device.width + 16"
+                [attr.height]="device.height + 16"
+                rx="8"
+              />
+
+              <g
+                appDeviceArt
+                [device]="device"
+                [running]="simulationRunning()"
+                [distance]="distance()"
+                [servoAngle]="servoAngle()"
+                [buttonPressed]="buttonPressedFor(device.instanceId)"
+                [relayStates]="relayStatesFor(device.instanceId)"
+                [state]="deviceStateFor(device.instanceId)"
+                [showCaption]="false"
+                [detail]="canvasDeviceDetail()"
+              ></g>
+
+              <g class="component-hitboxes">
+                @if (device.relayChannels) {
+                  @for (channel of device.relayChannels; track channel; let index = $index) {
+                    @let box = relayBox(device, index);
+                    <rect
+                      class="part-hitbox"
+                      [attr.x]="box.x"
+                      [attr.y]="box.y"
+                      [attr.width]="box.width"
+                      [attr.height]="box.height"
+                      rx="3"
+                      role="button"
+                      tabindex="0"
+                      [attr.aria-label]="'Toggle ' + device.name + ' channel ' + channel"
+                      [attr.aria-pressed]="relayChannelOn(device.instanceId, index)"
+                      (pointerdown)="toggleRelayChannel($event, device.instanceId, index)"
+                      (keydown.enter)="toggleRelayChannel($event, device.instanceId, index)"
+                    />
+                  }
+                }
+                @if (device.id === 'button') {
+                  <circle
+                    class="part-hitbox"
+                    cx="60"
+                    cy="40"
+                    r="23"
+                    role="button"
+                    tabindex="0"
+                    aria-label="Press the push button"
+                    [attr.aria-pressed]="buttonPressedFor(device.instanceId)"
+                    (pointerdown)="pressButton($event, device.instanceId, true)"
+                    (pointerup)="pressButton($event, device.instanceId, false)"
+                    (pointerleave)="pressButton($event, device.instanceId, false)"
+                    (keydown.enter)="toggleButton()"
+                  />
+                }
+              </g>
+
+              <g class="component-pins">
+                @for (pin of device.pins; track pin.name) {
+                  <g
+                    class="device-pin"
+                    [class.pin-essential]="importantDevicePin(device, pin)"
+                    [class.pin-art-only]="
+                      device.printsOwnPinLabels || device.id === 'arduino-uno-r3'
+                    "
+                    [class.relay-input-pin]="device.relayChannels"
+                    [class.lcd-parallel-pin]="device.lcdConfig?.interface === 'parallel'"
+                    [class.lcd-i2c-pin]="device.lcdConfig?.interface === 'i2c'"
+                    [class.pin-connected]="pinConnected(device.instanceId, pin.name)"
+                    [class.pin-pending]="pinPending(device.instanceId, pin.name)"
+                    [class.pin-compatible]="devicePinCompatible(device.instanceId, pin)"
+                    [class.pin-wire-selected]="devicePinOnSelectedWire(device.instanceId, pin.name)"
+                    role="button"
+                    tabindex="0"
+                    [attr.aria-label]="'Pin ' + pin.name"
+                    (pointerdown)="selectDevicePin($event, device.instanceId, pin.name)"
+                    (keydown.enter)="selectDevicePin($event, device.instanceId, pin.name)"
+                  >
+                    <circle
+                      class="device-pin-hit"
+                      [attr.cx]="pin.x"
+                      [attr.cy]="pin.y"
+                      [attr.r]="device.pinHitRadius ?? 9.5"
+                    />
+                    <circle class="pin-header-base" [attr.cx]="pin.x" [attr.cy]="pin.y" r="4.25" />
+                    <circle class="pin-contact" [attr.cx]="pin.x" [attr.cy]="pin.y" r="1.8" />
+                    @if (!(device.printsOwnPinLabels || device.id === 'arduino-uno-r3')) {
+                      <text
+                        class="pin-label"
+                        [attr.x]="
+                          pin.side === 'bottom'
+                            ? pin.x
+                            : device.relayChannels && pin.x === 0
+                              ? pin.x + 76
+                              : pin.x === 0
+                                ? pin.x + 12
+                                : pin.x - 12
+                        "
+                        [attr.y]="pin.side === 'bottom' ? pin.y - 12 : pin.y + 4"
+                        [attr.text-anchor]="
+                          pin.side === 'bottom' ? 'middle' : pin.x === 0 ? 'start' : 'end'
+                        "
+                      >
+                        {{ pin.name }}
+                      </text>
+                    }
+                  </g>
+                }
+              </g>
+
+              @if (selectedDeviceId() === device.instanceId) {
+                <g class="selection-chrome" aria-hidden="true">
+                  <text
+                    class="selection-label"
+                    [attr.x]="device.width / 2"
+                    y="-18"
+                    text-anchor="middle"
+                    [attr.transform]="labelTransform(device)"
+                  >
+                    {{ device.name }}
+                  </text>
+                </g>
+              }
+            </g>
+          }
+
+          @if (placingDevice(); as ghost) {
+            @if (ghostPoint()) {
+              <g class="placement-ghost" [attr.transform]="ghostTransform()" aria-hidden="true">
+                <rect
+                  class="ghost-outline"
+                  x="-8"
+                  y="-8"
+                  [attr.width]="ghost.width + 16"
+                  [attr.height]="ghost.height + 16"
+                  rx="8"
+                />
+                <g appDeviceArt [device]="ghost" [showCaption]="false"></g>
+              </g>
+            }
+          }
+
+          @if (selectedWire(); as wire) {
+            @for (control of wireControlHandles(wire); track control.trackId) {
+              <g
+                class="wire-control"
+                role="button"
+                tabindex="0"
+                [attr.aria-label]="
+                  control.label + '. Drag or use arrow keys to adjust. Double click to remove.'
+                "
+                (pointerdown)="beginWireCurveDrag($event, wire.id, control.waypointIndex)"
+                (keydown)="handleWireControlKeydown($event, wire.id, control.waypointIndex)"
+                (dblclick)="removeWireBend($event, wire.id, control.waypointIndex)"
+              >
+                <circle
+                  class="wire-control-hit"
+                  [attr.cx]="control.x"
+                  [attr.cy]="control.y"
+                  r="16"
+                />
+                <circle
+                  class="wire-control-handle"
+                  [attr.cx]="control.x"
+                  [attr.cy]="control.y"
+                  r="3"
+                />
+              </g>
+            }
+          }
+        </svg>
+
+        @if (canvasEmpty()) {
+          <div class="canvas-empty">
+            <strong>Start building your virtual circuit</strong>
+            <p>Add a device, then click the canvas to drop it next to the board.</p>
+            <button type="button" class="canvas-empty-action" (click)="toggleParts($event)">
+              <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                <path
+                  d="M10 4v12M4 10h12"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                />
+              </svg>
+              Add Device
+            </button>
+          </div>
+        }
+
+        @if (wireIssues().length) {
+          <!-- The dock floats inside the canvas viewport, so its pointer events
+               must not reach the pan/deselect handler underneath it. -->
+          <div
+            class="issue-dock"
+            role="status"
+            aria-live="polite"
+            (pointerdown)="$event.stopPropagation()"
+          >
+            <button
+              type="button"
+              class="issue-dock-toggle"
+              [attr.aria-expanded]="issueDockOpen()"
+              (click)="toggleIssueDock()"
+            >
+              <span class="issue-dock-count">{{ wireIssues().length }}</span>
+              <span>{{ issueSummary() }}</span>
+            </button>
+            @if (issueDockOpen()) {
+              <ul class="issue-dock-list">
+                @for (issue of wireIssues(); track issue.id) {
+                  <li [attr.data-severity]="issue.severity">
+                    <button type="button" (click)="focusIssue(issue)">
+                      <span class="issue-severity">
+                        {{ issueSeverityLabels[issue.severity] }}
+                      </span>
+                      <span>{{ issue.title }}</span>
+                    </button>
+                  </li>
+                }
+              </ul>
+            }
+          </div>
+        }
+      </div>
+
+      <div class="zoom-controls" aria-label="Canvas zoom controls">
+        <button
+          type="button"
+          aria-label="Zoom out"
+          title="Zoom out (Ctrl -)"
+          [disabled]="!canZoomOut()"
+          (click)="zoomOut()"
+        >
+          <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <path d="M5 10h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+          </svg>
+        </button>
+        <span>{{ (zoom() * 100).toFixed(0) }}%</span>
+        <button
+          type="button"
+          aria-label="Zoom in"
+          title="Zoom in (Ctrl +)"
+          [disabled]="!canZoomIn()"
+          (click)="zoomIn()"
+        >
+          +
+        </button>
+        <button
+          type="button"
+          aria-label="Fit diagram"
+          title="Fit diagram (F)"
+          (click)="fitCanvas()"
+        >
+          <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <path
+              d="M7 4H4v3m9-3h3v3M7 16H4v-3m9 3h3v-3"
+              stroke="currentColor"
+              stroke-width="1.4"
+              stroke-linecap="round"
+            />
+          </svg>
+        </button>
+      </div>
+
+      @if (serialOpen()) {
+        <section class="serial-monitor" aria-labelledby="serial-title">
+          <header>
+            <span
+              ><i></i><strong id="serial-title">Serial Monitor</strong
+              ><small>115200 baud</small></span
+            ><button type="button" aria-label="Close serial monitor" (click)="toggleSerial()">
+              <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                <path
+                  d="m5 5 10 10M15 5 5 15"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linecap="round"
+                />
+              </svg>
+            </button>
+          </header>
+          <div class="serial-output" aria-live="polite">
+            <p><span>[00:00.000]</span> ESP32 booting...</p>
+            <p><span>[00:00.184]</span> Initializing I2C, GPIO and PWM</p>
+            @if (simulationRunning()) {
+              <p class="serial-success"><span>[00:01.022]</span> Simulation started successfully</p>
+              <p>
+                <span>[00:02.401]</span> Distance: {{ distance() }} cm - Servo:
+                {{ servoAngle() }} deg - Relay: {{ relayOn() ? 'ON' : 'OFF' }}
+              </p>
+            } @else {
+              <p class="serial-muted">
+                <span>[stopped]</span> Press Start simulation to run firmware
+              </p>
+            }
+          </div>
+        </section>
+      }
+    </main>
+
+    @if (inspectorOpen() && (selectedDeviceId() || selectedWireId())) {
+      <aside class="property-panel" aria-label="Properties">
+        @if (selectedWire(); as wire) {
+          <div class="property-heading">
+            <span><small>Selected</small><strong>Wire connection</strong></span
+            ><button type="button" aria-label="Close inspector" (click)="toggleInspector()">
+              <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                <path
+                  d="m5 5 10 10M15 5 5 15"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linecap="round"
+                />
+              </svg>
+            </button>
+          </div>
+          <div class="wire-property">
+            <span class="wire-preview" [style.background]="wire.color"></span>
+            <p>
+              <strong>{{ wireEndpointLabel(wire.start) }}</strong
+              ><svg viewBox="0 0 24 12" aria-hidden="true">
+                <path
+                  d="M1 6h20m-4-4 4 4-4 4"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.4"
+                /></svg
+              ><strong>{{ wireEndpointLabel(wire.end) }}</strong>
+            </p>
+          </div>
+          <section class="property-section">
+            <h3>Wire color</h3>
+            <div class="color-grid">
+              @for (color of wireColors; track color) {
+                <button
+                  type="button"
+                  [style.background]="color"
+                  [class.color-active]="wire.color === color"
+                  [attr.aria-label]="'Use wire color ' + color"
+                  [attr.aria-pressed]="wire.color === color"
+                  (click)="setWireColor(color)"
+                ></button>
+              }
+            </div>
+          </section>
+          <button type="button" class="danger-button" (click)="deleteSelection()">
+            Delete wire
+          </button>
+        } @else if (selectedDevice(); as selected) {
+          <div class="property-heading">
+            <span
+              ><small>Selected part</small><strong>{{ selected.name }}</strong></span
+            ><button type="button" aria-label="Close inspector" (click)="toggleInspector()">
+              <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                <path
+                  d="m5 5 10 10M15 5 5 15"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linecap="round"
+                />
+              </svg>
+            </button>
+          </div>
+          <div class="part-property">
+            <span>{{ selected.model }}</span
+            ><strong>{{ activeReading() }}</strong>
+            <p>{{ selected.description }}</p>
+          </div>
+
+          @if (selectedDeviceIssues().length) {
+            <section class="property-section wiring-issues" aria-label="Wiring findings">
+              <div class="section-title">
+                <h3>ตรวจพบปัญหาการต่อสาย</h3>
+              </div>
+              @for (issue of selectedDeviceIssues(); track issue.id) {
+                <div class="wiring-issue" [attr.data-severity]="issue.severity">
+                  <p class="issue-head">
+                    <span class="issue-severity">{{ issueSeverityLabels[issue.severity] }}</span>
+                    <strong>{{ issue.title }}</strong>
+                  </p>
+                  <p class="issue-detail">{{ issue.detail }}</p>
+                  <div class="issue-actions">
+                    @if (issue.wireIds.length) {
+                      <button type="button" class="link-button" (click)="revealIssue(issue)">
+                        ดูสายที่เกี่ยวข้อง
+                      </button>
+                    }
+                    <button type="button" class="link-button" (click)="dismissIssue(issue.id)">
+                      ยอมรับและซ่อน
+                    </button>
+                  </div>
+                </div>
+              }
+            </section>
+          }
+
+          @if (selectedProperties().length) {
+            <section class="property-section device-properties">
+              <div class="section-title">
+                <h3>Properties</h3>
+                <button type="button" class="link-button" (click)="resetDeviceProperties()">
+                  Reset
+                </button>
+              </div>
+
+              @for (property of selectedProperties(); track property.id) {
+                <div class="device-property" [class.is-disabled]="propertyDisabled(property)">
+                  <label [attr.id]="'prop-label-' + property.id" [attr.for]="'prop-' + property.id">
+                    {{ property.label }}
+                    @if (property.unit) {
+                      <span class="property-unit">{{ property.unit }}</span>
+                    }
+                  </label>
+
+                  @switch (property.kind) {
+                    @case ('number') {
+                      <div class="property-number">
+                        @if (property.min !== undefined && property.max !== undefined) {
+                          <input
+                            type="range"
+                            [attr.id]="'prop-' + property.id"
+                            [min]="property.min"
+                            [max]="property.max"
+                            [step]="property.step ?? 1"
+                            [value]="propertyNumber(property)"
+                            [disabled]="propertyDisabled(property)"
+                            (input)="updateNumberProperty(property, $event)"
+                          />
+                        }
+                        <input
+                          type="number"
+                          class="property-number-input"
+                          [attr.id]="property.min === undefined ? 'prop-' + property.id : null"
+                          [attr.aria-label]="property.label"
+                          [min]="property.min ?? null"
+                          [max]="property.max ?? null"
+                          [step]="property.step ?? 1"
+                          [value]="propertyNumber(property)"
+                          [disabled]="propertyDisabled(property)"
+                          (change)="updateNumberProperty(property, $event)"
+                        />
+                      </div>
+                    }
+                    @case ('boolean') {
+                      <input
+                        type="checkbox"
+                        class="property-toggle"
+                        [attr.id]="'prop-' + property.id"
+                        [checked]="propertyChecked(property)"
+                        [disabled]="propertyDisabled(property)"
+                        (change)="updateBooleanProperty(property, $event)"
+                      />
+                    }
+                    @case ('select') {
+                      <div
+                        class="property-select"
+                        [class.is-open]="openPropertyDropdownId() === property.id"
+                        (focusout)="closePropertyDropdownOnFocusOut($event, property.id)"
+                        (keydown.escape)="closePropertyDropdownOnEscape($event)"
+                      >
+                        <button
+                          type="button"
+                          class="property-select-trigger"
+                          [attr.id]="'prop-' + property.id"
+                          [disabled]="propertyDisabled(property)"
+                          aria-haspopup="listbox"
+                          [attr.aria-labelledby]="
+                            'prop-label-' + property.id + ' prop-' + property.id
+                          "
+                          [attr.aria-expanded]="openPropertyDropdownId() === property.id"
+                          [attr.aria-controls]="'prop-options-' + property.id"
+                          (click)="togglePropertyDropdown(property.id)"
+                          (keydown.arrowdown)="
+                            openPropertyDropdownFromKeyboard($event, property.id)
+                          "
+                          (keydown.arrowup)="openPropertyDropdownFromKeyboard($event, property.id)"
+                        >
+                          <span class="property-select-value">
+                            @if (propertyColorSwatch(propertyText(property)); as swatch) {
+                              <i class="property-option-swatch" [style.background]="swatch"></i>
+                            }
+                            {{ propertyOptionLabel(property) }}
+                          </span>
+                          <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                            <path
+                              d="m4 6 4 4 4-4"
+                              stroke="currentColor"
+                              stroke-width="1.6"
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                            />
+                          </svg>
+                        </button>
+
+                        @if (openPropertyDropdownId() === property.id) {
+                          <div
+                            class="property-select-options"
+                            [attr.id]="'prop-options-' + property.id"
+                            role="listbox"
+                            [attr.aria-labelledby]="'prop-label-' + property.id"
+                          >
+                            @for (option of property.options ?? []; track option.value) {
+                              <button
+                                type="button"
+                                class="property-select-option"
+                                role="option"
+                                [class.is-selected]="option.value === propertyText(property)"
+                                [attr.aria-selected]="option.value === propertyText(property)"
+                                (click)="choosePropertyOption(property, option.value)"
+                              >
+                                <span>
+                                  @if (propertyColorSwatch(option.value); as swatch) {
+                                    <i
+                                      class="property-option-swatch"
+                                      [style.background]="swatch"
+                                    ></i>
+                                  }
+                                  {{ option.label }}
+                                </span>
+                                @if (option.value === propertyText(property)) {
+                                  <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                                    <path
+                                      d="m3.5 8.2 2.8 2.8 6.2-6.2"
+                                      stroke="currentColor"
+                                      stroke-width="1.7"
+                                      stroke-linecap="round"
+                                      stroke-linejoin="round"
+                                    />
+                                  </svg>
+                                }
+                              </button>
+                            }
+                          </div>
+                        }
+                      </div>
+                    }
+                    @default {
+                      <input
+                        type="text"
+                        [attr.id]="'prop-' + property.id"
+                        [value]="propertyText(property)"
+                        [disabled]="propertyDisabled(property)"
+                        (input)="updateTextProperty(property, $event)"
+                      />
+                    }
+                  }
+
+                  @if (property.description) {
+                    <p class="property-hint">{{ property.description }}</p>
+                  }
+                  @if (propertyDisabled(property)) {
+                    <p class="property-hint">Start the simulation to use this control.</p>
+                  }
+                </div>
+              }
+            </section>
+          }
+          <section class="property-section">
+            <div class="section-title">
+              <h3>Pin connections</h3>
+              <span>{{ selectedConnections().length }}</span>
+            </div>
+            <div class="pin-map">
+              @for (connection of selectedConnections(); track connection.id) {
+                <button type="button" (click)="selectWire($event, connection.id)">
+                  <i [style.background]="connection.color"></i
+                  ><span
+                    ><small>{{ selectedDevicePinLabel(connection) }}</small
+                    ><strong>{{ selectedDeviceTargetLabel(connection) }}</strong></span
+                  >
+                </button>
+              }
+            </div>
+          </section>
+          <section class="property-section">
+            <h3>Simulation controls</h3>
+            @if (selected.id === 'ultrasonic' || selected.lcdConfig) {
+              <label class="range-control"
+                ><span
+                  >Distance <strong>{{ distance() }} cm</strong></span
+                ><input
+                  type="range"
+                  min="2"
+                  max="200"
+                  [value]="distance()"
+                  [disabled]="!simulationRunning()"
+                  (input)="updateDistance($event)"
+              /></label>
+            }
+            @if (selected.id === 'servo') {
+              <label class="range-control"
+                ><span
+                  >Angle <strong>{{ servoAngle() }} deg</strong></span
+                ><input
+                  type="range"
+                  min="0"
+                  max="180"
+                  [value]="servoAngle()"
+                  [disabled]="!simulationRunning()"
+                  (input)="updateServoAngle($event)"
+              /></label>
+            }
+            @if (selected.relayChannels) {
+              <button
+                type="button"
+                class="action-button"
+                [disabled]="!simulationRunning()"
+                (click)="toggleRelay()"
+              >
+                {{ relayOn() ? 'Turn relay off' : 'Turn relay on' }}
+              </button>
+            }
+            @if (selected.id === 'button') {
+              <button type="button" class="action-button" (click)="toggleButton()">
+                {{ buttonPressedFor(selectedDeviceId()) ? 'Release button' : 'Press button' }}
+              </button>
+            }
+          </section>
+          <div class="part-actions">
+            <button type="button" (click)="rotateSelected()">Rotate 90 deg</button
+            ><button type="button" class="danger-text" (click)="deleteSelection()">
+              Delete part
+            </button>
+          </div>
+        } @else {
+          <div class="property-heading">
+            <span><small>Inspector</small><strong>Nothing selected</strong></span
+            ><button type="button" aria-label="Close inspector" (click)="toggleInspector()">
+              <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                <path
+                  d="m5 5 10 10M15 5 5 15"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linecap="round"
+                />
+              </svg>
+            </button>
+          </div>
+          <div class="empty-inspector">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path
+                d="M5 3.5 18 12l-6 1-3 5L5 3.5Z"
+                stroke="currentColor"
+                stroke-width="1.4"
+              /></svg
+            ><strong>Select a part or wire</strong>
+            <p>Click a component to inspect its pins, or click a colored wire to edit it.</p>
+          </div>
+        }
+      </aside>
+    }
+
+    @if (partsOpen()) {
+      <app-add-device-modal
+        [devices]="libraryDevices"
+        [favoriteIds]="favoriteDeviceIds()"
+        [recentIds]="recentDeviceIds()"
+        (closed)="closeParts()"
+        (devicesAdded)="startPlacements($event)"
+        (favoriteToggled)="toggleFavoriteDevice($event)"
+      />
+    }
+  </div>
+</div>
