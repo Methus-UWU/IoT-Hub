@@ -20,6 +20,22 @@ export interface WorkspaceSummary {
   role: WorkspaceRole;
 }
 
+export interface BoardDefinition {
+  id: string;
+  name: string;
+  defaultFramework: string;
+}
+
+export interface RemoteComponent {
+  id: string;
+  definitionId: string;
+  label: string;
+  x: number;
+  y: number;
+  rotation: number;
+  state: Record<string, unknown>;
+}
+
 export interface RemoteProject {
   id: string;
   workspaceId: string;
@@ -83,6 +99,67 @@ export class ProjectsApiService {
     return this.http.get<WorkspaceSummary[]>(`${environment.apiUrl}workspaces`);
   }
 
+  /** Boards a project can start from. One list, served by the backend. */
+  listBoards(): Observable<BoardDefinition[]> {
+    return this.http.get<BoardDefinition[]>(`${environment.apiUrl}boards`);
+  }
+
+  listComponents(
+    workspaceId: string,
+    projectId: string,
+  ): Observable<RemoteComponent[]> {
+    return this.http.get<RemoteComponent[]>(
+      `${this.projectUrl(workspaceId, projectId)}/components`,
+    );
+  }
+
+  /** Omit x and y to let the server place it where nothing is stacked. */
+  addComponent(
+    workspaceId: string,
+    projectId: string,
+    body: {
+      definitionId: string;
+      label?: string;
+      x?: number;
+      y?: number;
+      rotation?: number;
+      state?: Record<string, unknown>;
+    },
+  ): Observable<RemoteComponent> {
+    return this.http.post<RemoteComponent>(
+      `${this.projectUrl(workspaceId, projectId)}/components`,
+      body,
+    );
+  }
+
+  updateComponent(
+    workspaceId: string,
+    projectId: string,
+    componentId: string,
+    body: {
+      label?: string;
+      x?: number;
+      y?: number;
+      rotation?: number;
+      state?: Record<string, unknown>;
+    },
+  ): Observable<RemoteComponent> {
+    return this.http.patch<RemoteComponent>(
+      `${this.projectUrl(workspaceId, projectId)}/components/${encodeURIComponent(componentId)}`,
+      body,
+    );
+  }
+
+  deleteComponent(
+    workspaceId: string,
+    projectId: string,
+    componentId: string,
+  ): Observable<{ deleted: true }> {
+    return this.http.delete<{ deleted: true }>(
+      `${this.projectUrl(workspaceId, projectId)}/components/${encodeURIComponent(componentId)}`,
+    );
+  }
+
   listProjects(workspaceId: string): Observable<RemoteProject[]> {
     return this.http.get<RemoteProject[]>(this.projectsUrl(workspaceId));
   }
@@ -92,7 +169,8 @@ export class ProjectsApiService {
     body: {
       name: string;
       description?: string;
-      board?: string;
+      /** Catalog id; the backend creates this board as the project's first component. */
+      boardId: string;
       framework?: string;
     },
   ): Observable<RemoteProject> {

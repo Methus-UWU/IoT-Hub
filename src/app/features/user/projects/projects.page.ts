@@ -126,7 +126,11 @@ export class ProjectsPage {
       const project = await this.projectStore.create(value);
       this.createDialogOpen.set(false);
       void this.loadUsage();
-      void this.router.navigate(['/user/projects', project.id, 'ide']);
+      void this.router.navigate([
+        '/user/projects',
+        project.id,
+        'virtual-device',
+      ]);
     } catch (error) {
       // The backend owns plan limits, so a refusal arrives here rather than
       // being predicted locally. Surfacing it beats failing silently.

@@ -13,16 +13,22 @@ const EMPTY_PROJECT: NewProjectValue = {
   name: '',
   setupMode: 'ai',
   description: '',
-  board: 'ESP32 DevKit V1',
+  boardId: 'esp32-devkit-v1',
   framework: 'Arduino C++',
   devices: [],
 };
 
 const BOARD_OPTIONS: readonly CustomSelectOption[] = [
-  { value: 'ESP32 DevKit V1', label: 'ESP32 DevKit V1', description: 'เหมาะสำหรับเริ่มต้นและงานต้นแบบ' },
-  { value: 'ESP32-S3', label: 'ESP32-S3', description: 'รองรับ AI และ USB ในตัว' },
-  { value: 'Raspberry Pi Pico W', label: 'Raspberry Pi Pico W', description: 'บอร์ด RP2040 พร้อม Wi-Fi' },
-  { value: 'Arduino Nano 33 IoT', label: 'Arduino Nano 33 IoT', description: 'ขนาดกะทัดรัด พร้อม Wi-Fi' },
+  {
+    value: 'esp32-devkit-v1',
+    label: 'ESP32 DevKit V1',
+    description: 'เหมาะสำหรับเริ่มต้นและงานต้นแบบ',
+  },
+  { value: 'esp32-s3-devkitc-1', label: 'ESP32-S3', description: 'รองรับ AI และ USB ในตัว' },
+  { value: 'esp8266-nodemcu', label: 'ESP8266 NodeMCU', description: 'Wi-Fi ในตัว ราคาประหยัด' },
+  { value: 'arduino-uno-r3', label: 'Arduino Uno', description: 'บอร์ดสำหรับเริ่มต้น' },
+  { value: 'arduino-nano', label: 'Arduino Nano', description: 'ขนาดกะทัดรัด' },
+  { value: 'pico-w', label: 'Raspberry Pi Pico W', description: 'RP2040 พร้อม Wi-Fi' },
 ];
 
 const FRAMEWORK_OPTIONS: readonly CustomSelectOption[] = [
@@ -104,7 +110,7 @@ export class CreateProjectDialog {
   });
   protected readonly projectForm = form(this.model, (path) => {
     required(path.name, { message: 'กรุณากรอกชื่อโปรเจกต์' });
-    required(path.board, { message: 'กรุณาเลือกบอร์ดอุปกรณ์' });
+    required(path.boardId, { message: 'กรุณาเลือกบอร์ดอุปกรณ์' });
     required(path.framework, { message: 'กรุณาเลือกเฟรมเวิร์ก' });
   });
 
@@ -117,7 +123,7 @@ export class CreateProjectDialog {
     const project = this.model();
     const hasRequiredFields =
       project.name.trim().length > 0 &&
-      project.board.trim().length > 0 &&
+      project.boardId.trim().length > 0 &&
       project.framework.trim().length > 0;
     const hasManualDevice = project.setupMode !== 'manual' || project.devices.length > 0;
 
@@ -131,7 +137,7 @@ export class CreateProjectDialog {
   }
 
   protected updateBoard(value: string): void {
-    this.model.update((project) => ({ ...project, board: value }));
+    this.model.update((project) => ({ ...project, boardId: value }));
   }
 
   protected updateFramework(value: string): void {

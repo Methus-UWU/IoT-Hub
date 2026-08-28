@@ -29,7 +29,8 @@ export interface NewProjectValue {
   name: string;
   setupMode: ProjectSetupMode;
   description: string;
-  board: string;
+  /** Catalog id of the board, e.g. 'esp32-devkit-v1'. The backend rejects unknown ids. */
+  boardId: string;
   framework: string;
   devices: string[];
 }
@@ -129,7 +130,7 @@ export class ProjectStore {
       this.api.createProject(workspace.id, {
         name: value.name.trim(),
         description: value.description.trim(),
-        board: value.board,
+        boardId: value.boardId,
         framework: value.framework,
       }),
     );
