@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 
 import { AuthModule } from '../auth/auth.module';
 import { AuthorizationModule } from '../authorization/authorization.module';
+import { BillingModule } from '../billing/billing.module';
 import {
   PrismaProjectFileRepository,
   PrismaProjectRepository,
@@ -12,7 +13,7 @@ import { ProjectsController } from './projects.controller';
 import { ProjectsService } from './projects.service';
 
 @Module({
-  imports: [AuthModule, AuthorizationModule],
+  imports: [AuthModule, AuthorizationModule, BillingModule],
   controllers: [ProjectsController],
   providers: [
     ProjectsService,

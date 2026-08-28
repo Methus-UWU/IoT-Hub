@@ -1,4 +1,11 @@
-import { Controller, Get, Param, ParseUUIDPipe, Req, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 
 import {
   SupabaseAuthGuard,

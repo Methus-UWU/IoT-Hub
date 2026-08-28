@@ -70,7 +70,7 @@ export class ProjectsController {
       workspaceId,
       'editor',
     );
-    return this.projects.create(workspaceId, body);
+    return this.projects.create(request.user.id, workspaceId, body);
   }
 
   @Delete(':projectId')

@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 
+import { EntitlementService } from '../billing/entitlement.service';
 import { CreateProjectDto } from './dto/project.dto';
 import { Project, ProjectRepository } from './project.repository';
 
@@ -11,7 +12,10 @@ import { Project, ProjectRepository } from './project.repository';
  */
 @Injectable()
 export class ProjectsService {
-  constructor(private readonly projects: ProjectRepository) {}
+  constructor(
+    private readonly projects: ProjectRepository,
+    private readonly entitlements: EntitlementService,
+  ) {}
 
   list(workspaceId: string): Promise<Project[]> {
     return this.projects.listForWorkspace(workspaceId);
@@ -42,7 +46,18 @@ export class ProjectsService {
     return project;
   }
 
-  async create(workspaceId: string, body: CreateProjectDto): Promise<Project> {
+  /**
+   * The plan check runs before the write, and throws rather than returning a
+   * flag, so no caller can create a project past the ceiling by forgetting to
+   * look at a boolean.
+   */
+  async create(
+    userId: string,
+    workspaceId: string,
+    body: CreateProjectDto,
+  ): Promise<Project> {
+    await this.entitlements.assertCanCreateProject(userId);
+
     const name = body.name.trim();
     const slug = await this.uniqueSlug(workspaceId, name);
 

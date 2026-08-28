@@ -21,6 +21,8 @@ export interface ApiErrorBody {
     requestId: string;
     details?: unknown;
     debug?: unknown;
+    /** Extra context authored on a domain error, such as a limit and its usage. */
+    [key: string]: unknown;
   };
 }
 
@@ -41,6 +43,17 @@ const GENERIC_MESSAGE = 'An unexpected error occurred';
 
 /** Plain number so status comparisons do not mix a number with the HttpStatus enum. */
 const SERVER_ERROR_THRESHOLD = 500;
+
+/** Handled explicitly above; everything else on a domain payload is forwarded. */
+const RESERVED_ERROR_KEYS = new Set([
+  'code',
+  'message',
+  'statusCode',
+  'error',
+  'requestId',
+  'details',
+  'debug',
+]);
 
 /**
  * Central mapping from thrown errors to the `{ error: { code, message, requestId } }`
@@ -125,12 +138,27 @@ export class AllExceptionsFilter implements ExceptionFilter {
           ? payload
           : exception.message;
 
+    // A domain error may carry context the client needs to act on — the ceiling
+    // and current usage behind a limit refusal, for example. Those fields are
+    // authored by us on the thrown payload, never derived from an exception, so
+    // forwarding them leaks nothing. Server errors are excluded: their payload is
+    // not something we constructed for the client.
+    const context =
+      record && status < SERVER_ERROR_THRESHOLD
+        ? Object.fromEntries(
+            Object.entries(record).filter(
+              ([key]) => !RESERVED_ERROR_KEYS.has(key),
+            ),
+          )
+        : {};
+
     return {
       error: {
         code,
         message: status >= SERVER_ERROR_THRESHOLD ? GENERIC_MESSAGE : message,
         requestId,
         ...(details ? { details } : {}),
+        ...context,
       },
     };
   }

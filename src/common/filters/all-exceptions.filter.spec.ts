@@ -3,6 +3,7 @@ import {
   BadRequestException,
   ConflictException,
   HttpStatus,
+  InternalServerErrorException,
 } from '@nestjs/common';
 
 import {
@@ -89,6 +90,45 @@ describe('AllExceptionsFilter', () => {
     );
 
     expect(sent.body?.error.code).toBe('PROJECT_NOT_FOUND');
+  });
+
+  it('forwards domain context such as a limit and its usage', () => {
+    const { host, sent } = hostFor();
+
+    filter.catch(
+      new ConflictException({
+        code: 'PROJECT_LIMIT_REACHED',
+        message: 'Your Free plan supports up to 5 projects.',
+        limit: 5,
+        used: 5,
+        planCode: 'free',
+      }),
+      host,
+    );
+
+    expect(sent.body?.error).toMatchObject({
+      code: 'PROJECT_LIMIT_REACHED',
+      limit: 5,
+      used: 5,
+      planCode: 'free',
+    });
+  });
+
+  it('does not forward context from a server error', () => {
+    process.env.NODE_ENV = 'production';
+    const { host, sent } = hostFor();
+
+    filter.catch(
+      new InternalServerErrorException({
+        code: 'SUBSCRIPTION_MISSING',
+        message: 'internal detail',
+        internalHint: 'do not leak me',
+      }),
+      host,
+    );
+
+    expect(JSON.stringify(sent.body)).not.toContain('do not leak me');
+    expect(sent.body?.error.message).toBe('An unexpected error occurred');
   });
 
   it('never leaks an unexpected failure to a production client', () => {

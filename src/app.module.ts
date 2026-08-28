@@ -12,6 +12,7 @@ import { AdminUsersModule } from './modules/admin-users/admin-users.module';
 import { AiModule } from './modules/ai/ai.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { AuthorizationModule } from './modules/authorization/authorization.module';
+import { BillingModule } from './modules/billing/billing.module';
 import { ProjectsModule } from './modules/projects/projects.module';
 import { WorkspaceModule } from './modules/workspace/workspace.module';
 import { WorkspacesModule } from './modules/workspaces/workspaces.module';
@@ -30,6 +31,7 @@ import { PrismaModule } from './prisma/prisma.module';
     AuthorizationModule,
     WorkspacesModule,
     ProjectsModule,
+    BillingModule,
     AiModule,
     AdminUsersModule,
     WorkspaceModule,

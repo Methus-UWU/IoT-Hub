@@ -50,7 +50,8 @@ model User {
   roleId String @map("role_id") @db.Uuid
   role   Role   @relation(fields: [roleId], references: [id])
 
-  memberships WorkspaceMember[]
+  memberships  WorkspaceMember[]
+  subscription UserSubscription?
   ownedWorkspaces Workspace[] @relation("WorkspaceOwner")
 
   @@index([roleId])
@@ -138,5 +139,56 @@ model ProjectFile {
   @@unique([projectId, path])
   @@index([projectId])
   @@map("project_files")
+  @@schema("public")
+}
+
+/// A subscription tier. Limits live in PlanLimit rows so adjusting one is a data
+/// change rather than a deploy.
+model Plan {
+  id        String   @id @default(uuid()) @db.Uuid
+  code      String   @unique
+  name      String
+  rank      Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  limits        PlanLimit[]
+  subscriptions UserSubscription[]
+
+  @@map("plans")
+  @@schema("public")
+}
+
+/// One ceiling for one plan. A value of -1 means unlimited.
+model PlanLimit {
+  id        String   @id @default(uuid()) @db.Uuid
+  key       String
+  value     Int
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  planId String @map("plan_id") @db.Uuid
+  plan   Plan   @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, key])
+  @@map("plan_limits")
+  @@schema("public")
+}
+
+/// Which plan a user is on. Exactly one row per user, assigned at sign-up.
+model UserSubscription {
+  id        String   @id @default(uuid()) @db.Uuid
+  status    String   @default("active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  userId String @unique @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  planId String @map("plan_id") @db.Uuid
+  plan   Plan   @relation(fields: [planId], references: [id])
+
+  @@index([planId])
+  @@map("user_subscriptions")
   @@schema("public")
 }
