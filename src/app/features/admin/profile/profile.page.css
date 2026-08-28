@@ -1,0 +1,32 @@
+.profile-input {
+  border: 1px solid #e1e1e1;
+  border-radius: 0.75rem;
+  outline: none;
+  box-shadow: none;
+  transition: border-color 140ms ease;
+}
+
+.profile-input:hover {
+  border-color: #afafaf;
+}
+
+.profile-input:focus {
+  border-color: #808080;
+}
+
+.profile-input[readonly] {
+  cursor: default;
+  color: #64748b;
+  background: #f8fafc;
+}
+
+.profile-input[readonly]:hover,
+.profile-input[readonly]:focus {
+  border-color: #e1e1e1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .profile-input {
+    transition: none;
+  }
+}

@@ -1,71 +1,44 @@
-import { Component, DestroyRef, ElementRef, afterNextRender, inject, signal, viewChild } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { FormField, form, required, submit } from '@angular/forms/signals';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
+import { firstValueFrom } from 'rxjs';
 
+import { AuthService, OAuthProvider } from '../../../core/services/auth.service';
 import { LoggerService } from '../../../core/services/logger.service';
-import { environment } from '../../../../environments/environment';
+import { LoginFormValue } from './login.interface';
 
-interface LoginFormValue {
-  email: string;
-  password: string;
-  rememberMe: boolean;
-}
-
-interface TurnstileRenderOptions {
-  sitekey: string;
-  appearance?: 'always' | 'execute' | 'interaction-only';
-  theme?: 'light' | 'dark' | 'auto';
-  callback?: (token: string) => void;
-  'expired-callback'?: () => void;
-  'error-callback'?: () => void;
-}
-
-interface TurnstileApi {
-  render(container: HTMLElement, options: TurnstileRenderOptions): string;
-  reset(widgetId?: string): void;
-}
-
-declare global {
-  interface Window {
-    turnstile?: TurnstileApi;
-  }
-}
-
-const TURNSTILE_POLL_INTERVAL_MS = 500;
-
+/**
+ * Sign-in against Supabase Auth: email/password, Google, or GitHub.
+ *
+ * The Cloudflare Turnstile widget was removed. Its token was sent to the API and
+ * never verified, so it protected nothing, and sign-in no longer passes through the
+ * API at all. Bot protection belongs in the Supabase dashboard under
+ * Authentication → Attack Protection, where it is actually enforced.
+ */
 @Component({
   selector: 'app-login',
   imports: [FormField, RouterLink],
   templateUrl: './login.html',
-  styleUrl: './login.css'
 })
 export class Login {
   private readonly logger = inject(LoggerService);
-  private readonly destroyRef = inject(DestroyRef);
-
-  private readonly turnstileContainer = viewChild<ElementRef<HTMLDivElement>>('turnstileContainer');
-
-  protected readonly turnstileSiteKey = environment.turnstileSiteKey;
-  protected readonly turnstileToken = signal('');
+  private readonly authService = inject(AuthService);
+  private readonly router = inject(Router);
 
   private readonly model = signal<LoginFormValue>({
     email: '',
     password: '',
-    rememberMe: false
+    rememberMe: false,
   });
 
   protected readonly loginForm = form(this.model, (path) => {
-    required(path.email, { message: 'Enter your email' });
-    required(path.password, { message: 'Enter your password' });
+    required(path.email, { message: 'กรุณากรอกอีเมล' });
+    required(path.password, { message: 'กรุณากรอกรหัสผ่าน' });
   });
 
   protected readonly showPassword = signal(false);
   protected readonly submitting = signal(false);
   protected readonly submitError = signal<string | null>(null);
-
-  constructor() {
-    afterNextRender(() => this.renderTurnstile());
-  }
 
   protected togglePasswordVisibility(): void {
     this.showPassword.update((value) => !value);
@@ -73,50 +46,68 @@ export class Login {
 
   protected async onSubmit(): Promise<void> {
     this.submitError.set(null);
-
-    if (!this.turnstileToken()) {
-      this.submitError.set('Please complete the security check.');
-      this.logger.warn('Login blocked: Turnstile token missing');
-      return;
-    }
-
     this.submitting.set(true);
 
     try {
       await submit(this.loginForm, async () => {
-        this.logger.info('Login submitted', { email: this.model().email });
+        const value = this.loginForm().value();
+        await firstValueFrom(
+          this.authService.loginWithPassword({
+            email: value.email.trim(),
+            password: value.password,
+          }),
+        );
+
+        const user = await firstValueFrom(this.authService.getCurrentUser());
+        const destination =
+          user.role.name.toLowerCase() === 'admin' ? '/admin' : '/user/projects';
+        this.logger.info('Login successful');
+        await this.router.navigateByUrl(destination);
         return undefined;
       });
+    } catch (error) {
+      this.logger.error('Login failed', error);
+      this.submitError.set(signInErrorMessage(error));
     } finally {
       this.submitting.set(false);
     }
   }
 
-  private renderTurnstile(): void {
-    const container = this.turnstileContainer()?.nativeElement;
-    if (!container) return;
+  /**
+   * Starts the OAuth redirect. The browser navigates away, so `submitting` is left
+   * set: the component is about to be discarded, and re-enabling the buttons would
+   * only invite a second click during the redirect.
+   */
+  protected async onProviderLogin(provider: OAuthProvider): Promise<void> {
+    this.submitError.set(null);
+    this.submitting.set(true);
 
-    if (!window.turnstile) {
-      const timeoutId = setTimeout(() => this.renderTurnstile(), TURNSTILE_POLL_INTERVAL_MS);
-      this.destroyRef.onDestroy(() => clearTimeout(timeoutId));
-      return;
+    try {
+      await firstValueFrom(this.authService.loginWithProvider(provider));
+    } catch (error) {
+      this.logger.error(`${provider} sign-in failed`, error);
+      this.submitError.set('ไม่สามารถเริ่มการเข้าสู่ระบบได้ กรุณาลองใหม่อีกครั้ง');
+      this.submitting.set(false);
     }
-
-    window.turnstile.render(container, {
-      sitekey: this.turnstileSiteKey,
-      appearance: 'always',
-      theme: 'light',
-      callback: (token) => {
-        this.turnstileToken.set(token);
-      },
-      'expired-callback': () => {
-        this.turnstileToken.set('');
-        this.logger.warn('Turnstile token expired');
-      },
-      'error-callback': () => {
-        this.turnstileToken.set('');
-        this.logger.error('Turnstile error occurred');
-      }
-    });
   }
+}
+
+/**
+ * Supabase reports a failed sign-in uniformly, whether the address is unknown or
+ * the password is wrong, which is what keeps the endpoint from confirming that an
+ * account exists. The message here preserves that.
+ */
+function signInErrorMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message.toLowerCase() : '';
+
+  if (message.includes('invalid login credentials')) {
+    return 'อีเมลหรือรหัสผ่านไม่ถูกต้อง';
+  }
+  if (message.includes('email not confirmed')) {
+    return 'กรุณายืนยันอีเมลก่อนเข้าสู่ระบบ';
+  }
+  if (message.includes('failed to fetch') || message.includes('network')) {
+    return 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ กรุณาลองใหม่อีกครั้ง';
+  }
+  return 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง';
 }

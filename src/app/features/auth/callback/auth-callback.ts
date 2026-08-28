@@ -1,0 +1,68 @@
+import { Component, inject, signal } from '@angular/core';
+import { Router, RouterLink } from '@angular/router';
+import { firstValueFrom } from 'rxjs';
+
+import { AuthService } from '../../../core/services/auth.service';
+import { LoggerService } from '../../../core/services/logger.service';
+
+/**
+ * Landing page for the OAuth and email-confirmation redirects.
+ *
+ * The Supabase client parses the fragment and stores the session itself
+ * (`detectSessionInUrl`); this component waits for that to settle, then sends the
+ * user to the right home screen. It exists so the user sees a deliberate "signing
+ * you in" state rather than a flash of the login form.
+ */
+@Component({
+  selector: 'app-auth-callback',
+  imports: [RouterLink],
+  template: `
+    <div class="flex min-h-100 flex-col items-center justify-center gap-4 p-8 text-center">
+      @if (error()) {
+        <h1 class="text-lg font-semibold text-gray-900">เข้าสู่ระบบไม่สำเร็จ</h1>
+        <p class="max-w-sm text-sm text-gray-600">{{ error() }}</p>
+        <a
+          routerLink="/auth/login"
+          class="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white"
+          >กลับไปหน้าเข้าสู่ระบบ</a
+        >
+      } @else {
+        <div
+          class="h-8 w-8 animate-spin rounded-full border-3 border-gray-200 border-t-primary"
+          role="status"
+          aria-label="กำลังเข้าสู่ระบบ"
+        ></div>
+        <p class="text-sm text-gray-600">กำลังเข้าสู่ระบบ…</p>
+      }
+    </div>
+  `,
+})
+export class AuthCallback {
+  private readonly auth = inject(AuthService);
+  private readonly router = inject(Router);
+  private readonly logger = inject(LoggerService);
+
+  protected readonly error = signal<string | null>(null);
+
+  constructor() {
+    void this.complete();
+  }
+
+  private async complete(): Promise<void> {
+    try {
+      const session = await firstValueFrom(this.auth.restoreSession());
+      if (!session) {
+        this.error.set('ไม่พบเซสชัน กรุณาลองเข้าสู่ระบบอีกครั้ง');
+        return;
+      }
+
+      const user = await firstValueFrom(this.auth.getCurrentUser());
+      const destination =
+        user.role.name.toLowerCase() === 'admin' ? '/admin' : '/user/projects';
+      await this.router.navigateByUrl(destination);
+    } catch (error) {
+      this.logger.error('OAuth callback failed', error);
+      this.error.set('เกิดข้อผิดพลาดระหว่างเข้าสู่ระบบ กรุณาลองใหม่อีกครั้ง');
+    }
+  }
+}

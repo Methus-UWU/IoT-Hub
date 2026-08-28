@@ -1,203 +1,226 @@
-<main class="relative flex min-h-screen items-center justify-center overflow-hidden bg-gray-50 p-6">
-  <div class="pointer-events-none absolute inset-0 -z-10" aria-hidden="true">
-    <div class="absolute -top-32 -left-24 h-80 w-80 rounded-full bg-gray-300/50 blur-3xl"></div>
-    <div class="absolute -right-24 -bottom-32 h-80 w-80 rounded-full bg-gray-400/40 blur-3xl"></div>
+<div
+  class="rounded-3xl border border-gray-100 bg-white/80 p-8 shadow-xl shadow-gray-900/5 ring-1 ring-gray-900/5 backdrop-blur-xl"
+>
+  <div class="mb-6 flex flex-col items-center text-center">
+    <div
+      class="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-linear-to-br from-primary to-primary-dark shadow-lg shadow-primary/30"
+    >
+      <svg viewBox="0 0 24 24" fill="none" class="h-6 w-6 text-white" aria-hidden="true">
+        <path
+          d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"
+          stroke="currentColor"
+          stroke-width="1.6"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </svg>
+    </div>
+    <h1 class="text-2xl font-semibold tracking-tight text-gray-900">เข้าสู่ระบบ</h1>
+    <p class="mt-2 text-sm text-gray-500">ยินดีต้อนรับกลับสู่ IoT Hub</p>
   </div>
 
-  <div class="w-full max-w-120">
-    <div class="rounded-3xl border border-gray-100 bg-white/80 p-8 shadow-xl shadow-gray-900/5 ring-1 ring-gray-900/5 backdrop-blur-xl">
-      <div class="mb-6 flex flex-col items-center text-center">
-        <div class="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-linear-to-br from-primary to-primary-dark shadow-lg shadow-primary/30">
-          <svg viewBox="0 0 24 24" fill="none" class="h-6 w-6 text-white" aria-hidden="true">
+  <form class="space-y-4" novalidate (submit)="$event.preventDefault(); onSubmit()">
+    <div class="space-y-1.5">
+      <label class="ml-1 text-xs font-semibold text-gray-700" for="email">อีเมล</label>
+      <div class="group relative">
+        <span
+          class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-gray-400 group-focus-within:text-primary"
+        >
+          <svg viewBox="0 0 24 24" fill="none" class="h-5 w-5" aria-hidden="true">
             <path
-              d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"
+              d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 8a7 7 0 0 1 14 0"
               stroke="currentColor"
               stroke-width="1.6"
               stroke-linecap="round"
               stroke-linejoin="round"
             />
           </svg>
-        </div>
-        <h1 class="text-2xl font-semibold tracking-tight text-gray-900">Log in</h1>
-        <p class="mt-2 text-sm text-gray-500">Welcome back to IoT Hub</p>
+        </span>
+        <input
+          [formField]="loginForm.email"
+          class="h-11 w-full rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-4 text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all focus:border-primary focus:bg-white focus:ring-4 focus:ring-primary/10"
+          type="email"
+          id="email"
+          autocomplete="email"
+          placeholder="กรอกอีเมลของคุณ"
+          (keydown.space)="$event.preventDefault()"
+          [attr.aria-invalid]="
+            loginForm.email().touched() && loginForm.email().invalid() ? true : null
+          "
+          [attr.aria-describedby]="
+            loginForm.email().touched() && loginForm.email().invalid() ? 'email-error' : null
+          "
+        />
       </div>
+      @if (loginForm.email().touched() && loginForm.email().invalid()) {
+        <p class="ml-1 text-xs font-medium text-error" id="email-error">
+          {{ loginForm.email().errors()[0]?.message }}
+        </p>
+      }
+    </div>
 
-      <form class="space-y-4" novalidate (submit)="$event.preventDefault(); onSubmit()">
-        <div class="space-y-1.5">
-          <label class="ml-1 text-xs font-semibold text-gray-700" for="email">Email</label>
-          <div class="group relative">
-            <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-gray-400 group-focus-within:text-primary">
-              <svg viewBox="0 0 24 24" fill="none" class="h-5 w-5" aria-hidden="true">
-                <path
-                  d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 8a7 7 0 0 1 14 0"
-                  stroke="currentColor"
-                  stroke-width="1.6"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                />
-              </svg>
-            </span>
-            <input
-              [formField]="loginForm.email"
-              class="h-11 w-full rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-4 text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all focus:border-primary focus:bg-white focus:ring-4 focus:ring-primary/10"
-              type="text"
-              id="email"
-              autocomplete="email"
-              placeholder="Enter your email"
-              [attr.aria-invalid]="loginForm.email().touched() && loginForm.email().invalid() ? true : null"
-              [attr.aria-describedby]="loginForm.email().touched() && loginForm.email().invalid() ? 'email-error' : null"
+    <div class="space-y-1.5">
+      <label class="ml-1 text-xs font-semibold text-gray-700" for="password">รหัสผ่าน</label>
+      <div class="group relative">
+        <span
+          class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-gray-400 group-focus-within:text-primary"
+        >
+          <svg viewBox="0 0 24 24" fill="none" class="h-5 w-5" aria-hidden="true">
+            <path
+              d="M6 11V8a6 6 0 1 1 12 0v3M5 11h14v9a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-9Z"
+              stroke="currentColor"
+              stroke-width="1.6"
+              stroke-linecap="round"
+              stroke-linejoin="round"
             />
-          </div>
-          @if (loginForm.email().touched() && loginForm.email().invalid()) {
-            <p class="ml-1 text-xs font-medium text-error" id="email-error">
-              {{ loginForm.email().errors()[0]?.message }}
-            </p>
-          }
-        </div>
-
-        <div class="space-y-1.5">
-          <label class="ml-1 text-xs font-semibold text-gray-700" for="password">Password</label>
-          <div class="group relative">
-            <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-gray-400 group-focus-within:text-primary">
-              <svg viewBox="0 0 24 24" fill="none" class="h-5 w-5" aria-hidden="true">
-                <path
-                  d="M6 11V8a6 6 0 1 1 12 0v3M5 11h14v9a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-9Z"
-                  stroke="currentColor"
-                  stroke-width="1.6"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                />
-              </svg>
-            </span>
-            <input
-              [formField]="loginForm.password"
-              class="h-11 w-full rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-10 text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all focus:border-primary focus:bg-white focus:ring-4 focus:ring-primary/10"
-              [type]="showPassword() ? 'text' : 'password'"
-              id="password"
-              autocomplete="current-password"
-              placeholder="••••••••"
-              [attr.aria-invalid]="loginForm.password().touched() && loginForm.password().invalid() ? true : null"
-              [attr.aria-describedby]="loginForm.password().touched() && loginForm.password().invalid() ? 'password-error' : null"
-            />
-            <button
-              type="button"
-              class="absolute inset-y-0 right-0 flex items-center pr-3.5 text-gray-400 outline-none transition-colors hover:text-gray-600"
-              (mousedown)="$event.preventDefault()"
-              (click)="togglePasswordVisibility()"
-              [attr.aria-label]="showPassword() ? 'Hide password' : 'Show password'"
-              [attr.aria-pressed]="showPassword()"
-            >
-              @if (showPassword()) {
-                <svg viewBox="0 0 24 24" fill="none" class="h-5 w-5" aria-hidden="true">
-                  <path
-                    d="m3 3 18 18M10.6 10.6a2 2 0 0 0 2.8 2.8M9.4 5.5A10.6 10.6 0 0 1 12 5c5 0 9 4 10 7a12.6 12.6 0 0 1-3 4.1M6.3 6.9A12.9 12.9 0 0 0 2 12c1 3 5 7 10 7 1.4 0 2.7-.3 3.9-.8"
-                    stroke="currentColor"
-                    stroke-width="1.6"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  />
-                </svg>
-              } @else {
-                <svg viewBox="0 0 24 24" fill="none" class="h-5 w-5" aria-hidden="true">
-                  <path
-                    d="M2 12c1-3 5-7 10-7s9 4 10 7c-1 3-5 7-10 7s-9-4-10-7Z"
-                    stroke="currentColor"
-                    stroke-width="1.6"
-                    stroke-linejoin="round"
-                  />
-                  <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.6" />
-                </svg>
-              }
-            </button>
-          </div>
-          @if (loginForm.password().touched() && loginForm.password().invalid()) {
-            <p class="ml-1 text-xs font-medium text-error" id="password-error">
-              {{ loginForm.password().errors()[0]?.message }}
-            </p>
-          }
-        </div>
-
-        @if (submitError()) {
-          <div class="flex items-center gap-1.5 text-error" role="alert">
-            <svg viewBox="0 0 24 24" fill="none" class="h-4 w-4 shrink-0" aria-hidden="true">
-              <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6" />
-              <path d="M12 8v5M12 16h.01" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+          </svg>
+        </span>
+        <input
+          [formField]="loginForm.password"
+          class="h-11 w-full rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-10 text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all focus:border-primary focus:bg-white focus:ring-4 focus:ring-primary/10"
+          [type]="showPassword() ? 'text' : 'password'"
+          id="password"
+          autocomplete="current-password"
+          (keydown.space)="$event.preventDefault()"
+          placeholder="••••••••"
+          [attr.aria-invalid]="loginForm.password().touched() && loginForm.password().invalid() ? true : null"
+          [attr.aria-describedby]="loginForm.password().touched() && loginForm.password().invalid() ? 'password-error' : null"
+        />
+        <button
+          type="button"
+          class="absolute inset-y-0 right-0 flex items-center pr-3.5 text-gray-400 outline-none transition-colors hover:text-gray-600"
+          (mousedown)="$event.preventDefault()"
+          (click)="togglePasswordVisibility()"
+          [attr.aria-label]="showPassword() ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'"
+          [attr.aria-pressed]="showPassword()"
+        >
+          @if (showPassword()) {
+            <svg viewBox="0 0 24 24" fill="none" class="h-5 w-5" aria-hidden="true">
+              <path
+                d="m3 3 18 18M10.6 10.6a2 2 0 0 0 2.8 2.8M9.4 5.5A10.6 10.6 0 0 1 12 5c5 0 9 4 10 7a12.6 12.6 0 0 1-3 4.1M6.3 6.9A12.9 12.9 0 0 0 2 12c1 3 5 7 10 7 1.4 0 2.7-.3 3.9-.8"
+                stroke="currentColor"
+                stroke-width="1.6"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
             </svg>
-            <p class="text-xs font-medium">{{ submitError() }}</p>
-          </div>
-        }
-
-        <div class="flex items-center justify-between text-xs">
-          <label class="flex cursor-pointer select-none items-center gap-2 text-gray-600">
-            <input
-              [formField]="loginForm.rememberMe"
-              type="checkbox"
-              class="h-4 w-4 shrink-0 appearance-none rounded border border-gray-300 bg-white bg-size-[0.65rem] bg-center bg-no-repeat transition-colors checked:border-primary checked:bg-primary checked:bg-[url('data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2016%2016%22%20fill%3D%22none%22%3E%3Cpath%20d%3D%22M3.5%208.5l3%203%206-7%22%20stroke%3D%22white%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E')] focus-visible:outline focus-visible:outline-offset-2 focus-visible:outline-primary"
-            />
-            Remember me
-          </label>
-          <button type="button" class="font-semibold text-primary hover:text-primary/80 hover:underline">Forgot Password?</button>
-        </div>
-
-        <div #turnstileContainer class="flex min-h-16.25 justify-center"></div>
-
-        <button
-          class="mt-2 h-11 w-full rounded-xl bg-linear-to-r from-primary to-primary-dark text-sm font-semibold text-white shadow-lg shadow-primary/25 transition-colors enabled:hover:from-primary/90 enabled:hover:to-primary-dark/90 focus-visible:outline focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none"
-          type="submit"
-          [disabled]="submitting() || loginForm().invalid()"
-        >
-          {{ submitting() ? 'Logging in…' : 'Log in' }}
-        </button>
-      </form>
-
-      <p class="mt-4 text-center text-xs text-gray-500">
-        New here?
-        <a routerLink="/auth/signup" class="ml-1 font-semibold text-primary hover:text-primary/80 hover:underline">Create an account</a>
-      </p>
-
-      <div class="relative my-4 py-2">
-        <div class="absolute inset-0 flex items-center">
-          <div class="w-full border-t border-gray-200"></div>
-        </div>
-        <div class="relative flex justify-center text-[10px] font-bold uppercase tracking-widest text-gray-400">
-          <span class="bg-white/80 px-3 backdrop-blur-xl">Or log in with</span>
-        </div>
-      </div>
-
-      <div class="grid grid-cols-2 gap-3">
-        <button
-          type="button"
-          class="flex h-11 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white text-xs font-semibold text-gray-700 shadow-sm transition-shadow hover:border-gray-300 hover:shadow-md"
-        >
-          <svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
-            <path
-              fill="#4285F4"
-              d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.2 2.8-2.5 3.6v3h4a11.6 11.6 0 0 0 3.5-8.8Z"
-            />
-            <path
-              fill="#34A853"
-              d="M12 24c3.2 0 5.9-1.1 7.9-2.9l-4-3c-1.1.7-2.4 1.2-3.9 1.2-3 0-5.5-2-6.4-4.7h-4.1v3A12 12 0 0 0 12 24Z"
-            />
-            <path fill="#FBBC05" d="M5.6 14.6a7.2 7.2 0 0 1 0-4.6v-3H1.5a12 12 0 0 0 0 10.7l4.1-3.1Z" />
-            <path
-              fill="#EA4335"
-              d="M12 4.8c1.7 0 3.3.6 4.5 1.8l3.4-3.4A11.9 11.9 0 0 0 12 0 12 12 0 0 0 1.5 6.6l4.1 3.2C6.5 6.9 9 4.8 12 4.8Z"
-            />
-          </svg>
-          Google
-        </button>
-        <button
-          type="button"
-          class="flex h-11 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white text-xs font-semibold text-gray-700 shadow-sm transition-shadow hover:border-gray-300 hover:shadow-md"
-        >
-          <svg viewBox="0 0 24 24" class="h-4 w-4 text-gray-900" fill="currentColor" aria-hidden="true">
-            <path
-              d="M12 .5C5.7.5.5 5.7.5 12c0 5 3.3 9.3 7.8 10.8.6.1.8-.2.8-.6v-2c-3.2.7-3.9-1.4-3.9-1.4-.5-1.3-1.3-1.7-1.3-1.7-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.4 1 .1-.8.4-1.3.8-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.4-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.4 11.4 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.6 1.6.2 2.8.1 3.1.8.8 1.2 1.9 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.3c0 .4.2.7.8.6A11.5 11.5 0 0 0 23.5 12c0-6.3-5.2-11.5-11.5-11.5Z"
-            />
-          </svg>
-          GitHub
+          } @else {
+            <svg viewBox="0 0 24 24" fill="none" class="h-5 w-5" aria-hidden="true">
+              <path
+                d="M2 12c1-3 5-7 10-7s9 4 10 7c-1 3-5 7-10 7s-9-4-10-7Z"
+                stroke="currentColor"
+                stroke-width="1.6"
+                stroke-linejoin="round"
+              />
+              <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.6" />
+            </svg>
+          }
         </button>
       </div>
+      @if (loginForm.password().touched() && loginForm.password().invalid()) {
+        <p class="ml-1 text-xs font-medium text-error" id="password-error">
+          {{ loginForm.password().errors()[0]?.message }}
+        </p>
+      }
+    </div>
+
+    @if (submitError()) {
+      <div class="flex items-center gap-1.5 text-error" role="alert">
+        <svg viewBox="0 0 24 24" fill="none" class="h-4 w-4 shrink-0" aria-hidden="true">
+          <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6" />
+          <path
+            d="M12 8v5M12 16h.01"
+            stroke="currentColor"
+            stroke-width="1.6"
+            stroke-linecap="round"
+          />
+        </svg>
+        <p class="text-xs font-medium">{{ submitError() }}</p>
+      </div>
+    }
+
+    <div class="flex items-center justify-between text-xs">
+      <label class="flex cursor-pointer select-none items-center gap-2 text-gray-600">
+        <input
+          [formField]="loginForm.rememberMe"
+          type="checkbox"
+          class="h-4 w-4 shrink-0 appearance-none rounded border border-gray-300 bg-white bg-size-[0.65rem] bg-center bg-no-repeat transition-colors checked:border-primary checked:bg-primary checked:bg-[url('data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2016%2016%22%20fill%3D%22none%22%3E%3Cpath%20d%3D%22M3.5%208.5l3%203%206-7%22%20stroke%3D%22white%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E')] focus-visible:outline focus-visible:outline-offset-2 focus-visible:outline-primary"
+        />
+        จดจำฉัน
+      </label>
+      <button
+        type="button"
+        class="font-semibold text-primary hover:text-primary/80 hover:underline"
+      >
+        ลืมรหัสผ่าน?
+      </button>
+    </div>
+
+    <button
+      class="mt-2 h-11 w-full rounded-xl bg-linear-to-r from-primary to-primary-dark text-sm font-semibold text-white shadow-lg shadow-primary/25 transition-colors enabled:hover:from-primary/90 enabled:hover:to-primary-dark/90 focus-visible:outline focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none"
+      type="submit"
+      [disabled]="submitting() || loginForm().invalid()"
+    >
+      {{ submitting() ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ' }}
+    </button>
+  </form>
+
+  <p class="mt-4 text-center text-xs text-gray-500">
+    ยังไม่มีบัญชี?
+    <a
+      routerLink="/auth/signup"
+      class="ml-1 font-semibold text-primary hover:text-primary/80 hover:underline"
+      >สมัครสมาชิก</a
+    >
+  </p>
+
+  <div class="relative my-4 py-2">
+    <div class="absolute inset-0 flex items-center">
+      <div class="w-full border-t border-gray-200"></div>
+    </div>
+    <div
+      class="relative flex justify-center text-[10px] font-bold uppercase tracking-widest text-gray-400"
+    >
+      <span class="bg-white/80 px-3 backdrop-blur-xl">หรือเข้าสู่ระบบด้วย</span>
     </div>
   </div>
-</main>
+
+  <div class="grid grid-cols-2 gap-3">
+    <button
+      type="button"
+      class="flex h-11 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white text-xs font-semibold text-gray-700 shadow-sm transition-shadow hover:border-gray-300 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60"
+      [disabled]="submitting()"
+      (click)="onProviderLogin('google')"
+    >
+      <svg viewBox="0 0 24 24" class="h-4 w-4" aria-hidden="true">
+        <path
+          fill="#4285F4"
+          d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.2 2.8-2.5 3.6v3h4a11.6 11.6 0 0 0 3.5-8.8Z"
+        />
+        <path
+          fill="#34A853"
+          d="M12 24c3.2 0 5.9-1.1 7.9-2.9l-4-3c-1.1.7-2.4 1.2-3.9 1.2-3 0-5.5-2-6.4-4.7h-4.1v3A12 12 0 0 0 12 24Z"
+        />
+        <path fill="#FBBC05" d="M5.6 14.6a7.2 7.2 0 0 1 0-4.6v-3H1.5a12 12 0 0 0 0 10.7l4.1-3.1Z" />
+        <path
+          fill="#EA4335"
+          d="M12 4.8c1.7 0 3.3.6 4.5 1.8l3.4-3.4A11.9 11.9 0 0 0 12 0 12 12 0 0 0 1.5 6.6l4.1 3.2C6.5 6.9 9 4.8 12 4.8Z"
+        />
+      </svg>
+      Google
+    </button>
+    <button
+      type="button"
+      class="flex h-11 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white text-xs font-semibold text-gray-700 shadow-sm transition-shadow hover:border-gray-300 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60"
+      [disabled]="submitting()"
+      (click)="onProviderLogin('github')"
+    >
+      <svg viewBox="0 0 24 24" class="h-4 w-4 text-gray-900" fill="currentColor" aria-hidden="true">
+        <path
+          d="M12 .5C5.7.5.5 5.7.5 12c0 5 3.3 9.3 7.8 10.8.6.1.8-.2.8-.6v-2c-3.2.7-3.9-1.4-3.9-1.4-.5-1.3-1.3-1.7-1.3-1.7-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.4 1 .1-.8.4-1.3.8-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.4-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.4 11.4 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.6 1.6.2 2.8.1 3.1.8.8 1.2 1.9 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.3c0 .4.2.7.8.6A11.5 11.5 0 0 0 23.5 12c0-6.3-5.2-11.5-11.5-11.5Z"
+        />
+      </svg>
+      GitHub
+    </button>
+  </div>
+</div>
