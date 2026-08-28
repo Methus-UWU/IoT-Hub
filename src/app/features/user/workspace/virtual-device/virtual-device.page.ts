@@ -20,6 +20,12 @@ import { defaultStateFor, type DevicePropertyDefinition } from './devices/core/d
 import type { DetailLevel } from './devices/core/device-shape';
 import { DEVICES, DEVICE_LIBRARY_ITEMS, deviceById } from './devices/device-catalog';
 import {
+  orthogonalPath,
+  routeWire,
+  type Obstacle,
+  type PinSide as RouterPinSide,
+} from './simulation/wire-router';
+import {
   ProjectCanvasService,
   asComponentLimitRefusal,
 } from './services/project-canvas.service';
@@ -1277,14 +1283,60 @@ export class VirtualDevicePage {
     return this.curvedRoutePath(route, sourceControl);
   }
 
+  /**
+   * Orthogonal route for one wire.
+   *
+   * Straight diagonals cut through parts and cross at arbitrary angles, which is
+   * what makes a busy diagram unreadable. The router lays Manhattan segments
+   * instead and steers around component boxes; hand-placed bends still win,
+   * because a user who moved a wire has already said what they want.
+   */
   protected wirePath(connection: WireConnection): string {
     const geometry = this.wireGeometry(connection);
     if (!geometry) return '';
-    return this.curvedRoutePath(
-      [geometry.source, ...this.resolvedWireWaypoints(connection), geometry.target],
-      geometry.sourceControl,
-      geometry.targetControl,
+
+    const points = routeWire(
+      {
+        point: geometry.source,
+        side: this.routerSideFor(geometry.source, geometry.sourceControl),
+      },
+      {
+        point: geometry.target,
+        side: this.routerSideFor(geometry.target, geometry.targetControl),
+      },
+      this.routingObstacles(),
+      this.resolvedWireWaypoints(connection),
     );
+
+    return orthogonalPath(points);
+  }
+
+  /** Derives the exit edge from the tangent the geometry already computed. */
+  private routerSideFor(anchor: Point, control: Point): RouterPinSide | undefined {
+    const dx = control.x - anchor.x;
+    const dy = control.y - anchor.y;
+    if (dx === 0 && dy === 0) return undefined;
+    if (Math.abs(dx) >= Math.abs(dy)) return dx >= 0 ? 'right' : 'left';
+    return dy >= 0 ? 'bottom' : 'top';
+  }
+
+  /**
+   * Bounding boxes the router should avoid.
+   *
+   * Rotation is ignored: an unrotated box is a close enough hint for routing,
+   * and computing rotated hulls for every wire on every frame is not worth the
+   * cost when the result only nudges a detour.
+   */
+  private routingObstacles(): readonly Obstacle[] {
+    return this.visibleDevices().map((device) => {
+      const placement = this.placementFor(device.instanceId);
+      return {
+        x: placement.x,
+        y: placement.y,
+        width: device.width,
+        height: device.height,
+      };
+    });
   }
 
   protected wireControlHandles(connection: WireConnection): readonly WireControlHandle[] {
