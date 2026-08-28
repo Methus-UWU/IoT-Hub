@@ -3,13 +3,13 @@ import { Throttle } from '@nestjs/throttler';
 import type { Response } from 'express';
 
 import { THROTTLE_OVERRIDES } from '../../common/config/security.config';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { AdminRoleGuard } from '../../common/guards/admin-role.guard';
+import { SupabaseAuthGuard } from '../auth/supabase-auth.guard';
+import { PlatformAdminGuard } from '../authorization/platform-admin.guard';
 import { AiService } from './ai.service';
 import { AiChatDto } from './dto/ai-chat.dto';
 
 @Controller('admin/ai')
-@UseGuards(JwtAuthGuard, AdminRoleGuard)
+@UseGuards(SupabaseAuthGuard, PlatformAdminGuard)
 export class AiController {
   constructor(private readonly aiService: AiService) {}
 

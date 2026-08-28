@@ -13,7 +13,7 @@ async function main() {
   console.log('🌱 Seeding started...');
 
   await seedRoles(prisma);
-  await seedUsers(prisma);
+  await seedUsers();
 
   console.log('🎉 All seeds completed!');
 }

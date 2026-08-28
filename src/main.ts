@@ -1,7 +1,6 @@
 import 'dotenv/config';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import cookieParser from 'cookie-parser';
 import express from 'express';
 import helmet from 'helmet';
 
@@ -19,7 +18,6 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api');
   app.use(helmet());
-  app.use(cookieParser());
 
   // Bounded bodies. The workspace file editor is the largest legitimate payload.
   app.use(express.json({ limit: REQUEST_BODY_LIMIT }));

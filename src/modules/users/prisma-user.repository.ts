@@ -3,14 +3,11 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
   AdminUserView,
-  CreateUserInput,
   UpdateAdminUserInput,
-  UserCredentials,
   UserProfile,
   UserRepository,
 } from './user.repository';
 
-/** Shape shared by the two admin-facing queries, kept in one place. */
 const ADMIN_VIEW_SELECT = {
   id: true,
   username: true,
@@ -18,11 +15,6 @@ const ADMIN_VIEW_SELECT = {
   isActive: true,
   createdAt: true,
   role: { select: { name: true } },
-  sessions: {
-    orderBy: { createdAt: 'desc' },
-    take: 1,
-    select: { createdAt: true },
-  },
 } as const;
 
 const PROFILE_SELECT = {
@@ -40,7 +32,6 @@ interface AdminUserRow {
   isActive: boolean;
   createdAt: Date;
   role: { name: string };
-  sessions: { createdAt: Date }[];
 }
 
 @Injectable()
@@ -49,45 +40,11 @@ export class PrismaUserRepository extends UserRepository {
     super();
   }
 
-  async findCredentialsByEmail(email: string): Promise<UserCredentials | null> {
-    const user = await this.prisma.db.user.findUnique({
-      where: { email },
-      select: {
-        id: true,
-        email: true,
-        password: true,
-        isActive: true,
-        role: { select: { name: true } },
-      },
-    });
-
-    if (!user) return null;
-
-    return {
-      id: user.id,
-      email: user.email,
-      passwordHash: user.password,
-      isActive: user.isActive,
-      roleName: user.role.name,
-    };
-  }
-
   findProfileById(id: string): Promise<UserProfile | null> {
     return this.prisma.db.user.findUnique({
       where: { id },
       select: PROFILE_SELECT,
     });
-  }
-
-  async findIdByUsernameOrEmail(
-    username: string,
-    email: string,
-  ): Promise<string | null> {
-    const user = await this.prisma.db.user.findFirst({
-      where: { OR: [{ username }, { email }] },
-      select: { id: true },
-    });
-    return user?.id ?? null;
   }
 
   async findOtherIdByUsernameOrEmail(
@@ -124,58 +81,12 @@ export class PrismaUserRepository extends UserRepository {
     return user !== null;
   }
 
-  async create(input: CreateUserInput): Promise<void> {
-    await this.prisma.db.user.create({
-      data: {
-        username: input.username,
-        email: input.email,
-        password: input.passwordHash,
-        roleId: input.roleId,
-      },
-    });
-  }
-
-  updateProfile(
-    id: string,
-    input: { username: string; email: string },
-  ): Promise<UserProfile> {
+  updateUsername(id: string, username: string): Promise<UserProfile> {
     return this.prisma.db.user.update({
       where: { id },
-      data: { username: input.username, email: input.email },
+      data: { username },
       select: PROFILE_SELECT,
     });
-  }
-
-  async findPasswordHashById(id: string): Promise<string | null> {
-    const user = await this.prisma.db.user.findUnique({
-      where: { id },
-      select: { password: true },
-    });
-    return user?.password ?? null;
-  }
-
-  async changePassword(
-    id: string,
-    passwordHash: string,
-    keepSessionId: string | undefined,
-  ): Promise<void> {
-    const updatePassword = this.prisma.db.user.update({
-      where: { id },
-      data: { password: passwordHash },
-    });
-
-    if (!keepSessionId) {
-      await updatePassword;
-      return;
-    }
-
-    await this.prisma.db.$transaction([
-      updatePassword,
-      this.prisma.db.session.updateMany({
-        where: { userId: id, id: { not: keepSessionId }, revokeAt: null },
-        data: { revokeAt: new Date() },
-      }),
-    ]);
   }
 
   count(): Promise<number> {
@@ -203,35 +114,17 @@ export class PrismaUserRepository extends UserRepository {
     id: string,
     input: UpdateAdminUserInput,
   ): Promise<AdminUserView> {
-    const updateUser = this.prisma.db.user.update({
+    const updated = await this.prisma.db.user.update({
       where: { id },
       data: {
         ...(input.username !== undefined ? { username: input.username } : {}),
-        ...(input.email !== undefined ? { email: input.email } : {}),
         ...(input.roleName
           ? { role: { connect: { name: input.roleName } } }
           : {}),
         ...(input.isActive !== undefined ? { isActive: input.isActive } : {}),
-        ...(input.passwordHash ? { password: input.passwordHash } : {}),
       },
       select: ADMIN_VIEW_SELECT,
     });
-
-    // Losing access must not depend on a second round trip succeeding.
-    const revokeSessions =
-      input.isActive === false || input.passwordHash !== undefined;
-
-    if (!revokeSessions) {
-      return toAdminUserView(await updateUser);
-    }
-
-    const [updated] = await this.prisma.db.$transaction([
-      updateUser,
-      this.prisma.db.session.updateMany({
-        where: { userId: id, revokeAt: null },
-        data: { revokeAt: new Date() },
-      }),
-    ]);
 
     return toAdminUserView(updated);
   }
@@ -245,6 +138,5 @@ function toAdminUserView(user: AdminUserRow): AdminUserView {
     role: user.role.name,
     status: user.isActive ? 'active' : 'suspended',
     createdAt: user.createdAt,
-    lastLoginAt: user.sessions[0]?.createdAt ?? null,
   };
 }

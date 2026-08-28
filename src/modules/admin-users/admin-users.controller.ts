@@ -1,12 +1,27 @@
-import { Body, Controller, Get, Param, Patch, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 
-import { AdminRoleGuard } from '../../common/guards/admin-role.guard';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import {
+  SupabaseAuthGuard,
+  type AuthenticatedRequest,
+} from '../auth/supabase-auth.guard';
+import { PlatformAdminGuard } from '../authorization/platform-admin.guard';
 import { AdminUsersService } from './admin-users.service';
 import { UpdateAdminUserDto } from './dto/update-admin-user.dto';
 
+/**
+ * Guard order matters: SupabaseAuthGuard establishes identity, PlatformAdminGuard
+ * then resolves the platform role from the database.
+ */
 @Controller('admin/users')
-@UseGuards(JwtAuthGuard, AdminRoleGuard)
+@UseGuards(SupabaseAuthGuard, PlatformAdminGuard)
 export class AdminUsersController {
   constructor(private readonly adminUsersService: AdminUsersService) {}
 
@@ -21,7 +36,11 @@ export class AdminUsersController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() body: UpdateAdminUserDto) {
-    return this.adminUsersService.update(id, body);
+  update(
+    @Req() request: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Body() body: UpdateAdminUserDto,
+  ) {
+    return this.adminUsersService.update(request.user.id, id, body);
   }
 }

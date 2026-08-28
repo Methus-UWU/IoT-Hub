@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { cpus, freemem, loadavg, totalmem, uptime } from 'node:os';
 
-import { SessionRepository } from '../auth/session.repository';
 import { UserRepository } from '../users/user.repository';
 
 /**
@@ -15,17 +14,10 @@ import { UserRepository } from '../users/user.repository';
  */
 @Injectable()
 export class SystemContextService {
-  constructor(
-    private readonly users: UserRepository,
-    private readonly sessions: SessionRepository,
-  ) {}
+  constructor(private readonly users: UserRepository) {}
 
   async build(): Promise<string> {
-    const [userCountResult, activeSessionCountResult] =
-      await Promise.allSettled([
-        this.users.count(),
-        this.sessions.countActive(),
-      ]);
+    const [userCountResult] = await Promise.allSettled([this.users.count()]);
 
     const totalMemory = totalmem();
     const freeMemory = freemem();
@@ -49,10 +41,6 @@ export class SystemContextService {
         users:
           userCountResult.status === 'fulfilled'
             ? userCountResult.value
-            : 'unavailable',
-        activeSessions:
-          activeSessionCountResult.status === 'fulfilled'
-            ? activeSessionCountResult.value
             : 'unavailable',
         database:
           userCountResult.status === 'fulfilled' ? 'connected' : 'unavailable',

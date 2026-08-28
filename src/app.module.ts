@@ -6,11 +6,14 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { THROTTLE_RULES } from './common/config/security.config';
+import { SupabaseModule } from './common/config/supabase.module';
 import { RequestIdMiddleware } from './common/http/request-id.middleware';
 import { AdminUsersModule } from './modules/admin-users/admin-users.module';
 import { AiModule } from './modules/ai/ai.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { AuthorizationModule } from './modules/authorization/authorization.module';
 import { WorkspaceModule } from './modules/workspace/workspace.module';
+import { WorkspacesModule } from './modules/workspaces/workspaces.module';
 import { PrismaModule } from './prisma/prisma.module';
 
 @Module({
@@ -20,8 +23,11 @@ import { PrismaModule } from './prisma/prisma.module';
     // per handler with @Throttle(THROTTLE_OVERRIDES.auth) and friends; declaring
     // the stricter tiers here would instead apply them to every endpoint.
     ThrottlerModule.forRoot([THROTTLE_RULES.default]),
+    SupabaseModule,
     PrismaModule,
     AuthModule,
+    AuthorizationModule,
+    WorkspacesModule,
     AiModule,
     AdminUsersModule,
     WorkspaceModule,
