@@ -1,8 +1,15 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 
 import { EntitlementService } from '../billing/entitlement.service';
+import { findBoard } from './board-catalog';
+import { ProjectComponentsService } from './project-components.service';
 import { CreateProjectDto } from './dto/project.dto';
-import { Project, ProjectRepository } from './project.repository';
+import {
+  Project,
+  ProjectComponent,
+  ProjectComponentRepository,
+  ProjectRepository,
+} from './project.repository';
 
 /**
  * Project lifecycle inside a workspace.
@@ -14,6 +21,8 @@ import { Project, ProjectRepository } from './project.repository';
 export class ProjectsService {
   constructor(
     private readonly projects: ProjectRepository,
+    private readonly components: ProjectComponentRepository,
+    private readonly componentsService: ProjectComponentsService,
     private readonly entitlements: EntitlementService,
   ) {}
 
@@ -55,20 +64,36 @@ export class ProjectsService {
     userId: string,
     workspaceId: string,
     body: CreateProjectDto,
-  ): Promise<Project> {
+  ): Promise<Project & { components: ProjectComponent[] }> {
     await this.entitlements.assertCanCreateProject(userId);
+
+    const board = findBoard(body.boardId);
+    if (!board) {
+      throw new NotFoundException({
+        code: 'BOARD_NOT_FOUND',
+        message: 'Unknown board definition',
+      });
+    }
 
     const name = body.name.trim();
     const slug = await this.uniqueSlug(workspaceId, name);
 
-    return this.projects.create({
-      workspaceId,
-      name,
-      slug,
-      description: body.description?.trim(),
-      board: body.board?.trim(),
-      framework: body.framework?.trim(),
-    });
+    // Project and board commit together. A project that opened to an empty
+    // canvas after the user had already picked a board is the exact failure
+    // this flow exists to prevent.
+    const created = await this.components.createProjectWithBoard(
+      {
+        workspaceId,
+        name,
+        slug,
+        description: body.description?.trim(),
+        board: board.name,
+        framework: body.framework?.trim() || board.defaultFramework,
+      },
+      this.componentsService.boardPlacement(board.id, board.name),
+    );
+
+    return { ...created.project, components: [created.component] };
   }
 
   async delete(workspaceId: string, projectId: string): Promise<void> {

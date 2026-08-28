@@ -4,6 +4,9 @@ import {
   ArrayMinSize,
   IsArray,
   IsInt,
+  IsNumber,
+  IsObject,
+  Max,
   IsOptional,
   IsString,
   Matches,
@@ -50,6 +53,16 @@ export class SaveProjectFilesDto {
 }
 
 export class CreateProjectDto {
+  /**
+   * Catalog id of the board this project starts with, e.g. 'esp32-devkit-v1'.
+   * Required: a project without a board would open to an empty canvas after the
+   * user had already chosen one.
+   */
+  @IsString()
+  @MaxLength(64)
+  @Matches(/^[a-z0-9][a-z0-9._-]*$/)
+  boardId!: string;
+
   @IsString()
   @MinLength(1)
   @MaxLength(80)
@@ -71,4 +84,74 @@ export class CreateProjectDto {
   @MaxLength(80)
   @Matches(/^[a-zA-Z0-9 ._+-]*$/)
   framework?: string;
+}
+
+export class CreateComponentDto {
+  @IsString()
+  @MaxLength(64)
+  @Matches(/^[a-z0-9][a-z0-9._-]*$/)
+  definitionId!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  label?: string;
+
+  /** Omit both to let the server find a free spot instead of stacking. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(-100000)
+  @Max(100000)
+  x?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(-100000)
+  @Max(100000)
+  y?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(359)
+  rotation?: number;
+
+  @IsOptional()
+  @IsObject()
+  state?: Record<string, unknown>;
+}
+
+export class UpdateComponentDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  label?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(-100000)
+  @Max(100000)
+  x?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(-100000)
+  @Max(100000)
+  y?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(359)
+  rotation?: number;
+
+  @IsOptional()
+  @IsObject()
+  state?: Record<string, unknown>;
 }

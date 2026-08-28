@@ -112,7 +112,8 @@ model Project {
   workspaceId String    @map("workspace_id") @db.Uuid
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
-  files ProjectFile[]
+  files      ProjectFile[]
+  components ProjectComponent[]
 
   @@unique([workspaceId, slug])
   @@index([workspaceId])
@@ -190,5 +191,30 @@ model UserSubscription {
 
   @@index([planId])
   @@map("user_subscriptions")
+  @@schema("public")
+}
+
+/// One component placed in a project.
+///
+/// The catalog definition (what an ESP32 is) lives in code and is shared by every
+/// project; this row is only where a particular one sits in a particular project.
+model ProjectComponent {
+  id           String   @id @default(uuid()) @db.Uuid
+  /// Catalog key, e.g. "esp32-devkit-v1". Not a relation: the catalog is code.
+  definitionId String   @map("definition_id")
+  label        String   @default("")
+  x            Float    @default(0)
+  y            Float    @default(0)
+  rotation     Int      @default(0)
+  /// Property overrides only; defaults come from the definition.
+  state        Json     @default("{}")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  projectId String  @map("project_id") @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@map("project_components")
   @@schema("public")
 }

@@ -100,3 +100,66 @@ export abstract class ProjectFileRepository {
 
   abstract exists(projectId: string, path: string): Promise<boolean>;
 }
+
+export interface ProjectComponent {
+  id: string;
+  definitionId: string;
+  label: string;
+  x: number;
+  y: number;
+  rotation: number;
+  state: Record<string, unknown>;
+}
+
+export interface CreateComponentInput {
+  definitionId: string;
+  label?: string;
+  x: number;
+  y: number;
+  rotation?: number;
+  state?: Record<string, unknown>;
+}
+
+export interface UpdateComponentInput {
+  label?: string;
+  x?: number;
+  y?: number;
+  rotation?: number;
+  state?: Record<string, unknown>;
+}
+
+export abstract class ProjectComponentRepository {
+  abstract list(projectId: string): Promise<ProjectComponent[]>;
+
+  abstract findById(
+    projectId: string,
+    componentId: string,
+  ): Promise<ProjectComponent | null>;
+
+  abstract count(projectId: string): Promise<number>;
+
+  abstract create(
+    projectId: string,
+    input: CreateComponentInput,
+  ): Promise<ProjectComponent>;
+
+  abstract update(
+    projectId: string,
+    componentId: string,
+    input: UpdateComponentInput,
+  ): Promise<ProjectComponent | null>;
+
+  abstract delete(projectId: string, componentId: string): Promise<boolean>;
+
+  /**
+   * Creates the project and its board component together.
+   *
+   * One transaction, because a project whose board failed to save would open to
+   * an empty canvas after the user had already chosen a board — exactly the
+   * behaviour this flow exists to prevent.
+   */
+  abstract createProjectWithBoard(
+    project: CreateProjectInput,
+    board: CreateComponentInput,
+  ): Promise<{ project: Project; component: ProjectComponent }>;
+}

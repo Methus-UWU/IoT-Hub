@@ -5,6 +5,7 @@ import {
   Get,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
   Put,
   Query,
@@ -18,11 +19,14 @@ import {
 } from '../auth/supabase-auth.guard';
 import { AuthorizationService } from '../authorization/authorization.service';
 import {
+  CreateComponentDto,
   CreateProjectDto,
   ProjectFilePathDto,
   SaveProjectFileDto,
   SaveProjectFilesDto,
+  UpdateComponentDto,
 } from './dto/project.dto';
+import { ProjectComponentsService } from './project-components.service';
 import { ProjectFilesService } from './project-files.service';
 import { ProjectsService } from './projects.service';
 
@@ -43,6 +47,7 @@ export class ProjectsController {
   constructor(
     private readonly projects: ProjectsService,
     private readonly files: ProjectFilesService,
+    private readonly components: ProjectComponentsService,
     private readonly authorization: AuthorizationService,
   ) {}
 
@@ -150,6 +155,74 @@ export class ProjectsController {
     );
     await this.projects.requireInWorkspace(workspaceId, projectId);
     return this.files.saveMany(projectId, body.files);
+  }
+
+  // ------------------------------------------------------------ components
+
+  @Get(':projectId/components')
+  async listComponents(
+    @Req() request: AuthenticatedRequest,
+    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+  ) {
+    await this.authorization.requireWorkspaceRole(
+      request.user.id,
+      workspaceId,
+      'viewer',
+    );
+    await this.projects.requireInWorkspace(workspaceId, projectId);
+    return this.components.list(projectId);
+  }
+
+  @Post(':projectId/components')
+  async addComponent(
+    @Req() request: AuthenticatedRequest,
+    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Body() body: CreateComponentDto,
+  ) {
+    await this.authorization.requireWorkspaceRole(
+      request.user.id,
+      workspaceId,
+      'editor',
+    );
+    await this.projects.requireInWorkspace(workspaceId, projectId);
+    return this.components.add(request.user.id, projectId, body);
+  }
+
+  /** Position, rotation, label, and property overrides. Used by drag and inspector. */
+  @Patch(':projectId/components/:componentId')
+  async updateComponent(
+    @Req() request: AuthenticatedRequest,
+    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('componentId', ParseUUIDPipe) componentId: string,
+    @Body() body: UpdateComponentDto,
+  ) {
+    await this.authorization.requireWorkspaceRole(
+      request.user.id,
+      workspaceId,
+      'editor',
+    );
+    await this.projects.requireInWorkspace(workspaceId, projectId);
+    return this.components.update(projectId, componentId, body);
+  }
+
+  @Delete(':projectId/components/:componentId')
+  async removeComponent(
+    @Req() request: AuthenticatedRequest,
+    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('componentId', ParseUUIDPipe) componentId: string,
+  ) {
+    await this.authorization.requireWorkspaceRole(
+      request.user.id,
+      workspaceId,
+      'editor',
+    );
+    await this.projects.requireInWorkspace(workspaceId, projectId);
+    await this.components.remove(projectId, componentId);
+    return { deleted: true };
   }
 
   @Delete(':projectId/file')
