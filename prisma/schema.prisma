@@ -69,7 +69,8 @@ model Workspace {
   ownerId String @map("owner_id") @db.Uuid
   owner   User   @relation("WorkspaceOwner", fields: [ownerId], references: [id])
 
-  members WorkspaceMember[]
+  members  WorkspaceMember[]
+  projects Project[]
 
   @@index([ownerId])
   @@map("workspaces")
@@ -92,5 +93,50 @@ model WorkspaceMember {
   @@unique([workspaceId, userId])
   @@index([userId])
   @@map("workspace_members")
+  @@schema("public")
+}
+
+/// A user project inside a workspace. Ownership is the workspace's, so access is
+/// resolved by membership rather than by any field on this row.
+model Project {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String
+  slug        String
+  description String   @default("")
+  board       String   @default("")
+  framework   String   @default("")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  workspaceId String    @map("workspace_id") @db.Uuid
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  files ProjectFile[]
+
+  @@unique([workspaceId, slug])
+  @@index([workspaceId])
+  @@map("projects")
+  @@schema("public")
+}
+
+/// One row per file. The project source tree is never a single JSON document, so a
+/// save touches only the file that changed.
+model ProjectFile {
+  id          String   @id @default(uuid()) @db.Uuid
+  path        String
+  content     String
+  contentHash String   @map("content_hash")
+  sizeBytes   Int      @map("size_bytes")
+  /// Optimistic concurrency: a write states the version it read.
+  version     Int      @default(1)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  projectId String  @map("project_id") @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, path])
+  @@index([projectId])
+  @@map("project_files")
   @@schema("public")
 }
