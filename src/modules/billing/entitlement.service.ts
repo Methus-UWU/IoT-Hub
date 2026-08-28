@@ -23,6 +23,11 @@ export interface UsageMetric {
   unit?: string;
 }
 
+export interface ProjectUsageReport {
+  plan: { code: string; name: string };
+  metrics: UsageMetric[];
+}
+
 export interface AccountUsageReport {
   plan: { code: string; name: string };
   metrics: UsageMetric[];
@@ -132,6 +137,38 @@ export class EntitlementService {
     ];
 
     return { plan: { code: plan.code, name: plan.name }, metrics };
+  }
+
+  /**
+   * Usage inside one project, for the canvas.
+   *
+   * Counts are passed in rather than fetched here: the caller already holds the
+   * component and connection repositories, and this service must not grow a
+   * dependency on every table it reports on.
+   */
+  async projectUsageReport(
+    userId: string,
+    counts: { components: number; connections: number },
+  ): Promise<ProjectUsageReport> {
+    const plan = await this.planFor(userId);
+
+    return {
+      plan: { code: plan.code, name: plan.name },
+      metrics: [
+        this.metric(
+          LIMIT_KEYS.maxComponentsPerProject,
+          'DEVICES',
+          counts.components,
+          this.limitOf(plan, LIMIT_KEYS.maxComponentsPerProject),
+        ),
+        this.metric(
+          LIMIT_KEYS.maxConnectionsPerProject,
+          'CONNECTIONS',
+          counts.connections,
+          this.limitOf(plan, LIMIT_KEYS.maxConnectionsPerProject),
+        ),
+      ],
+    };
   }
 
   private metric(

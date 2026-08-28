@@ -41,6 +41,10 @@ export class ProjectComponentsService {
     return this.components.list(projectId);
   }
 
+  count(projectId: string): Promise<number> {
+    return this.components.count(projectId);
+  }
+
   /**
    * Adds a component, refusing once the plan's per-project ceiling is reached.
    *

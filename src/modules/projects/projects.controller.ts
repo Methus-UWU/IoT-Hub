@@ -18,6 +18,7 @@ import {
   type AuthenticatedRequest,
 } from '../auth/supabase-auth.guard';
 import { AuthorizationService } from '../authorization/authorization.service';
+import { EntitlementService } from '../billing/entitlement.service';
 import {
   CreateComponentDto,
   CreateConnectionDto,
@@ -53,6 +54,7 @@ export class ProjectsController {
     private readonly components: ProjectComponentsService,
     private readonly connections: ProjectConnectionsService,
     private readonly authorization: AuthorizationService,
+    private readonly entitlements: EntitlementService,
   ) {}
 
   @Get()
@@ -159,6 +161,34 @@ export class ProjectsController {
     );
     await this.projects.requireInWorkspace(workspaceId, projectId);
     return this.files.saveMany(projectId, body.files);
+  }
+
+  /**
+   * Device and connection usage for one project, so the canvas can show a limit
+   * before the user runs into it. The refusal is still what enforces it.
+   */
+  @Get(':projectId/usage')
+  async projectUsage(
+    @Req() request: AuthenticatedRequest,
+    @Param('workspaceId', ParseUUIDPipe) workspaceId: string,
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+  ) {
+    await this.authorization.requireWorkspaceRole(
+      request.user.id,
+      workspaceId,
+      'viewer',
+    );
+    await this.projects.requireInWorkspace(workspaceId, projectId);
+
+    const [components, connections] = await Promise.all([
+      this.components.count(projectId),
+      this.connections.count(projectId),
+    ]);
+
+    return this.entitlements.projectUsageReport(request.user.id, {
+      components,
+      connections,
+    });
   }
 
   // ------------------------------------------------------------ components

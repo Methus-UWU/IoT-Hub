@@ -27,6 +27,10 @@ export class ProjectConnectionsService {
     return this.connections.list(projectId);
   }
 
+  count(projectId: string): Promise<number> {
+    return this.connections.count(projectId);
+  }
+
   async add(
     userId: string,
     projectId: string,
