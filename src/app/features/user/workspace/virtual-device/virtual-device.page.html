@@ -733,6 +733,46 @@
           }
         </svg>
 
+        @if (selectionToolbarAt(); as anchor) {
+          <!--
+            Contextual actions for the selected part. Positioned above the
+            component so it never covers the headers being wired, and it only
+            exists while something is selected.
+          -->
+          <div
+            class="selection-toolbar"
+            [style.left.px]="canvasToScreenX(anchor.x)"
+            [style.top.px]="canvasToScreenY(anchor.y)"
+            role="toolbar"
+            aria-label="Selected device actions"
+          >
+            <button type="button" title="Rotate (R)" aria-label="Rotate" (click)="rotateSelected()">
+              <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                <path d="M15.5 7A6 6 0 1 0 16 12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+                <path d="M16 3v4h-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            <button type="button" title="Duplicate" aria-label="Duplicate" (click)="duplicateSelected()">
+              <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                <rect x="7" y="7" width="9" height="9" rx="2" stroke="currentColor" stroke-width="1.5"/>
+                <path d="M13 7V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h1" stroke="currentColor" stroke-width="1.5"/>
+              </svg>
+            </button>
+            <button type="button" title="Details" aria-label="Details" (click)="inspectorOpen.set(true)">
+              <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                <circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="1.5"/>
+                <path d="M10 9v5M10 6.5v.01" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+              </svg>
+            </button>
+            <span class="selection-toolbar-divider" aria-hidden="true"></span>
+            <button type="button" class="danger" title="Delete (Del)" aria-label="Delete" (click)="deleteSelection()">
+              <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                <path d="M4 6h12M8 6V4.5h4V6M6.5 6l.6 9.5h5.8L13.5 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+          </div>
+        }
+
         @if (layoutLoading()) {
           <!-- Shown instead of the empty state while the layout is in flight,
                so a project that has devices never flashes "add a device". -->
@@ -939,6 +979,38 @@
             ><strong>{{ activeReading() }}</strong>
             <p>{{ selected.description }}</p>
           </div>
+
+          @if (selectedDeviceInfo(); as info) {
+            <section class="property-section" aria-label="Placement">
+              <div class="section-title"><span>Placement</span></div>
+              <dl class="placement-grid">
+                <div><dt>X</dt><dd>{{ info.x }}</dd></div>
+                <div><dt>Y</dt><dd>{{ info.y }}</dd></div>
+                <div><dt>Rotation</dt><dd>{{ info.rotation }}°</dd></div>
+                <div><dt>Pins</dt><dd>{{ info.pinCount }}</dd></div>
+              </dl>
+            </section>
+
+            <section class="property-section" aria-label="Connections">
+              <div class="section-title">
+                <span>Connections</span><em>{{ info.connections.length }}</em>
+              </div>
+              @if (info.connections.length) {
+                <ul class="connection-list">
+                  @for (link of info.connections; track link.id) {
+                    <li>
+                      <span class="connection-swatch" [style.background]="link.color"></span>
+                      <strong>{{ link.fromPin }}</strong>
+                      <span class="connection-arrow" aria-hidden="true">→</span>
+                      <span class="connection-target">{{ link.to }}</span>
+                    </li>
+                  }
+                </ul>
+              } @else {
+                <p class="connection-empty">No wires attached yet.</p>
+              }
+            </section>
+          }
 
           @if (selectedDeviceIssues().length) {
             <section class="property-section wiring-issues" aria-label="Wiring findings">

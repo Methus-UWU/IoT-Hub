@@ -23,6 +23,14 @@ export interface RouteEndpoint {
   readonly point: Point;
   /** Which edge of its component the pin sits on; decides the exit direction. */
   readonly side?: PinSide;
+  /**
+   * Bounds of the component this pin belongs to.
+   *
+   * Headers sit inside the PCB edge on a real board, so a pin is usually *within*
+   * its own outline and the wire has to cross that outline to escape. Knowing the
+   * box lets the exit stub run far enough to actually clear it.
+   */
+  readonly ownerBounds?: Obstacle;
 }
 
 export interface Obstacle {
@@ -59,6 +67,29 @@ function directionFor(side: PinSide | undefined, fallback: Point, target: Point)
 
 function offset(point: Point, direction: Point, distance: number): Point {
   return { x: point.x + direction.x * distance, y: point.y + direction.y * distance };
+}
+
+/**
+ * How far the wire must travel from a pin before it is clear to turn.
+ *
+ * At least STUB, and further when the pin sits inside its own board — which is
+ * the normal case, since headers are inset from the PCB edge. Turning while
+ * still over the board is what made wires appear to run underneath it.
+ */
+function exitDistance(endpoint: RouteEndpoint, direction: Point): number {
+  const bounds = endpoint.ownerBounds;
+  if (!bounds) return STUB;
+
+  const { point } = endpoint;
+  let toEdge = 0;
+  if (direction.x > 0) toEdge = bounds.x + bounds.width - point.x;
+  else if (direction.x < 0) toEdge = point.x - bounds.x;
+  else if (direction.y > 0) toEdge = bounds.y + bounds.height - point.y;
+  else if (direction.y < 0) toEdge = point.y - bounds.y;
+
+  // Clear the edge, then the routing margin, then a little breathing room so
+  // the first corner does not sit hard against the board.
+  return Math.max(STUB, toEdge + MARGIN + 4);
 }
 
 function expand(box: Obstacle, margin: number): Obstacle {
@@ -171,8 +202,12 @@ export function routeWire(
 ): Point[] {
   const startDirection = directionFor(start.side, start.point, end.point);
   const endDirection = directionFor(end.side, end.point, start.point);
-  const startStub = offset(start.point, startDirection, STUB);
-  const endStub = offset(end.point, endDirection, STUB);
+  const startStub = offset(
+    start.point,
+    startDirection,
+    exitDistance(start, startDirection),
+  );
+  const endStub = offset(end.point, endDirection, exitDistance(end, endDirection));
 
   if (manualWaypoints.length > 0) {
     return simplify([
@@ -184,16 +219,18 @@ export function routeWire(
     ]);
   }
 
-  // Ignore boxes that contain a pin: a wire must be allowed to leave the
-  // component it is attached to.
-  const padded = obstacles
-    .map((box) => expand(box, MARGIN))
-    .filter((box) => !contains(box, start.point) && !contains(box, end.point));
+  // Every component is an obstacle, including the two a wire is attached to.
+  // Dropping those two — the previous behaviour — meant a wire between two
+  // boards was tested against nothing and ran straight across both of them.
+  const padded = obstacles.map((box) => expand(box, MARGIN));
 
   let best: Point[] | null = null;
   for (const elbow of candidates(startStub, endStub)) {
     const full = simplify([start.point, ...elbow, end.point]);
-    if (!pathHitsAny(full, padded)) return full;
+    // Only the middle is collision-tested. The two stub segments necessarily
+    // cross the outline of the board they belong to, because that is what
+    // leaving a pin means; testing them would reject every possible route.
+    if (!pathHitsAny(simplify(elbow), padded)) return full;
     // Remember the first candidate so a fully blocked route still returns a
     // readable orthogonal path rather than nothing.
     best ??= full;

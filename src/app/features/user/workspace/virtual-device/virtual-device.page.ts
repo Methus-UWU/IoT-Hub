@@ -1413,16 +1413,41 @@ export class VirtualDevicePage {
       {
         point: geometry.source,
         side: this.routerSideFor(geometry.source, geometry.sourceControl),
+        ownerBounds: this.endpointBounds(connection.start),
       },
       {
         point: geometry.target,
         side: this.routerSideFor(geometry.target, geometry.targetControl),
+        ownerBounds: this.endpointBounds(connection.end),
       },
       this.routingObstacles(),
       this.resolvedWireWaypoints(connection),
     );
 
     return orthogonalPath(points);
+  }
+
+  /**
+   * Bounds of the component an endpoint belongs to.
+   *
+   * The router needs this to run the exit stub far enough to clear the board:
+   * headers sit inside the PCB edge, so a pin is normally within its own
+   * outline and a wire that turns too early reads as passing underneath it.
+   */
+  private endpointBounds(endpoint: WireEndpoint): Obstacle | undefined {
+    if (endpoint.type !== 'device') return undefined;
+
+    const device = this.deviceInstanceById(endpoint.deviceId);
+    if (!device) return undefined;
+
+    const placement = this.placementFor(device.instanceId);
+    const scale = this.renderScale(device);
+    return {
+      x: placement.x,
+      y: placement.y,
+      width: device.width * scale,
+      height: device.height * scale,
+    };
   }
 
   /** Derives the exit edge from the tangent the geometry already computed. */
@@ -1702,6 +1727,112 @@ export class VirtualDevicePage {
     if (!id || this.simulationRunning()) return;
     const placement = this.placementFor(id);
     this.updatePlacement(id, { rotation: (placement.rotation + 90) % 360 });
+  }
+
+  /**
+   * Screen position for the floating toolbar, in canvas coordinates.
+   *
+   * Anchored above the part rather than beside it, so it never sits over the
+   * headers a user is trying to wire.
+   */
+  protected readonly selectionToolbarAt = computed(() => {
+    const device = this.selectedDevice();
+    if (!device) return null;
+
+    const placement = this.placementFor(device.instanceId);
+    const scale = this.renderScale(device);
+    return {
+      x: placement.x + (device.width * scale) / 2,
+      y: placement.y - 14,
+    };
+  });
+
+  /**
+   * Places a copy of the selected part, offset so it does not land on top of
+   * the original. Wires are not copied: a duplicate is a new component, and
+   * silently inventing connections for it would be a surprise.
+   */
+  /**
+   * Canvas coordinates to viewport pixels.
+   *
+   * The toolbar is HTML, not SVG, so it has to be placed in screen space while
+   * following something positioned in canvas space.
+   */
+  /**
+   * Where the selected part sits and what it is wired to.
+   *
+   * Connections are listed by pin on both ends — "GPIO23 -> HC-SR04 TRIG" —
+   * because a pin name is what a user checks against their circuit, and a
+   * device name alone does not answer the question they are asking.
+   */
+  protected readonly selectedDeviceInfo = computed(() => {
+    const device = this.selectedDevice();
+    if (!device) return null;
+
+    const placement = this.placementFor(device.instanceId);
+    const connections = this.connections().flatMap((wire) => {
+      const near = this.endpointOn(wire.start, device.instanceId);
+      const far = near ? wire.end : this.endpointOn(wire.end, device.instanceId) ? wire.start : null;
+      const own = near ?? this.endpointOn(wire.end, device.instanceId);
+      if (!own || !far) return [];
+
+      return [
+        {
+          id: wire.id,
+          fromPin: own,
+          to: this.endpointLabel(far),
+          color: wire.color,
+        },
+      ];
+    });
+
+    return {
+      name: device.name,
+      model: device.model,
+      x: Math.round(placement.x),
+      y: Math.round(placement.y),
+      rotation: placement.rotation,
+      pinCount: device.pins.length,
+      connections,
+    };
+  });
+
+  /** The pin name when this endpoint belongs to the given device, else null. */
+  private endpointOn(endpoint: WireEndpoint, deviceId: string): string | null {
+    return endpoint.type === 'device' && endpoint.deviceId === deviceId
+      ? endpoint.pinId
+      : null;
+  }
+
+  /** Human-readable "Device PIN" for the far end of a wire. */
+  private endpointLabel(endpoint: WireEndpoint): string {
+    if (endpoint.type === 'board') return `ESP32 ${endpoint.pinId}`;
+    if (endpoint.type === 'junction') return 'Junction';
+
+    const device = this.deviceInstanceById(endpoint.deviceId);
+    return device ? `${device.name} ${endpoint.pinId}` : endpoint.pinId;
+  }
+
+  protected canvasToScreenX(x: number): number {
+    return x * this.canvasScale() + this.canvasPan().x;
+  }
+
+  protected canvasToScreenY(y: number): number {
+    return y * this.canvasScale() + this.canvasPan().y;
+  }
+
+  protected duplicateSelected(): void {
+    const device = this.selectedDevice();
+    if (!device) return;
+
+    const placement = this.placementFor(device.instanceId);
+    const before = this.snapshot();
+    const created = this.createDeviceInstance(device.id, {
+      x: placement.x + GRID_SIZE * 2,
+      y: placement.y + GRID_SIZE * 2,
+    });
+    this.recordChange(before);
+    this.selectDevice(created);
   }
 
   protected deleteSelection(): void {
