@@ -485,3 +485,70 @@ at all. `ProjectsApiService` is in place on the client and ready for that work.
 
 The old filesystem endpoints stay until then, per the rule that legacy is removed
 only after its replacement is working — not before.
+
+---
+
+# Device Catalog: one physical scale
+
+The circuit editor draws ~46 parts. Every one of them now shares a single unit
+system, because the alternative — each part choosing its own drawing size —
+produced a canvas where an SG90 servo (23 mm in the flesh) was drawn the same
+size as an HC-SR04 board (45 mm), and an ESP32 sat at a third scale again.
+Nothing tied a drawing to the object it depicted.
+
+## The chain
+
+```
+millimetres --(UNITS_PER_MM = 10)--> drawing units --(PIXELS_PER_MM / UNITS_PER_MM)--> canvas pixels
+```
+
+- A part declares `physicalSize` in real millimetres.
+- Its artwork is authored in **drawing units**, where `u(mm)` = `mm × 10`. A
+  0.1 in header pitch is therefore `HEADER_PITCH = 25.4` everywhere in the
+  catalog, and a 0.1 mm silkscreen line is a whole number.
+- `drawingScaleFor()` maps units to pixels. Because every part is on the same
+  grid, that factor is the same constant for all of them — which is the property
+  that makes two parts placed side by side correct relative to each other.
+- The same factor is applied to the artwork **and** to pin coordinates together.
+  Applying it to only one would drift the visible pin away from the point a wire
+  attaches to.
+
+`bodyFromMm({ widthMm, heightMm })` derives `width`, `height` and `physicalSize`
+from one measurement, so the drawn aspect ratio cannot disagree with the declared
+one. Parts whose size follows their own content — a breadboard's column count, a
+relay board's channel count, a DIP's pin count — compute `physicalSize` from the
+layout instead, for the same reason.
+
+## Artwork is data
+
+A part describes itself as a flat `Shape[]` returned by `render.draw(state)`.
+One renderer (`DeviceShapes`) turns that into SVG, so the canvas, the placement
+ghost, the library thumbnail and the inspector preview all draw from one source
+and cannot drift apart. There are no per-device Angular templates and no
+per-device CSS; a part is a single file in `devices/<category>/`, listed once in
+`devices/device-catalog.ts`.
+
+`detail` (`low` / `normal` / `high`) is a budget, not a style: thumbnails ask for
+`low` and get only silhouette-defining shapes; the canvas asks for `normal`.
+
+## Live values belong to the part
+
+Anything a part displays — an LCD's text, a servo's angle, a relay's coil, a
+sensor's reading — is a declared property read out of `state`. The page holds no
+per-device signals. Defaults are blank or at rest rather than sample content, so
+a display never shows a reading the circuit has not produced.
+
+## Verification
+
+`scripts/verify-devices.ts` is the catalog's test suite (the frontend has no test
+runner yet). Bundle it with esbuild and run it on Node:
+
+```bash
+node_modules/@esbuild/win32-x64/esbuild.exe scripts/verify-devices.ts \
+  --bundle --platform=node --format=cjs --outfile=.tmp/verify.cjs && node .tmp/verify.cjs
+```
+
+Beyond the simulation and wiring checks it already carried, it now asserts that
+every part declares `physicalSize`, has declarative artwork, agrees with its own
+aspect ratio to within 2 %, keeps its pins inside the drawn body plus bleed, and
+does not let neighbouring pin hit areas overlap.
