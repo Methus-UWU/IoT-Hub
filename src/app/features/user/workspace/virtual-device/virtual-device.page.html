@@ -706,6 +706,15 @@
           }
         </svg>
 
+        @if (layoutLoading()) {
+          <!-- Shown instead of the empty state while the layout is in flight,
+               so a project that has devices never flashes "add a device". -->
+          <div class="canvas-loading" role="status">
+            <span class="canvas-spinner" aria-hidden="true"></span>
+            <p>Loading layout…</p>
+          </div>
+        }
+
         @if (canvasEmpty()) {
           <div class="canvas-empty">
             <strong>Start building your virtual circuit</strong>

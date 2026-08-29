@@ -232,6 +232,8 @@ export class VirtualDevicePage {
    * alongside it.
    */
   protected readonly usesPersistedLayout = signal(false);
+  /** True while this project's saved layout is still being fetched. */
+  protected readonly layoutLoading = signal(false);
   /** Plan refusal from the server, shown instead of the device silently vanishing. */
   protected readonly componentLimitMessage = signal<string | null>(null);
   /** Live plan usage for this project, refreshed after the layout is written. */
@@ -518,8 +520,18 @@ export class VirtualDevicePage {
   protected readonly visibleDevices = computed(() =>
     this.deviceInstances().filter((device) => this.placements()[device.instanceId]?.visible),
   );
+  /**
+   * True only once the project's layout has settled and it really is empty.
+   *
+   * Without the loading term the empty state flashed on every refresh of a
+   * project that has devices: the canvas is cleared before the fetch, so it
+   * looked empty for as long as the round trip took, then filled in.
+   */
   protected readonly canvasEmpty = computed(
-    () => this.visibleDevices().length === 0 && !this.placingDeviceId(),
+    () =>
+      !this.layoutLoading() &&
+      this.visibleDevices().length === 0 &&
+      !this.placingDeviceId(),
   );
   protected readonly visibleConnections = computed(() =>
     this.connections().filter(
@@ -628,6 +640,7 @@ export class VirtualDevicePage {
     // during the moment before the saved layout arrives.
     if (this.persistedProjectId) {
       this.usesPersistedLayout.set(true);
+      this.layoutLoading.set(true);
       this.deviceInstances.set([]);
       this.placements.set({});
       this.connections.set([]);
@@ -690,6 +703,8 @@ export class VirtualDevicePage {
       await this.restorePersistedConnections(projectId, new Set(Object.keys(placements)));
     } catch {
       this.layoutLoadFailed.set(true);
+    } finally {
+      this.layoutLoading.set(false);
     }
   }
 
