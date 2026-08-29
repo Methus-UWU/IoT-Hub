@@ -129,6 +129,8 @@ export const PUSH_BUTTON: VirtualDevice = {
   y: 588,
   width: WIDTH,
   height: HEIGHT,
+  // 6 x 6 mm tactile switch; the drawn width includes its leads.
+  physicalSize: { widthMm: 9, heightMm: 6 },
   interfaces: ['digital', 'passive'],
   pins: [
     pin('1', 0, LEG_TOP, 'passive', { side: 'left', description: 'Side A, common with pin 2' }),

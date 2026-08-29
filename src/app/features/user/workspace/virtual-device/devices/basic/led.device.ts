@@ -201,6 +201,8 @@ export const LED_5MM: VirtualDevice = {
   y: 288,
   width: WIDTH,
   height: HEIGHT,
+  // 5 mm through-hole LED, drawn with its legs: 5.2 mm across, 7 mm tall.
+  physicalSize: { widthMm: 5.2, heightMm: 7 },
   operatingVoltage: { min: 1.8, max: 3.4, recommended: 3.3 },
   interfaces: ['digital', 'pwm'],
   pins: [

@@ -4,6 +4,7 @@ import type {
   DevicePropertyDefinition,
   DeviceRenderDefinition,
 } from '../devices/core/device-definition';
+import type { PhysicalSize } from '../devices/core/device-metrics';
 import type { DeviceBehaviorFactory } from '../devices/core/device-simulation';
 import type { DeviceInterface, PinDirection, PinType } from '../devices/core/device-types';
 
@@ -61,8 +62,23 @@ export interface VirtualDevice {
   /** Default drop position, used when the part is restored by "Reset diagram". */
   x: number;
   y: number;
+  /**
+   * Drawing units, the space the artwork and pins are authored in.
+   *
+   * `physicalSize` is what the part actually measures; `drawingScaleFor()`
+   * relates the two, and applying that one factor to both the artwork and the
+   * pins is what keeps every part on a single shared scale.
+   */
   width: number;
   height: number;
+  /**
+   * Real-world dimensions of the part.
+   *
+   * The source of truth for how large it appears. Optional only so the catalog
+   * can be migrated one part at a time; a part without it renders at its
+   * drawing units, which is the old behaviour.
+   */
+  physicalSize?: PhysicalSize;
   pins: readonly DevicePin[];
   catalog: DeviceCatalogInfo;
   lcdConfig?: LcdConfig;

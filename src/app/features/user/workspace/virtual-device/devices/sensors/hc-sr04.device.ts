@@ -9,14 +9,16 @@ export const HC_SR04: VirtualDevice = {
   x: 692,
   y: 58,
   width: 250,
-  height: 150,
+  height: 111,
+  // Measured module: 45 mm wide PCB, 20 mm tall, header along the bottom edge.
+  physicalSize: { widthMm: 45, heightMm: 20 },
   // The module prints VCC/TRIG/ECHO/GND above its header, so hide the overlay.
   printsOwnPinLabels: true,
   pins: [
-    { name: 'VCC', x: 104, y: 150, kind: 'power', side: 'bottom' },
-    { name: 'TRIG', x: 118, y: 150, kind: 'signal', side: 'bottom' },
-    { name: 'ECHO', x: 132, y: 150, kind: 'signal', side: 'bottom' },
-    { name: 'GND', x: 146, y: 150, kind: 'ground', side: 'bottom' },
+    { name: 'VCC', x: 104, y: 111, kind: 'power', side: 'bottom' },
+    { name: 'TRIG', x: 118, y: 111, kind: 'signal', side: 'bottom' },
+    { name: 'ECHO', x: 132, y: 111, kind: 'signal', side: 'bottom' },
+    { name: 'GND', x: 146, y: 111, kind: 'ground', side: 'bottom' },
   ],
   catalog: {
     categoryId: 'sensors',

@@ -19,6 +19,7 @@ import { DeviceKind } from './device-library.models';
 import { defaultStateFor, type DevicePropertyDefinition } from './devices/core/device-definition';
 import type { DetailLevel } from './devices/core/device-shape';
 import { DEVICES, DEVICE_LIBRARY_ITEMS, deviceById } from './devices/device-catalog';
+import { drawingScaleFor } from './devices/core/device-metrics';
 import {
   orthogonalPath,
   routeWire,
@@ -714,9 +715,23 @@ export class VirtualDevicePage {
     return this.placements()[id];
   }
 
+  /**
+   * Scale that maps this part's drawing units onto the shared physical scale.
+   *
+   * The same factor is applied to the artwork here and to pin coordinates in
+   * devicePinPoint. Scaling one without the other would drift the visible pin
+   * away from the point a wire attaches to.
+   */
+  protected renderScale(device: DeviceInstance): number {
+    return drawingScaleFor(device);
+  }
+
   protected deviceTransform(device: DeviceInstance): string {
     const placement = this.placementFor(device.instanceId);
-    return `translate(${placement.x} ${placement.y}) rotate(${placement.rotation} ${
+    const scale = this.renderScale(device);
+    // Order matters: rotate about the body centre in drawing units, then scale,
+    // then position. devicePinPoint composes the same operations.
+    return `translate(${placement.x} ${placement.y}) scale(${scale}) rotate(${placement.rotation} ${
       device.width / 2
     } ${device.height / 2})`;
   }
@@ -1362,11 +1377,12 @@ export class VirtualDevicePage {
   private routingObstacles(): readonly Obstacle[] {
     return this.visibleDevices().map((device) => {
       const placement = this.placementFor(device.instanceId);
+      const scale = this.renderScale(device);
       return {
         x: placement.x,
         y: placement.y,
-        width: device.width,
-        height: device.height,
+        width: device.width * scale,
+        height: device.height * scale,
       };
     });
   }
@@ -1495,13 +1511,19 @@ export class VirtualDevicePage {
 
   protected devicePinPoint(device: DeviceInstance, pin: DevicePin): Point {
     const placement = this.placementFor(device.instanceId);
+    const scale = this.renderScale(device);
     const center = { x: device.width / 2, y: device.height / 2 };
     const radians = (placement.rotation * Math.PI) / 180;
     const dx = pin.x - center.x;
     const dy = pin.y - center.y;
+    // Mirrors deviceTransform exactly: rotate in drawing units, scale, translate.
     return {
-      x: placement.x + center.x + dx * Math.cos(radians) - dy * Math.sin(radians),
-      y: placement.y + center.y + dx * Math.sin(radians) + dy * Math.cos(radians),
+      x:
+        placement.x +
+        scale * (center.x + dx * Math.cos(radians) - dy * Math.sin(radians)),
+      y:
+        placement.y +
+        scale * (center.y + dx * Math.sin(radians) + dy * Math.cos(radians)),
     };
   }
 

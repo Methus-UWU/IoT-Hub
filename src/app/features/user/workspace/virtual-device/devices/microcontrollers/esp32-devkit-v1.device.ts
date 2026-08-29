@@ -26,7 +26,8 @@ import type { PinType } from '../core/device-types';
  */
 
 const WIDTH = 232;
-const HEIGHT = 396;
+// 232 / (28.3/51.4) — keeps the drawn PCB at the real board proportion.
+const HEIGHT = 421;
 const HEADER_TOP = 118;
 const HEADER_PITCH = 18;
 const LEFT_HEADER_X = 16;
@@ -269,6 +270,8 @@ export const ESP32_DEVKIT_V1: VirtualDevice = {
   y: 60,
   width: WIDTH,
   height: HEIGHT,
+  // Measured DOIT DevKit V1: 51.4 mm long, 28.3 mm across the PCB.
+  physicalSize: { widthMm: 28.3, heightMm: 51.4 },
   initiallyVisible: false,
   // The board prints every pin name, so the hover overlay would duplicate it.
   printsOwnPinLabels: true,
