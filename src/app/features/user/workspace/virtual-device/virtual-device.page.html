@@ -175,6 +175,33 @@
         <strong>{{ metric.used }} / {{ metric.unlimited ? '∞' : metric.limit }}</strong>
       </div>
     }
+    <div class="history-cell">
+      <span>History</span>
+      <span class="history-buttons">
+        <button
+          type="button"
+          title="Undo (Ctrl+Z)"
+          aria-label="Undo"
+          [disabled]="!canUndo()"
+          (click)="undo()"
+        >
+          <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <path d="M7 5 3 9l4 4M3 9h8a5 5 0 0 1 0 10H8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <button
+          type="button"
+          title="Redo (Ctrl+Shift+Z)"
+          aria-label="Redo"
+          [disabled]="!canRedo()"
+          (click)="redo()"
+        >
+          <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <path d="m13 5 4 4-4 4M17 9H9a5 5 0 0 0 0 10h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+      </span>
+    </div>
     <div class="wire-mode-cell">
       <span>Wires</span>
       <button

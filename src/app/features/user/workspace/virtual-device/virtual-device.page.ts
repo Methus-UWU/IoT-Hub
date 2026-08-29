@@ -21,6 +21,10 @@ import type { DetailLevel } from './devices/core/device-shape';
 import { DEVICES, DEVICE_LIBRARY_ITEMS, deviceById } from './devices/device-catalog';
 import { drawingScaleFor } from './devices/core/device-metrics';
 import {
+  CircuitHistory,
+  type CircuitSnapshot,
+} from './services/circuit-history';
+import {
   orthogonalPath,
   routeWire,
   type Obstacle,
@@ -116,8 +120,8 @@ const EMPTY_SIMULATION: SimulationResult = Object.freeze({
 /** Diagram coordinate system. The SVG is 1:1 with CSS pixels before transform. */
 const BASE_CANVAS_SCALE = 0.6;
 const GRID_SIZE = 25;
-const MIN_ZOOM = 0.6;
-const MAX_ZOOM = 2;
+const MIN_ZOOM = 0.25;
+const MAX_ZOOM = 4;
 const ZOOM_STEP = 0.1;
 /** Simulation tick interval. 20 Hz is ample for the parts in this catalog. */
 const SIMULATION_TICK_MS = 50;
@@ -173,6 +177,21 @@ export class VirtualDevicePage {
   private readonly canvasSvg = viewChild<ElementRef<SVGSVGElement>>('canvasSvg');
   private readonly canvasViewport = viewChild<ElementRef<HTMLElement>>('canvasViewport');
   private readonly addPartTrigger = viewChild<ElementRef<HTMLButtonElement>>('addPartTrigger');
+  /**
+   * Undo/redo over the editable circuit state.
+   *
+   * Snapshot-based: placements, connections, and device states are plain
+   * records, so capturing them is cheap and every operation gets undo without
+   * having to author an inverse.
+   */
+  private readonly history = new CircuitHistory<
+    DevicePlacement,
+    WireConnection,
+    DeviceState
+  >();
+  protected readonly canUndo = signal(false);
+  protected readonly canRedo = signal(false);
+
   private dragState: DragState | null = null;
   private boardDragState: BoardDragState | null = null;
   private wireCurveDragState: WireCurveDragState | null = null;
@@ -560,14 +579,26 @@ export class VirtualDevicePage {
   });
   protected readonly canvasScale = computed(() => BASE_CANVAS_SCALE * this.zoom());
 
+  /**
+   * Dot grid, kept deliberately quiet.
+   *
+   * Spacing steps by powers of two so the dots stay roughly the same distance
+   * apart on screen at any zoom. Without that they crowd into a grey wash when
+   * zoomed out and drift apart into uselessness when zoomed in. The grid is a
+   * hint about alignment, not something to look at.
+   */
   private readonly gridLayers = computed(() => {
     const scale = this.canvasScale();
     const pan = this.canvasPan();
-    const spacing = GRID_SIZE * scale;
+
+    // Aim for ~26 px between dots, snapping the multiplier to a power of two so
+    // the pattern stays aligned with the snap grid at every zoom level.
+    const steps = Math.round(Math.log2(26 / (GRID_SIZE * scale)));
+    const spacing = GRID_SIZE * scale * Math.pow(2, Math.max(0, steps));
 
     return [
       {
-        image: 'radial-gradient(circle, #b8bec5 1px, transparent 1.2px)',
+        image: 'radial-gradient(circle, #cfd4da 0.9px, transparent 1px)',
         size: `${spacing}px ${spacing}px`,
         position: `${pan.x - spacing / 2}px ${pan.y - spacing / 2}px`,
       },
@@ -1037,6 +1068,33 @@ export class VirtualDevicePage {
   }
 
   protected handleCanvasZoomKeydown(event: KeyboardEvent): void {
+    // Never steal a keystroke from a field the user is typing into.
+    if (isTypingTarget(event.target)) return;
+
+    const accel = event.ctrlKey || event.metaKey;
+
+    if (accel && event.key.toLowerCase() === 'z') {
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.shiftKey) this.redo();
+      else this.undo();
+      return;
+    }
+
+    if (accel && event.key.toLowerCase() === 'y') {
+      event.preventDefault();
+      event.stopPropagation();
+      this.redo();
+      return;
+    }
+
+    if (!accel && event.key.toLowerCase() === 'r') {
+      event.preventDefault();
+      event.stopPropagation();
+      this.rotateSelected();
+      return;
+    }
+
     if (!event.ctrlKey) return;
     if (event.key === '+' || event.key === '=') {
       event.preventDefault();
@@ -1111,6 +1169,9 @@ export class VirtualDevicePage {
     if (!point) return;
     const placement = this.placementFor(id);
     this.selectDevice(id);
+    // Opened here and committed on pointer-up, so the whole movement is one
+    // undo step instead of one per frame.
+    this.history.begin(this.snapshot());
     this.dragState = {
       deviceId: id,
       pointerId: event.pointerId,
@@ -1209,7 +1270,13 @@ export class VirtualDevicePage {
     }
     if (this.boardDragState?.pointerId === event.pointerId) this.boardDragState = null;
     if (this.wireCurveDragState?.pointerId === event.pointerId) this.wireCurveDragState = null;
-    if (this.dragState?.pointerId === event.pointerId) this.dragState = null;
+    if (this.dragState?.pointerId === event.pointerId) {
+      this.dragState = null;
+      // A click that moved nothing commits no entry: the history compares the
+      // snapshots and discards a no-op gesture.
+      this.history.commit(this.snapshot());
+      this.syncHistoryFlags();
+    }
   }
 
   protected handleBoardKeydown(event: KeyboardEvent): void {
@@ -1425,11 +1492,13 @@ export class VirtualDevicePage {
   }
 
   protected removeWireBend(event: Event, wireId: string, waypointIndex: number): void {
+    this.recordChange(this.snapshot());
     event.stopPropagation();
     this.removeWireWaypoint(wireId, waypointIndex);
   }
 
   protected addWireBend(event: MouseEvent, wireId: string): void {
+    this.recordChange(this.snapshot());
     event.preventDefault();
     event.stopPropagation();
     const connection = this.connections().find((wire) => wire.id === wireId);
@@ -1581,7 +1650,54 @@ export class VirtualDevicePage {
 
   // ---------------------------------------------------------------- commands
 
+  /** The state undo restores. Cheap enough to take on every recorded change. */
+  private snapshot(): CircuitSnapshot<DevicePlacement, WireConnection, DeviceState> {
+    return {
+      placements: { ...this.placements() },
+      connections: [...this.connections()],
+      deviceStates: { ...this.deviceStates() },
+    };
+  }
+
+  private applySnapshot(
+    snapshot: CircuitSnapshot<DevicePlacement, WireConnection, DeviceState>,
+  ): void {
+    this.placements.set({ ...snapshot.placements });
+    this.connections.set([...snapshot.connections]);
+    this.deviceStates.set({ ...snapshot.deviceStates });
+    this.syncHistoryFlags();
+  }
+
+  private syncHistoryFlags(): void {
+    this.canUndo.set(this.history.canUndo);
+    this.canRedo.set(this.history.canRedo);
+  }
+
+  /** Records a change that has already happened, given the state before it. */
+  private recordChange(
+    before: CircuitSnapshot<DevicePlacement, WireConnection, DeviceState>,
+  ): void {
+    this.history.record(before);
+    this.syncHistoryFlags();
+  }
+
+  protected undo(): void {
+    const restored = this.history.undo(this.snapshot());
+    if (restored) this.applySnapshot(restored);
+  }
+
+  protected redo(): void {
+    const restored = this.history.redo(this.snapshot());
+    if (restored) this.applySnapshot(restored);
+  }
+
   protected rotateSelected(): void {
+    const before = this.snapshot();
+    this.rotateSelectedInternal();
+    this.recordChange(before);
+  }
+
+  private rotateSelectedInternal(): void {
     const id = this.selectedDeviceId();
     if (!id || this.simulationRunning()) return;
     const placement = this.placementFor(id);
@@ -2206,6 +2322,7 @@ export class VirtualDevicePage {
   }
 
   private finishPendingWire(endpoint: WireEndpoint): void {
+    const historyBefore = this.snapshot();
     const pending = this.pendingPin();
     const kind = pending ? this.endpointKind(pending) : null;
     if (!pending || !kind) return;
@@ -2240,6 +2357,8 @@ export class VirtualDevicePage {
     this.selectedDeviceId.set(null);
     this.boardSelected.set(false);
     this.inspectorOpen.set(true);
+
+    this.recordChange(historyBefore);
 
     // The wire is on the canvas already; the write swaps in the server's id.
     void this.persistNewConnection(connection);
@@ -2621,4 +2740,18 @@ export class VirtualDevicePage {
     const transformed = point.matrixTransform(matrix.inverse());
     return { x: transformed.x, y: transformed.y };
   }
+}
+
+/**
+ * True when the event came from somewhere the user is entering text.
+ *
+ * Without this, pressing R while naming something would rotate the selected
+ * device instead of typing the letter.
+ */
+function isTypingTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  if (target.isContentEditable) return true;
+
+  const tag = target.tagName;
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
 }

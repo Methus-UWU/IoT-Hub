@@ -255,26 +255,28 @@
 }
 
 /*
- * Wires must never make a device hard to reach.
+ * Wires stay selectable without competing with the hardware.
  *
- * The invisible hit stroke is 16px wide, so a wire crossing near a part used to
- * swallow the pointer before it reached the part. Wires are inert by default and
- * become interactive only in wire-edit mode, where grabbing a wire is what the
- * user is actually trying to do.
+ * Two things make that work. The hit stroke is narrow enough that it does not
+ * reach out and grab clicks aimed near a part — it was 16 px, which swallowed
+ * the pointer well before it arrived. And the device layer is painted after the
+ * wire layer, so wherever the two overlap the device wins the hit test outright.
+ * Wire-edit mode widens the target for deliberate rerouting.
  */
 .wire-hit {
   stroke: transparent;
-  stroke-width: 16;
-  cursor: crosshair;
-  pointer-events: none;
-}
-
-.wire-editing .wire-hit {
+  stroke-width: 9;
+  cursor: pointer;
   pointer-events: stroke;
 }
 
+.wire-editing .wire-hit {
+  stroke-width: 16;
+  cursor: crosshair;
+}
+
 .wire {
-  stroke-width: 4;
+  stroke-width: 2.5;
   pointer-events: none;
   transition:
     filter 120ms ease,
@@ -363,15 +365,25 @@ path.wire-preview {
   stroke-width: 3;
   vector-effect: non-scaling-stroke;
 }
+/*
+ * Selection is a hairline, not a box.
+ *
+ * The dashed fill used to sit on top of the hardware and compete with it for
+ * attention — on a dark PCB it read as part of the board. State should be
+ * legible without covering the thing it describes.
+ */
 .hardware:hover .selection-box,
 .hardware:focus-visible .selection-box {
-  stroke: rgb(255 255 255 / 0.32);
-  stroke-dasharray: 5 4;
+  fill: none;
+  stroke: rgb(148 163 184 / 0.55);
+  stroke-width: 1;
+  stroke-dasharray: none;
 }
 .hardware-selected .selection-box {
-  fill: rgb(37 99 235 / 0.06);
-  stroke: #60a5fa;
-  stroke-dasharray: 6 4;
+  fill: none;
+  stroke: #2563eb;
+  stroke-width: 1.25;
+  stroke-dasharray: none;
 }
 .lcd-text {
   font-family: monospace;
@@ -1200,15 +1212,15 @@ input:focus-visible {
 
 .hardware:hover .selection-box,
 .hardware:focus-visible .selection-box {
-  stroke: rgb(37 99 235 / 0.45);
-  stroke-dasharray: 4 4;
+  stroke: rgb(37 99 235 / 0.5);
+  stroke-dasharray: none;
 }
 
 .hardware-selected .selection-box,
 .hardware-selected:hover .selection-box {
-  fill: rgb(37 99 235 / 0.04);
+  fill: none;
   stroke: #2563eb;
-  stroke-width: 1.5;
+  stroke-width: 1.25;
   stroke-dasharray: none;
 }
 
@@ -1814,4 +1826,45 @@ input:focus-visible {
   .canvas-spinner {
     animation-duration: 2.4s;
   }
+}
+
+
+/* Undo/redo controls in the status strip. */
+.history-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.history-buttons {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.history-buttons button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 22px;
+  border: 1px solid #d4d4d8;
+  border-radius: 7px;
+  background: #fff;
+  color: #52525b;
+  cursor: pointer;
+}
+
+.history-buttons button:hover:not(:disabled) {
+  border-color: #a1a1aa;
+  color: #27272a;
+}
+
+.history-buttons button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.history-buttons svg {
+  width: 14px;
+  height: 14px;
 }
