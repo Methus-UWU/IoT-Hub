@@ -5,18 +5,26 @@ import {
   type DeviceDrawContext,
   type DevicePropertyDefinition,
 } from '../core/device-definition';
+import { bodyFromMm, u } from '../core/device-metrics';
 import { OUTLINE, PART, SILK } from '../core/device-palette';
-import { PIN_PITCH } from '../core/device-parts';
 import { pin } from '../core/device-pin';
 import { circle, line, path, repeat, text, type Shape } from '../core/device-shape';
 import { isLogicHigh, type DeviceBehavior } from '../core/device-simulation';
 
-const WIDTH = 116;
-const HEIGHT = 128;
+/**
+ * A 12 mm buzzer can on 7.62 mm lead spacing — three header pitches, which is
+ * what lets one straddle the ravine of a breadboard.
+ */
+const BODY = bodyFromMm({ widthMm: 13, heightMm: 19 });
+const WIDTH = BODY.width;
+const HEIGHT = BODY.height;
 const CENTER_X = WIDTH / 2;
-const CAN_CY = 52;
-const CAN_R = 46;
-const PIN_START_X = CENTER_X - PIN_PITCH / 2;
+const CAN_CY = u(6.5);
+const CAN_R = u(6);
+const LEAD_PITCH = u(7.62);
+const PIN_START_X = CENTER_X - LEAD_PITCH / 2;
+/** The negative lead is cut short, as it is on the real part. */
+const SHORT_LEAD_Y = HEIGHT - u(1.2);
 
 type BuzzerKind = 'active' | 'passive';
 
@@ -70,43 +78,47 @@ function createBuzzer(kind: BuzzerKind): VirtualDevice {
 
     return [
       // Leads. The longer one is positive on an active buzzer.
-      line(PIN_START_X, CAN_CY + 40, PIN_START_X, HEIGHT, {
+      line(PIN_START_X, CAN_CY + CAN_R - u(0.4), PIN_START_X, HEIGHT, {
         stroke: PART.metal,
-        strokeWidth: 4,
+        strokeWidth: u(0.45),
         strokeLinecap: 'round',
       }),
-      line(PIN_START_X + PIN_PITCH, CAN_CY + 40, PIN_START_X + PIN_PITCH, HEIGHT - 12, {
-        stroke: PART.metal,
-        strokeWidth: 4,
-        strokeLinecap: 'round',
-      }),
+      line(
+        PIN_START_X + LEAD_PITCH,
+        CAN_CY + CAN_R - u(0.4),
+        PIN_START_X + LEAD_PITCH,
+        SHORT_LEAD_Y,
+        { stroke: PART.metal, strokeWidth: u(0.45), strokeLinecap: 'round' },
+      ),
 
       // Black plastic can.
       circle(CENTER_X, CAN_CY, CAN_R, {
         fill: PART.plasticBlack,
         stroke: OUTLINE,
-        strokeWidth: 1.5,
+        strokeWidth: u(0.15),
       }),
-      circle(CENTER_X, CAN_CY, CAN_R - 8, {
+      circle(CENTER_X, CAN_CY, CAN_R - u(0.8), {
         fill: '#1a1d21',
         stroke: '#000',
-        strokeWidth: 0.75,
+        strokeWidth: u(0.08),
         detail: 'normal',
       }),
 
       // Sound port.
-      circle(CENTER_X, CAN_CY, 9, { fill: '#0a0c0f', stroke: '#3a3f46', strokeWidth: 1 }),
+      circle(CENTER_X, CAN_CY, u(1), { fill: '#0a0c0f', stroke: '#3a3f46', strokeWidth: u(0.1) }),
 
       // Emission arcs, drawn only while it is actually sounding.
       ...(sounding
         ? repeat(3, {}, (index) =>
             path(
-              `M ${CENTER_X + 16 + index * 10} ${CAN_CY - 14 - index * 5}
-               a ${18 + index * 8} ${18 + index * 8} 0 0 1 0 ${28 + index * 10}`,
+              `M ${CENTER_X + u(1.8) + index * u(1)} ${CAN_CY - u(1.6) - index * u(0.5)}` +
+                ` a ${u(2) + index * u(0.8)} ${u(2) + index * u(0.8)} 0 0 1 0 ${
+                  u(3.2) + index * u(1)
+                }`,
               {
                 fill: 'none',
                 stroke: '#38bdf8',
-                strokeWidth: 2.5,
+                strokeWidth: u(0.28),
                 strokeLinecap: 'round',
                 opacity: 0.75 - index * 0.18,
               },
@@ -114,8 +126,8 @@ function createBuzzer(kind: BuzzerKind): VirtualDevice {
           )
         : []),
 
-      text(CENTER_X, CAN_CY + 26, active ? 'ACTIVE' : 'PASSIVE', {
-        size: 8.5,
+      text(CENTER_X, CAN_CY + u(3), active ? 'ACTIVE' : 'PASSIVE', {
+        size: u(1),
         fill: SILK.dim,
         anchor: 'middle',
         weight: 700,
@@ -123,8 +135,8 @@ function createBuzzer(kind: BuzzerKind): VirtualDevice {
         detail: 'normal',
       }),
 
-      text(CENTER_X, HEIGHT - 2, sounding && !active ? `${Math.round(frequency)} Hz` : '', {
-        size: 9.5,
+      text(CENTER_X, HEIGHT - u(0.3), sounding && !active ? `${Math.round(frequency)} Hz` : '', {
+        size: u(1),
         fill: '#38bdf8',
         anchor: 'middle',
         weight: 600,
@@ -132,8 +144,8 @@ function createBuzzer(kind: BuzzerKind): VirtualDevice {
         detail: 'normal',
       }),
 
-      text(PIN_START_X - 8, CAN_CY + 52, '+', {
-        size: 12,
+      text(PIN_START_X - u(1.1), CAN_CY + u(6.4), '+', {
+        size: u(1.3),
         fill: SILK.dim,
         anchor: 'middle',
         weight: 700,
@@ -151,8 +163,7 @@ function createBuzzer(kind: BuzzerKind): VirtualDevice {
       : 'Bare transducer — the controller must generate the tone frequency.',
     x: 340,
     y: 760,
-    width: WIDTH,
-    height: HEIGHT,
+    ...BODY,
     initiallyVisible: false,
     operatingVoltage: { min: 3, max: 5.5, recommended: 5 },
     interfaces: active ? ['digital'] : ['pwm', 'digital'],
@@ -162,7 +173,7 @@ function createBuzzer(kind: BuzzerKind): VirtualDevice {
         direction: 'input',
         description: active ? 'Drive high to sound' : 'Drive with a square wave at the tone frequency',
       }),
-      pin('−', PIN_START_X + PIN_PITCH, HEIGHT - 12, 'gnd', {
+      pin('−', PIN_START_X + LEAD_PITCH, SHORT_LEAD_Y, 'gnd', {
         side: 'bottom',
         description: 'Ground reference',
       }),

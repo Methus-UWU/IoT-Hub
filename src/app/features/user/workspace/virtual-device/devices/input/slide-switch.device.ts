@@ -4,16 +4,28 @@ import {
   type DeviceDrawContext,
   type DevicePropertyDefinition,
 } from '../core/device-definition';
+import { bodyFromMm, HEADER_PITCH, u } from '../core/device-metrics';
 import { OUTLINE, PART, SILK } from '../core/device-palette';
-import { PIN_PITCH } from '../core/device-parts';
 import { pin } from '../core/device-pin';
 import { line, rect, text, type Shape } from '../core/device-shape';
 import { propertyString, type DeviceBehavior } from '../core/device-simulation';
 
-const WIDTH = 120;
-const HEIGHT = 74;
-const PIN_Y = HEIGHT + 22;
-const PIN_START_X = WIDTH / 2 - PIN_PITCH;
+/**
+ * SS12D00: an 8.9 × 3.6 mm can with three lugs on 0.1 in pitch below it. The
+ * body is barely wider than its own pin span, which is what makes this part read
+ * as the tiny thing it is next to a relay or a servo.
+ */
+const BODY = bodyFromMm({ widthMm: 9, heightMm: 8 });
+const WIDTH = BODY.width;
+const HEIGHT = BODY.height;
+/** Metal can, sitting on top with the lugs reaching down from it. */
+const CAN_TOP = u(0.5);
+const CAN_HEIGHT = u(3.6);
+const CAN_BOTTOM = CAN_TOP + CAN_HEIGHT;
+/** Actuator travel: 3 mm of slot, 2 mm of slider. */
+const SLIDER_WIDTH = u(2);
+const PIN_Y = HEIGHT;
+const PIN_START_X = WIDTH / 2 - HEADER_PITCH;
 
 const PROPERTIES: readonly DevicePropertyDefinition[] = [
   {
@@ -33,50 +45,63 @@ const PROPERTIES: readonly DevicePropertyDefinition[] = [
 function draw(context: DeviceDrawContext): readonly Shape[] {
   const position = stringState(context, 'position', 'a');
   const atA = position === 'a';
-  const actuatorX = atA ? 28 : WIDTH - 28 - 26;
+  const actuatorX = atA ? u(2.6) : WIDTH - u(2.6) - SLIDER_WIDTH;
 
   return [
     // Terminals.
     ...[0, 1, 2].map((index) =>
-      line(PIN_START_X + index * PIN_PITCH, HEIGHT - 6, PIN_START_X + index * PIN_PITCH, PIN_Y, {
-        stroke: PART.metal,
-        strokeWidth: 4,
-        strokeLinecap: 'round',
-      }),
+      line(
+        PIN_START_X + index * HEADER_PITCH,
+        CAN_BOTTOM - u(0.2),
+        PIN_START_X + index * HEADER_PITCH,
+        PIN_Y,
+        { stroke: PART.metal, strokeWidth: u(0.45), strokeLinecap: 'round' },
+      ),
     ),
 
     // Metal can with the moulded slot the actuator travels in.
-    rect(0, 8, WIDTH, HEIGHT - 8, {
-      rx: 4,
+    rect(0, CAN_TOP, WIDTH, CAN_HEIGHT, {
+      rx: u(0.35),
       fill: PART.metal,
       stroke: PART.metalDark,
-      strokeWidth: 1.5,
+      strokeWidth: u(0.15),
     }),
-    rect(18, 20, WIDTH - 36, 26, {
-      rx: 3,
+    rect(u(2.4), CAN_TOP + u(0.9), WIDTH - u(4.8), CAN_HEIGHT - u(1.8), {
+      rx: u(0.25),
       fill: '#7d848d',
       stroke: OUTLINE,
-      strokeWidth: 1,
+      strokeWidth: u(0.1),
     }),
 
     // Actuator — its side of the slot is the whole state readout.
-    rect(actuatorX, 4, 26, 40, {
-      rx: 3,
+    rect(actuatorX, CAN_TOP - u(0.5), SLIDER_WIDTH, CAN_HEIGHT + u(1), {
+      rx: u(0.25),
       fill: PART.plasticBlack,
       stroke: OUTLINE,
-      strokeWidth: 1.25,
+      strokeWidth: u(0.12),
     }),
     ...[0, 1, 2].map((index) =>
-      line(actuatorX + 6, 12 + index * 8, actuatorX + 20, 12 + index * 8, {
-        stroke: '#4b5058',
-        strokeWidth: 1.5,
-        detail: 'high',
-      }),
+      line(
+        actuatorX + u(0.4),
+        CAN_TOP + u(0.6) + index * u(0.9),
+        actuatorX + SLIDER_WIDTH - u(0.4),
+        CAN_TOP + u(0.6) + index * u(0.9),
+        { stroke: '#4b5058', strokeWidth: u(0.12), detail: 'high' },
+      ),
     ),
 
-    text(WIDTH / 2, HEIGHT - 10, atA ? 'A ◂' : '▸ B', {
-      size: 11,
-      fill: SILK.dim,
+    // Throw markings on the can, the way a real switch is printed.
+    text(u(1.1), CAN_BOTTOM - u(1.2), 'A', {
+      size: u(1.2),
+      fill: atA ? '#2563eb' : SILK.dim,
+      anchor: 'middle',
+      weight: 700,
+      mono: true,
+      detail: 'normal',
+    }),
+    text(WIDTH - u(1.1), CAN_BOTTOM - u(1.2), 'B', {
+      size: u(1.2),
+      fill: atA ? SILK.dim : '#2563eb',
       anchor: 'middle',
       weight: 700,
       mono: true,
@@ -96,8 +121,7 @@ export const SLIDE_SWITCH: VirtualDevice = {
   description: 'Single-pole double-throw slide switch. COM bonds to one side at a time.',
   x: 520,
   y: 760,
-  width: WIDTH,
-  height: HEIGHT,
+  ...BODY,
   initiallyVisible: false,
   interfaces: ['digital', 'passive'],
   pins: [
@@ -105,17 +129,17 @@ export const SLIDE_SWITCH: VirtualDevice = {
       side: 'bottom',
       description: 'Throw A — connected when the actuator is left',
     }),
-    pin('COM', PIN_START_X + PIN_PITCH, PIN_Y, 'passive', {
+    pin('COM', PIN_START_X + HEADER_PITCH, PIN_Y, 'passive', {
       side: 'bottom',
       description: 'Common pole',
     }),
-    pin('3', PIN_START_X + PIN_PITCH * 2, PIN_Y, 'passive', {
+    pin('3', PIN_START_X + HEADER_PITCH * 2, PIN_Y, 'passive', {
       side: 'bottom',
       description: 'Throw B — connected when the actuator is right',
     }),
   ],
   properties: PROPERTIES,
-  render: { draw, bleed: { bottom: 24 } },
+  render: { draw },
   catalog: {
     categoryId: 'switches',
     category: 'Switches',

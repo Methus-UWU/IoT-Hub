@@ -571,10 +571,6 @@
                 appDeviceArt
                 [device]="device"
                 [running]="simulationRunning()"
-                [distance]="distance()"
-                [servoAngle]="servoAngle()"
-                [buttonPressed]="buttonPressedFor(device.instanceId)"
-                [relayStates]="relayStatesFor(device.instanceId)"
                 [state]="deviceStateFor(device.instanceId)"
                 [showCaption]="false"
                 [detail]="canvasDeviceDetail()"
@@ -603,9 +599,9 @@
                 @if (device.id === 'button') {
                   <circle
                     class="part-hitbox"
-                    cx="60"
-                    cy="40"
-                    r="23"
+                    [attr.cx]="buttonCap.cx"
+                    [attr.cy]="buttonCap.cy"
+                    [attr.r]="buttonCap.r"
                     role="button"
                     tabindex="0"
                     aria-label="Press the push button"
@@ -897,10 +893,13 @@
             <p><span>[00:00.184]</span> Initializing I2C, GPIO and PWM</p>
             @if (simulationRunning()) {
               <p class="serial-success"><span>[00:01.022]</span> Simulation started successfully</p>
-              <p>
-                <span>[00:02.401]</span> Distance: {{ distance() }} cm - Servo:
-                {{ servoAngle() }} deg - Relay: {{ relayOn() ? 'ON' : 'OFF' }}
-              </p>
+              <!--
+                No readings are printed here. The values that used to appear were
+                page-local demo signals, not anything the circuit produced, so a
+                user could read a distance off this panel with nothing wired up.
+                Live values belong to the parts themselves and show in the
+                inspector.
+              -->
             } @else {
               <p class="serial-muted">
                 <span>[stopped]</span> Press Start simulation to run firmware
@@ -1216,50 +1215,6 @@
                 </button>
               }
             </div>
-          </section>
-          <section class="property-section">
-            <h3>Simulation controls</h3>
-            @if (selected.id === 'ultrasonic' || selected.lcdConfig) {
-              <label class="range-control"
-                ><span
-                  >Distance <strong>{{ distance() }} cm</strong></span
-                ><input
-                  type="range"
-                  min="2"
-                  max="200"
-                  [value]="distance()"
-                  [disabled]="!simulationRunning()"
-                  (input)="updateDistance($event)"
-              /></label>
-            }
-            @if (selected.id === 'servo') {
-              <label class="range-control"
-                ><span
-                  >Angle <strong>{{ servoAngle() }} deg</strong></span
-                ><input
-                  type="range"
-                  min="0"
-                  max="180"
-                  [value]="servoAngle()"
-                  [disabled]="!simulationRunning()"
-                  (input)="updateServoAngle($event)"
-              /></label>
-            }
-            @if (selected.relayChannels) {
-              <button
-                type="button"
-                class="action-button"
-                [disabled]="!simulationRunning()"
-                (click)="toggleRelay()"
-              >
-                {{ relayOn() ? 'Turn relay off' : 'Turn relay on' }}
-              </button>
-            }
-            @if (selected.id === 'button') {
-              <button type="button" class="action-button" (click)="toggleButton()">
-                {{ buttonPressedFor(selectedDeviceId()) ? 'Release button' : 'Press button' }}
-              </button>
-            }
           </section>
           <div class="part-actions">
             <button type="button" (click)="rotateSelected()">Rotate 90 deg</button

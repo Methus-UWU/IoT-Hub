@@ -4,19 +4,30 @@ import {
   type DeviceDrawContext,
   type DevicePropertyDefinition,
 } from '../core/device-definition';
+import { bodyFromMm, HEADER_PITCH, u } from '../core/device-metrics';
 import { OUTLINE, PART } from '../core/device-palette';
-import { PIN_PITCH, silkLabel } from '../core/device-parts';
+import { silkLabel } from '../core/device-parts';
 import { pin } from '../core/device-pin';
 import { circle, ellipse, line, path, type Shape } from '../core/device-shape';
 import type { DeviceBehavior } from '../core/device-simulation';
 
-const WIDTH = 118;
-const DOME_CY = 56;
-const DOME_R = 40;
-const HEIGHT = 150;
+/**
+ * A 5 mm RGB package is the same T-1¾ body as a single-colour LED, but its four
+ * legs on 0.1 in pitch span 7.62 mm — which is what sets the drawn width. The
+ * body cannot be narrower than its own lead frame.
+ */
+const BODY = bodyFromMm({ widthMm: 8.6, heightMm: 14 });
+const WIDTH = BODY.width;
+const HEIGHT = BODY.height;
 const CENTER_X = WIDTH / 2;
-/** Four legs at 0.1 in; the longest is the common pin on a real package. */
-const PIN_START_X = CENTER_X - PIN_PITCH * 1.5;
+/** Dome: 5 mm across, shoulder where the straight sides begin. */
+const DOME_R = u(2.5);
+const DOME_CY = u(3.4);
+const FLANGE_Y = u(8.6);
+/** Four legs at 0.1 in; the second is the common pin on a real package. */
+const PIN_START_X = CENTER_X - HEADER_PITCH * 1.5;
+/** Short legs stop above the common one, as the real lead frame is cut. */
+const SHORT_LEG_Y = HEIGHT - u(1.6);
 
 type Polarity = 'cathode' | 'anode';
 
@@ -87,47 +98,56 @@ function createRgbLed(polarity: Polarity): VirtualDevice {
       // Legs — the common one is drawn longer, as on the real part.
       ...[0, 1, 2, 3].map((index) =>
         line(
-          PIN_START_X + index * PIN_PITCH,
-          DOME_CY + 34,
-          PIN_START_X + index * PIN_PITCH,
-          index === 1 ? HEIGHT : HEIGHT - 14,
-          { stroke: PART.metal, strokeWidth: 4, strokeLinecap: 'round' },
+          PIN_START_X + index * HEADER_PITCH,
+          FLANGE_Y,
+          PIN_START_X + index * HEADER_PITCH,
+          index === 1 ? HEIGHT : SHORT_LEG_Y,
+          { stroke: PART.metal, strokeWidth: u(0.45), strokeLinecap: 'round' },
         ),
       ),
 
       // Soft halo, only while lit and never strong enough to wash out wires.
       ...(lit
-        ? [circle(CENTER_X, DOME_CY, DOME_R + 26, { fill: color, opacity: 0.16 * level })]
+        ? [circle(CENTER_X, DOME_CY, DOME_R + u(2.6), { fill: color, opacity: 0.16 * level })]
         : []),
 
       // Water-clear dome.
       path(
-        `M ${CENTER_X - DOME_R} ${DOME_CY + 30}
-         V ${DOME_CY} a ${DOME_R} ${DOME_R} 0 0 1 ${DOME_R * 2} 0
-         V ${DOME_CY + 30} z`,
+        `M ${CENTER_X - DOME_R} ${FLANGE_Y}` +
+          ` V ${DOME_CY} a ${DOME_R} ${DOME_R} 0 0 1 ${DOME_R * 2} 0` +
+          ` V ${FLANGE_Y} z`,
         {
           fill: lit ? color : '#c9ced6',
           opacity: lit ? Math.max(0.45, level) : 0.75,
           stroke: OUTLINE,
-          strokeWidth: 1.5,
+          strokeWidth: u(0.15),
         },
       ),
 
       // Flange that marks the flat side of the package.
-      ellipse(CENTER_X, DOME_CY + 30, DOME_R + 5, 8, {
+      ellipse(CENTER_X, FLANGE_Y, DOME_R + u(0.4), u(0.45), {
         fill: lit ? color : '#b9c0c9',
         opacity: lit ? 0.6 : 0.9,
         stroke: OUTLINE,
-        strokeWidth: 1.25,
+        strokeWidth: u(0.13),
       }),
 
       // The three dies, visible through the clear body.
-      circle(CENTER_X - 15, DOME_CY + 4, 6, { fill: red > 0 ? '#ff4d4d' : '#8a3a3a', detail: 'normal' }),
-      circle(CENTER_X, DOME_CY - 6, 6, { fill: green > 0 ? '#4dff88' : '#356b45', detail: 'normal' }),
-      circle(CENTER_X + 15, DOME_CY + 4, 6, { fill: blue > 0 ? '#5599ff' : '#33507f', detail: 'normal' }),
+      circle(CENTER_X - u(1.1), DOME_CY + u(0.5), u(0.55), {
+        fill: red > 0 ? '#ff4d4d' : '#8a3a3a',
+        detail: 'normal',
+      }),
+      circle(CENTER_X, DOME_CY - u(0.7), u(0.55), {
+        fill: green > 0 ? '#4dff88' : '#356b45',
+        detail: 'normal',
+      }),
+      circle(CENTER_X + u(1.1), DOME_CY + u(0.5), u(0.55), {
+        fill: blue > 0 ? '#5599ff' : '#33507f',
+        detail: 'normal',
+      }),
 
-      silkLabel(CENTER_X, HEIGHT - 2, commonLabel, {
-        size: 9,
+      silkLabel(CENTER_X, HEIGHT - u(0.2), commonLabel, {
+        size: u(0.85),
         fill: '#6b7280',
         detail: 'high',
       }),
@@ -141,32 +161,31 @@ function createRgbLed(polarity: Polarity): VirtualDevice {
     description: `Three dies in one package sharing a common ${polarity}. Mix colour with PWM.`,
     x: 380,
     y: 700,
-    width: WIDTH,
-    height: HEIGHT,
+    ...BODY,
     initiallyVisible: false,
     operatingVoltage: { min: 2, max: 3.4, recommended: 3.3 },
     interfaces: ['pwm', 'digital'],
     pins: [
-      pin('R', PIN_START_X, HEIGHT - 14, 'pwm', {
+      pin('R', PIN_START_X, SHORT_LEG_Y, 'pwm', {
         side: 'bottom',
         description: 'Red die, needs its own series resistor',
       }),
-      pin(commonLabel, PIN_START_X + PIN_PITCH, HEIGHT, commonType, {
+      pin(commonLabel, PIN_START_X + HEADER_PITCH, HEIGHT, commonType, {
         side: 'bottom',
         description:
           polarity === 'cathode' ? 'Common cathode, tie to GND' : 'Common anode, tie to VCC',
       }),
-      pin('G', PIN_START_X + PIN_PITCH * 2, HEIGHT - 14, 'pwm', {
+      pin('G', PIN_START_X + HEADER_PITCH * 2, SHORT_LEG_Y, 'pwm', {
         side: 'bottom',
         description: 'Green die, needs its own series resistor',
       }),
-      pin('B', PIN_START_X + PIN_PITCH * 3, HEIGHT - 14, 'pwm', {
+      pin('B', PIN_START_X + HEADER_PITCH * 3, SHORT_LEG_Y, 'pwm', {
         side: 'bottom',
         description: 'Blue die, needs its own series resistor',
       }),
     ],
     properties: PROPERTIES,
-    render: { draw, bleed: { left: 26, right: 26 } },
+    render: { draw, bleed: { left: u(2), right: u(2), top: u(1.5) } },
     requiresSeriesResistor: true,
     catalog: {
       categoryId: 'leds',

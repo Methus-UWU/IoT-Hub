@@ -4,8 +4,9 @@ import {
   type DeviceDrawContext,
   type DevicePropertyDefinition,
 } from '../core/device-definition';
+import { bodyFromMm, HEADER_PITCH, u } from '../core/device-metrics';
 import { OUTLINE, PART } from '../core/device-palette';
-import { PIN_PITCH, silkLabel } from '../core/device-parts';
+import { silkLabel } from '../core/device-parts';
 import { pin } from '../core/device-pin';
 import { circle, group, line, path, rect, text, type Shape } from '../core/device-shape';
 import {
@@ -14,14 +15,19 @@ import {
   type DeviceBehavior,
 } from '../core/device-simulation';
 
-const WIDTH = 140;
-const HEIGHT = 150;
-const BODY_Y = 18;
-const BODY_R = 52;
+/**
+ * RV09-style 9 mm vertical pot: a 9.5 mm phenolic case on three lugs at 0.1 in
+ * pitch. The case is only twice the width of its own lug spacing, which is why
+ * a real one looks so much smaller in a circuit than the knob it usually wears.
+ */
+const BODY = bodyFromMm({ widthMm: 11, heightMm: 15 });
+const WIDTH = BODY.width;
+const HEIGHT = BODY.height;
+const BODY_R = u(4.75);
 const CENTER_X = WIDTH / 2;
-const CENTER_Y = BODY_Y + BODY_R;
+const CENTER_Y = u(5.5);
 const PIN_Y = HEIGHT;
-const PIN_START_X = CENTER_X - PIN_PITCH;
+const PIN_START_X = CENTER_X - HEADER_PITCH;
 
 /** Rotation limits of a standard single-turn pot, in degrees from vertical. */
 const SWEEP = 135;
@@ -79,38 +85,41 @@ function draw(context: DeviceDrawContext): readonly Shape[] {
   return [
     // Solder lugs.
     ...[0, 1, 2].map((index) =>
-      line(PIN_START_X + index * PIN_PITCH, CENTER_Y + BODY_R - 8, PIN_START_X + index * PIN_PITCH, PIN_Y, {
-        stroke: PART.metal,
-        strokeWidth: 4,
-        strokeLinecap: 'round',
-      }),
+      line(
+        PIN_START_X + index * HEADER_PITCH,
+        CENTER_Y + BODY_R - u(0.8),
+        PIN_START_X + index * HEADER_PITCH,
+        PIN_Y,
+        { stroke: PART.metal, strokeWidth: u(0.45), strokeLinecap: 'round' },
+      ),
     ),
 
     // Blue phenolic case with the metal shaft collar.
     circle(CENTER_X, CENTER_Y, BODY_R, {
       fill: '#2f6fbf',
       stroke: OUTLINE,
-      strokeWidth: 1.5,
+      strokeWidth: u(0.15),
     }),
-    circle(CENTER_X, CENTER_Y, BODY_R - 9, {
+    circle(CENTER_X, CENTER_Y, BODY_R - u(0.9), {
       fill: '#2a63ab',
       stroke: '#20508d',
-      strokeWidth: 1,
+      strokeWidth: u(0.1),
       detail: 'normal',
     }),
-    circle(CENTER_X, CENTER_Y, 22, {
+    // 6 mm shaft collar.
+    circle(CENTER_X, CENTER_Y, u(3), {
       fill: PART.metalLight,
       stroke: PART.metalDark,
-      strokeWidth: 1.5,
+      strokeWidth: u(0.15),
     }),
 
     // Knob indicator — rotates with the wiper so the position is readable
     // straight off the canvas.
     group(
       [
-        line(0, 0, 0, -16, {
+        line(0, 0, 0, -u(2.4), {
           stroke: '#1f2937',
-          strokeWidth: 4,
+          strokeWidth: u(0.5),
           strokeLinecap: 'round',
         }),
       ],
@@ -119,18 +128,21 @@ function draw(context: DeviceDrawContext): readonly Shape[] {
 
     // Travel arc.
     path(
-      `M ${CENTER_X - 34} ${CENTER_Y + 26} A 42 42 0 0 1 ${CENTER_X + 34} ${CENTER_Y + 26}`,
-      { fill: 'none', stroke: '#93c5fd', strokeWidth: 2, opacity: 0.7, detail: 'high' },
+      `M ${CENTER_X - u(2.7)} ${CENTER_Y + u(2.1)} A ${u(3.4)} ${u(3.4)} 0 0 1 ${
+        CENTER_X + u(2.7)
+      } ${CENTER_Y + u(2.1)}`,
+      { fill: 'none', stroke: '#93c5fd', strokeWidth: u(0.2), opacity: 0.7, detail: 'high' },
     ),
 
-    silkLabel(CENTER_X, CENTER_Y + BODY_R - 16, `${Math.round(position)}%`, {
-      size: 11,
+    silkLabel(CENTER_X, CENTER_Y + BODY_R - u(0.9), `${Math.round(position)}%`, {
+      size: u(1.1),
       fill: '#e6f0ff',
       weight: 700,
+      detail: 'normal',
     }),
 
-    text(CENTER_X, HEIGHT - 2, `${formatOhms(wiper)} / ${formatOhms(total)}`, {
-      size: 9.5,
+    text(CENTER_X, HEIGHT - u(0.3), `${formatOhms(wiper)}/${formatOhms(total)}`, {
+      size: u(0.95),
       fill: '#6b7280',
       anchor: 'middle',
       weight: 600,
@@ -154,8 +166,7 @@ export const POTENTIOMETER: VirtualDevice = {
   description: 'Rotary voltage divider. The wiper reads between the two end terminals.',
   x: 520,
   y: 640,
-  width: WIDTH,
-  height: HEIGHT,
+  ...BODY,
   initiallyVisible: false,
   interfaces: ['analog', 'passive'],
   pins: [
@@ -163,12 +174,12 @@ export const POTENTIOMETER: VirtualDevice = {
       side: 'bottom',
       description: 'End terminal, commonly tied to GND',
     }),
-    pin('WIPER', PIN_START_X + PIN_PITCH, PIN_Y, 'analog', {
+    pin('WIPER', PIN_START_X + HEADER_PITCH, PIN_Y, 'analog', {
       side: 'bottom',
       direction: 'output',
       description: 'Wiper output, feed this to an ADC pin',
     }),
-    pin('3', PIN_START_X + PIN_PITCH * 2, PIN_Y, 'passive', {
+    pin('3', PIN_START_X + HEADER_PITCH * 2, PIN_Y, 'passive', {
       side: 'bottom',
       description: 'End terminal, commonly tied to VCC',
     }),

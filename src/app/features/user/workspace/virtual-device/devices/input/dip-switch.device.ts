@@ -3,17 +3,19 @@ import type {
   DeviceDrawContext,
   DevicePropertyDefinition,
 } from '../core/device-definition';
+import { HEADER_PITCH, u, UNITS_PER_MM } from '../core/device-metrics';
 import { OUTLINE, PART, SILK } from '../core/device-palette';
-import { PIN_PITCH } from '../core/device-parts';
 import { pin } from '../core/device-pin';
 import { rect, repeat, text, type Shape } from '../core/device-shape';
 import type { DeviceBehavior } from '../core/device-simulation';
 
 type DipPositions = 2 | 4 | 6 | 8;
 
-const SWITCH_PITCH = PIN_PITCH;
-const BODY_HEIGHT = 96;
-const MARGIN = 14;
+/** One switch per 0.1 in column, the same grid as the pins beneath it. */
+const SWITCH_PITCH = HEADER_PITCH;
+/** A DIP switch package is 9.8 mm across the rows whatever its length. */
+const BODY_HEIGHT = u(9.8);
+const MARGIN = u(1.3);
 
 /**
  * DIP switch bank.
@@ -43,13 +45,13 @@ function createDipSwitch(positions: DipPositions): VirtualDevice {
     return [
       // Red package with the cream actuator channel down the middle.
       rect(0, 0, width, height, {
-        rx: 4,
+        rx: u(0.4),
         fill: '#b23030',
         stroke: OUTLINE,
-        strokeWidth: 1.5,
+        strokeWidth: u(0.15),
       }),
-      rect(MARGIN - 4, 26, width - (MARGIN - 4) * 2, 44, {
-        rx: 2,
+      rect(MARGIN - u(0.4), u(2.6), width - (MARGIN - u(0.4)) * 2, u(4.5), {
+        rx: u(0.2),
         fill: '#7f2020',
         detail: 'normal',
       }),
@@ -58,14 +60,14 @@ function createDipSwitch(positions: DipPositions): VirtualDevice {
       ...repeat(positions, { x: SWITCH_PITCH }, (index, x) => {
         const on = context.state[`switch${index + 1}`] === true;
         return [
-          rect(x - 6, on ? 29 : 49, 12, 19, {
-            rx: 1.5,
+          rect(x - u(0.6), on ? u(2.9) : u(4.8), u(1.2), u(1.9), {
+            rx: u(0.15),
             fill: on ? PART.plasticCream : '#cfc6b0',
             stroke: OUTLINE,
-            strokeWidth: 0.75,
+            strokeWidth: u(0.08),
           }),
-          text(x, 22, String(index + 1), {
-            size: 8.5,
+          text(x, u(2.2), String(index + 1), {
+            size: u(0.9),
             fill: SILK.white,
             anchor: 'middle',
             weight: 700,
@@ -75,8 +77,8 @@ function createDipSwitch(positions: DipPositions): VirtualDevice {
         ];
       }, { x: firstX, y: 0 }),
 
-      text(width - 6, height - 6, 'ON', {
-        size: 8,
+      text(width - u(0.6), height - u(0.7), 'ON', {
+        size: u(0.9),
         fill: SILK.soft,
         anchor: 'end',
         weight: 700,
@@ -86,8 +88,11 @@ function createDipSwitch(positions: DipPositions): VirtualDevice {
 
       // Gull-wing leads.
       ...repeat(positions, { x: SWITCH_PITCH }, (_, x) => [
-        rect(x - 3.5, -7, 7, 8, { fill: PART.headerGold, detail: 'normal' }),
-        rect(x - 3.5, height - 1, 7, 8, { fill: PART.headerGold, detail: 'normal' }),
+        rect(x - u(0.35), -u(0.7), u(0.7), u(0.8), { fill: PART.headerGold, detail: 'normal' }),
+        rect(x - u(0.35), height - u(0.1), u(0.7), u(0.8), {
+          fill: PART.headerGold,
+          detail: 'normal',
+        }),
       ], { x: firstX, y: 0 }),
     ];
   }
@@ -101,6 +106,8 @@ function createDipSwitch(positions: DipPositions): VirtualDevice {
     y: 720,
     width,
     height,
+    // Length follows the switch count; the 9.8 mm package height never does.
+    physicalSize: { widthMm: width / UNITS_PER_MM, heightMm: height / UNITS_PER_MM },
     initiallyVisible: false,
     interfaces: ['digital', 'passive'],
     pins: [
@@ -118,7 +125,7 @@ function createDipSwitch(positions: DipPositions): VirtualDevice {
       ),
     ],
     properties,
-    render: { draw, bleed: { top: 10, bottom: 10 } },
+    render: { draw, bleed: { top: u(1), bottom: u(1) } },
     catalog: {
       categoryId: 'switches',
       category: 'Switches',

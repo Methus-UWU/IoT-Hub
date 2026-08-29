@@ -5,34 +5,48 @@ import {
   type DeviceDrawContext,
   type DevicePropertyDefinition,
 } from '../core/device-definition';
+import { bodyFromMm, HEADER_PITCH, u } from '../core/device-metrics';
 import { PART } from '../core/device-palette';
-import { PIN_PITCH } from '../core/device-parts';
 import { pin } from '../core/device-pin';
 import { circle, ellipse, line, path, text, type Shape } from '../core/device-shape';
 import {
-  isLogicHigh,
-  propertyNumber,
   type DeviceBehavior,
   type DeviceSimulationContext,
 } from '../core/device-simulation';
 
-const WIDTH = 104;
-const HEIGHT = 140;
+/**
+ * 5 mm through-hole LED.
+ *
+ * A T-1¾ package is 5 mm across the dome and 5.8 mm across the flange, standing
+ * 8.6 mm tall, with its two leads on the usual 2.54 mm pitch. Those four numbers
+ * are the whole part — everything drawn below is derived from them, which is why
+ * changing the package size property rescales the body without moving the leads.
+ */
+
+const BODY = bodyFromMm({ widthMm: 6.2, heightMm: 14 });
+const WIDTH = BODY.width;
+const HEIGHT = BODY.height;
 const CENTER_X = WIDTH / 2;
-const BODY_TOP = 16;
-const BODY_BOTTOM = 76;
-const BODY_HALF_WIDTH = 16;
-const ANODE_X = CENTER_X - PIN_PITCH / 2;
-const CATHODE_X = CENTER_X + PIN_PITCH / 2;
+
+/** Where the epoxy meets the flange. */
+const BODY_BOTTOM = u(8.6);
+const BODY_TOP = u(0.6);
+/** Half the dome at the reference 5 mm package. */
+const BODY_HALF_WIDTH = u(2.5);
+
+const ANODE_X = CENTER_X - HEADER_PITCH / 2;
+const CATHODE_X = CENTER_X + HEADER_PITCH / 2;
+/** The cathode leg is cut shorter, which is how you tell it apart in hand. */
+const CATHODE_LENGTH = HEIGHT - u(1.6);
 
 /** Emitted colour and typical forward drop per LED colour. */
-const LED_TONES: Readonly<Record<string, { color: string; forward: number }>> = {
-  red: { color: '#ff3b30', forward: 1.8 },
-  green: { color: '#34d058', forward: 2.1 },
-  blue: { color: '#4a9eff', forward: 3.0 },
-  yellow: { color: '#ffd60a', forward: 2.1 },
-  white: { color: '#f8fafc', forward: 3.1 },
-  orange: { color: '#ff9f0a', forward: 2.0 },
+const LED_TONES: Readonly<Record<string, { color: string; edge: string; forward: number }>> = {
+  red: { color: '#ff3b30', edge: '#a52620', forward: 1.8 },
+  green: { color: '#34d058', edge: '#1f7a37', forward: 2.1 },
+  blue: { color: '#4a9eff', edge: '#2159a8', forward: 3.0 },
+  yellow: { color: '#ffd60a', edge: '#a8880a', forward: 2.1 },
+  white: { color: '#f8fafc', edge: '#9aa2ad', forward: 3.1 },
+  orange: { color: '#ff9f0a', edge: '#a86308', forward: 2.0 },
 };
 
 const PROPERTIES: readonly DevicePropertyDefinition[] = [
@@ -92,79 +106,86 @@ export function ledBrightness(across: number, forwardVoltage: number): number {
 
 function draw(context: DeviceDrawContext): readonly Shape[] {
   const tone = LED_TONES[stringState(context, 'color', 'red')] ?? LED_TONES['red'];
-  const scale = Number(stringState(context, 'size', '5')) / 5;
   const level = numberState(context, 'brightness', 0) / 100;
   const lit = level > 0.02;
-  const packageScale = 0.82 + scale * 0.18;
-  const halfWidth = BODY_HALF_WIDTH * packageScale;
-  const domeBottom = BODY_TOP + halfWidth;
+
+  // A 3 mm part is genuinely smaller than a 10 mm one, but the leads stay on
+  // 0.1 in pitch in every package — so only the body scales.
+  const millimetres = Number(stringState(context, 'size', '5')) || 5;
+  const halfWidth = u(millimetres / 2);
+  const domeTop = BODY_BOTTOM - halfWidth * 1.6;
+  const domeShoulder = domeTop + halfWidth;
 
   return [
     // Leads. The anode is drawn longer, as on a real through-hole LED.
-    line(ANODE_X, BODY_BOTTOM - 1, ANODE_X, HEIGHT, {
+    line(ANODE_X, BODY_BOTTOM - u(0.1), ANODE_X, HEIGHT, {
       stroke: PART.metal,
-      strokeWidth: 3.5,
+      strokeWidth: u(0.5),
       strokeLinecap: 'round',
     }),
-    line(CATHODE_X, BODY_BOTTOM - 1, CATHODE_X, HEIGHT - 16, {
+    line(CATHODE_X, BODY_BOTTOM - u(0.1), CATHODE_X, CATHODE_LENGTH, {
       stroke: PART.metal,
-      strokeWidth: 3.5,
+      strokeWidth: u(0.5),
       strokeLinecap: 'round',
     }),
 
     // Halo only while lit, and scaled by brightness so PWM reads visually.
     ...(lit
       ? [
-          circle(CENTER_X, BODY_TOP + 31, halfWidth + 12 * level, {
+          circle(CENTER_X, domeShoulder, halfWidth + u(1.4) * level, {
             fill: tone.color,
             opacity: 0.18 * level,
           }),
         ]
       : []),
 
-    // Narrow, tall epoxy package like a real 5 mm through-hole LED.
+    // Epoxy package: straight sides up to a hemispherical dome.
     path(
-      `M ${CENTER_X - halfWidth} ${BODY_BOTTOM}
-       V ${domeBottom}
-       A ${halfWidth} ${halfWidth} 0 0 1 ${CENTER_X + halfWidth} ${domeBottom}
-       V ${BODY_BOTTOM} Z`,
+      `M ${CENTER_X - halfWidth} ${BODY_BOTTOM}` +
+        ` V ${domeShoulder}` +
+        ` A ${halfWidth} ${halfWidth} 0 0 1 ${CENTER_X + halfWidth} ${domeShoulder}` +
+        ` V ${BODY_BOTTOM} Z`,
       {
         fill: tone.color,
         opacity: lit ? 0.88 + level * 0.12 : 0.82,
-        stroke: '#a52620',
-        strokeWidth: 1.5,
+        stroke: tone.edge,
+        strokeWidth: u(0.15),
       },
     ),
 
-    // Flange, flattened on the cathode side exactly as the real package is.
-    ellipse(CENTER_X, BODY_BOTTOM, halfWidth + 3, 4.5, {
+    // Flange, wider than the dome exactly as the real package is.
+    ellipse(CENTER_X, BODY_BOTTOM, halfWidth + u(0.4), u(0.45), {
       fill: tone.color,
       opacity: lit ? 1 : 0.88,
-      stroke: '#a52620',
-      strokeWidth: 1.25,
+      stroke: tone.edge,
+      strokeWidth: u(0.13),
     }),
 
-    // Subtle internal reflector and highlight keep the package readable.
-    path(`M ${CENTER_X + 2} ${domeBottom + 8} l 10 9 v 26 l -10 6 z`, {
-      fill: '#b91f1a',
-      opacity: lit ? 0.3 : 0.42,
-      detail: 'normal',
-    }),
-    path(`M ${CENTER_X - 8} ${domeBottom + 2} V ${BODY_BOTTOM - 12}`, {
+    // Internal reflector cup and a highlight down the near face.
+    path(
+      `M ${CENTER_X + u(0.2)} ${domeShoulder + u(0.8)} l ${u(1)} ${u(0.9)}` +
+        ` v ${u(2.6)} l ${-u(1)} ${u(0.6)} z`,
+      {
+        fill: tone.edge,
+        opacity: lit ? 0.3 : 0.42,
+        detail: 'normal',
+      },
+    ),
+    path(`M ${CENTER_X - u(0.8)} ${domeShoulder} V ${BODY_BOTTOM - u(1.2)}`, {
       fill: 'none',
-      stroke: '#fff5f4',
-      strokeWidth: 2.2,
+      stroke: '#ffffff',
+      strokeWidth: u(0.22),
       strokeLinecap: 'round',
       opacity: lit ? 0.72 : 0.48,
       detail: 'normal',
     }),
 
-    text(ANODE_X, HEIGHT - 2, '+', {
-      size: 11,
+    text(ANODE_X, HEIGHT - u(0.2), '+', {
+      size: u(1.1),
       fill: '#6b7280',
       anchor: 'middle',
       weight: 700,
-      detail: 'normal',
+      detail: 'high',
     }),
   ];
 }
@@ -191,7 +212,6 @@ function createBehavior(): DeviceBehavior {
   };
 }
 
-/** 5 mm through-hole LED. */
 export const LED_5MM: VirtualDevice = {
   id: 'led',
   name: 'LED',
@@ -199,10 +219,7 @@ export const LED_5MM: VirtualDevice = {
   description: 'Lights when forward voltage is applied. Always pair with a series resistor.',
   x: 240,
   y: 288,
-  width: WIDTH,
-  height: HEIGHT,
-  // 5 mm through-hole LED, drawn with its legs: 5.2 mm across, 7 mm tall.
-  physicalSize: { widthMm: 5.2, heightMm: 7 },
+  ...BODY,
   operatingVoltage: { min: 1.8, max: 3.4, recommended: 3.3 },
   interfaces: ['digital', 'pwm'],
   pins: [
@@ -210,13 +227,14 @@ export const LED_5MM: VirtualDevice = {
       side: 'bottom',
       description: 'Anode — the longer leg, wire toward the positive supply',
     }),
-    pin('K', CATHODE_X, HEIGHT - 16, 'passive', {
+    pin('K', CATHODE_X, CATHODE_LENGTH, 'passive', {
       side: 'bottom',
       description: 'Cathode — flat side of the flange, wire toward ground',
     }),
   ],
   properties: PROPERTIES,
-  render: { draw, bleed: { left: 18, right: 18 } },
+  // A 10 mm package and its halo spill past the 6.2 mm body.
+  render: { draw, bleed: { left: u(3), right: u(3), top: u(2) } },
   requiresSeriesResistor: true,
   simulation: createBehavior,
   catalog: {

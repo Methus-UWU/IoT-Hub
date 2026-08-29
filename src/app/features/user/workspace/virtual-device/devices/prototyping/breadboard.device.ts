@@ -1,5 +1,6 @@
 import type { DevicePin, VirtualDevice } from '../../models/virtual-device.model';
 import type { DeviceDrawContext } from '../core/device-definition';
+import { u, UNITS_PER_MM } from '../core/device-metrics';
 import { OUTLINE, PART } from '../core/device-palette';
 import { PIN_PITCH } from '../core/device-parts';
 import { pin } from '../core/device-pin';
@@ -8,8 +9,10 @@ import type { DeviceBehavior } from '../core/device-simulation';
 
 /** Real breadboards are on a 0.1 in grid, the same pitch as every DIP part. */
 const HOLE = PIN_PITCH;
-const MARGIN = 22;
-const RAIL_GAP = 16;
+/** Plastic border outside the outermost holes. */
+const MARGIN = u(3.6);
+/** Gap between a power rail pair and the terminal strips. */
+const RAIL_GAP = u(3.6);
 const RAVINE = HOLE * 2;
 
 const ROW_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'] as const;
@@ -97,26 +100,30 @@ function createBreadboard(size: BreadboardSize): VirtualDevice {
   }
 
   function hole(x: number, y: number): Shape {
-    return rect(x - 4, y - 4, 8, 8, { rx: 1.5, fill: '#7d838c', detail: 'normal' });
+    return rect(x - u(0.75), y - u(0.75), u(1.5), u(1.5), {
+      rx: u(0.2),
+      fill: '#7d838c',
+      detail: 'normal',
+    });
   }
 
   function railRow(y: number, positive: boolean): readonly Shape[] {
     const color = positive ? '#dc2626' : '#2563eb';
     return [
-      line(MARGIN - 8, y, width - MARGIN + 8, y - 0, {
+      line(MARGIN - u(1.2), y, width - MARGIN + u(1.2), y, {
         stroke: color,
-        strokeWidth: 1.5,
+        strokeWidth: u(0.2),
         opacity: 0.55,
         detail: 'normal',
       }),
-      text(MARGIN - 12, y + 4, positive ? '+' : '−', {
-        size: 13,
+      text(MARGIN - u(1.8), y + u(0.6), positive ? '+' : '−', {
+        size: u(1.8),
         fill: color,
         anchor: 'end',
         weight: 700,
       }),
-      text(width - MARGIN + 12, y + 4, positive ? '+' : '−', {
-        size: 13,
+      text(width - MARGIN + u(1.8), y + u(0.6), positive ? '+' : '−', {
+        size: u(1.8),
         fill: color,
         anchor: 'start',
         weight: 700,
@@ -127,17 +134,17 @@ function createBreadboard(size: BreadboardSize): VirtualDevice {
   function draw(_context: DeviceDrawContext): readonly Shape[] {
     return [
       rect(0, 0, width, height, {
-        rx: 6,
+        rx: u(1),
         fill: '#f0ece2',
         stroke: '#c9c3b4',
-        strokeWidth: 1.5,
+        strokeWidth: u(0.2),
       }),
 
       // Central ravine that isolates the two halves.
-      rect(MARGIN - 6, upperStripY + stripHeight, width - (MARGIN - 6) * 2, RAVINE, {
+      rect(MARGIN - u(0.9), upperStripY + stripHeight, width - (MARGIN - u(0.9)) * 2, RAVINE, {
         fill: '#e2ddd0',
         stroke: '#cdc7b8',
-        strokeWidth: 1,
+        strokeWidth: u(0.15),
       }),
 
       // Power rail markings.
@@ -171,8 +178,8 @@ function createBreadboard(size: BreadboardSize): VirtualDevice {
         // Column numbers every fifth column, as printed on a real board.
         ...((column + 1) % 5 === 0
           ? [
-              text(x, upperStripY - 4, String(column + 1), {
-                size: 8,
+              text(x, upperStripY - u(0.6), String(column + 1), {
+                size: u(1.2),
                 fill: '#9a9384',
                 anchor: 'middle',
                 mono: true,
@@ -185,9 +192,10 @@ function createBreadboard(size: BreadboardSize): VirtualDevice {
       // Row letters down both edges.
       ...ROW_LETTERS.map((letter, row) => {
         const upper = row < 5;
-        const y = (upper ? upperStripY : lowerStripY) + (upper ? row : row - 5) * HOLE + HOLE / 2 + 3;
-        return text(MARGIN - 12, y, letter, {
-          size: 8,
+        const y =
+          (upper ? upperStripY : lowerStripY) + (upper ? row : row - 5) * HOLE + HOLE / 2 + u(0.42);
+        return text(MARGIN - u(1.4), y, letter, {
+          size: u(1.2),
           fill: '#9a9384',
           anchor: 'end',
           mono: true,
@@ -208,6 +216,10 @@ function createBreadboard(size: BreadboardSize): VirtualDevice {
     y: 40,
     width,
     height,
+    // The board is laid out directly on the 0.1 in grid, so its millimetres are
+    // whatever that grid adds up to rather than a separately typed figure that
+    // could drift away from it.
+    physicalSize: { widthMm: width / UNITS_PER_MM, heightMm: height / UNITS_PER_MM },
     initiallyVisible: false,
     interfaces: ['passive'],
     pins,

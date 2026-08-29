@@ -42,6 +42,7 @@ import {
   WIRE_COLORS,
 } from './devices/microcontrollers/esp32-devkit.board';
 import { relayChannelBox } from './devices/relay/relay-module.device';
+import { BUTTON_CAP } from './devices/input/push-button.device';
 import type {
   BoardPin,
   ConnectionKind,
@@ -146,13 +147,6 @@ const INITIAL_DEVICE_STATES: Readonly<Record<string, DeviceState>> = Object.from
   ]),
 );
 
-const INITIAL_RELAY_STATES: Readonly<Record<string, readonly boolean[]>> = {
-  relay: [false],
-  relay2: [false, false],
-  relay4: [false, false, false, false],
-  relay8: [false, false, false, false, false, false, false, false],
-};
-
 @Component({
   selector: 'app-virtual-device-page',
   imports: [AddDeviceModal, DeviceArt],
@@ -209,6 +203,8 @@ export class VirtualDevicePage {
   ]);
   protected readonly libraryDevices = DEVICE_LIBRARY_ITEMS;
   protected readonly boardPins = BOARD_PINS;
+  /** Actuator geometry, so the press target is exactly the cap that is drawn. */
+  protected readonly buttonCap = BUTTON_CAP;
   protected readonly wireColors = WIRE_COLORS;
   protected readonly placements = signal<Record<string, DevicePlacement>>({
     ...INITIAL_PLACEMENTS,
@@ -526,14 +522,6 @@ export class VirtualDevicePage {
     this.inspectorOpen.set(true);
   }
 
-  protected readonly relayChannelStates =
-    signal<Readonly<Record<string, readonly boolean[]>>>(INITIAL_RELAY_STATES);
-  protected readonly relayOn = computed(() =>
-    Object.values(this.relayChannelStates()).some((states) => states?.some(Boolean)),
-  );
-  protected readonly servoAngle = signal(90);
-  protected readonly distance = signal(42);
-
   protected readonly project = computed(() =>
     this.projectStore.projectById(this.route.snapshot.paramMap.get('projectId')),
   );
@@ -627,34 +615,7 @@ export class VirtualDevicePage {
     const device = this.selectedDevice();
     if (!device) return 'No part selected';
 
-    // Parts on the declarative pipeline report from their runtime state rather
-    // than needing a case added to the legacy switch below.
-    if (device.render) return this.liveReadingFor(device);
-
-    switch (device.id) {
-      case 'lcd':
-      case 'lcd1602parallel':
-      case 'lcd2004parallel':
-      case 'lcd2004i2c':
-        return this.simulationRunning() ? `${this.distance()} cm` : 'Standby';
-      case 'led':
-        return this.simulationRunning() ? 'On' : 'Off';
-      case 'ultrasonic':
-        return `${this.distance()} cm`;
-      case 'relay':
-      case 'relay2':
-      case 'relay4':
-      case 'relay8':
-        return this.relayOn() ? 'Energized' : 'Open';
-      case 'button':
-        return this.buttonPressedFor(this.selectedDeviceId()) ? 'Pressed' : 'Released';
-      case 'servo':
-        return `${this.servoAngle()} deg`;
-      case 'dc-motor':
-        return this.simulationRunning() ? 'Running' : 'Stopped';
-      default:
-        return 'No part selected';
-    }
+    return this.liveReadingFor(device);
   });
 
   /** Route project id. Null only if the canvas is opened outside a project. */
@@ -677,7 +638,6 @@ export class VirtualDevicePage {
       this.placements.set({});
       this.connections.set([]);
       this.deviceStates.set({});
-      this.relayChannelStates.set({});
     }
 
     void this.restorePersistedComponents();
@@ -780,10 +740,6 @@ export class VirtualDevicePage {
   protected canvasTransform(): string {
     const pan = this.canvasPan();
     return `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${this.canvasScale()})`;
-  }
-
-  protected relayStatesFor(id: string): readonly boolean[] {
-    return this.relayChannelStates()[id] ?? [];
   }
 
   // ------------------------------------------------------- device properties
@@ -1922,13 +1878,11 @@ export class VirtualDevicePage {
     return this.buttonPressedStates()[deviceId] ?? false;
   }
 
+  /** Keyboard equivalent of pressing the cap: toggles rather than holds. */
   protected toggleButton(): void {
     const deviceId = this.selectedDeviceId();
     if (!deviceId) return;
-    this.buttonPressedStates.update((states) => ({
-      ...states,
-      [deviceId]: !this.buttonPressedFor(deviceId),
-    }));
+    this.pressButton(new Event('keyboard'), deviceId, !this.buttonPressedFor(deviceId));
   }
 
   /**
@@ -1959,42 +1913,36 @@ export class VirtualDevicePage {
     }
   }
 
-  protected toggleRelay(): void {
-    const id = this.selectedDeviceId();
-    const current = id ? this.relayChannelStates()[id] : undefined;
-    if (!this.simulationRunning() || !id || !current) return;
-    const nextState = !current.every(Boolean);
-    this.relayChannelStates.update((states) => ({ ...states, [id]: current.map(() => nextState) }));
-  }
-
+  /**
+   * Relay coil state, read from the part's own `chN` property.
+   *
+   * It used to live in a separate signal on this page, which meant the canvas
+   * showed a relay closed while the simulation still saw its coil at rest. One
+   * source now feeds the artwork, the inspector and the solver alike.
+   */
   protected relayChannelOn(deviceId: string, channelIndex: number): boolean {
-    return this.relayChannelStates()[deviceId]?.[channelIndex] ?? false;
+    return this.deviceStates()[deviceId]?.[`ch${channelIndex + 1}`] === true;
   }
 
   protected toggleRelayChannel(event: Event, deviceId: string, channelIndex: number): void {
     event.stopPropagation();
-    if (!this.simulationRunning()) return;
-    const current = this.relayChannelStates()[deviceId];
-    if (!current || channelIndex < 0 || channelIndex >= current.length) return;
-    this.relayChannelStates.update((states) => ({
+    const device = this.deviceInstanceById(deviceId);
+    const key = `ch${channelIndex + 1}`;
+    if (!device?.properties?.some((property) => property.id === key)) return;
+
+    this.deviceStates.update((states) => ({
       ...states,
-      [deviceId]: current.map((isOn, index) => (index === channelIndex ? !isOn : isOn)),
+      [deviceId]: {
+        ...(states[deviceId] ?? defaultStateFor(device.properties)),
+        [key]: !this.relayChannelOn(deviceId, channelIndex),
+      },
     }));
-  }
-
-  protected updateDistance(event: Event): void {
-    this.distance.set(Number((event.target as HTMLInputElement).value));
-  }
-
-  protected updateServoAngle(event: Event): void {
-    this.servoAngle.set(Number((event.target as HTMLInputElement).value));
   }
 
   protected resetDiagram(): void {
     this.deviceInstances.set([...INITIAL_DEVICE_INSTANCES]);
     this.placements.set({ ...INITIAL_PLACEMENTS });
     this.connections.set([...INITIAL_CONNECTIONS]);
-    this.relayChannelStates.set(INITIAL_RELAY_STATES);
     this.deviceStates.set(INITIAL_DEVICE_STATES);
     this.buttonPressedStates.set({});
     this.selectedDeviceId.set(null);
@@ -2088,12 +2036,6 @@ export class VirtualDevicePage {
       ...placements,
       [instance.instanceId]: { ...origin, rotation: 0, visible: true },
     }));
-    if (instance.relayChannels) {
-      this.relayChannelStates.update((states) => ({
-        ...states,
-        [instance.instanceId]: instance.relayChannels!.map(() => false),
-      }));
-    }
     if (instance.properties?.length) {
       this.deviceStates.update((states) => ({
         ...states,

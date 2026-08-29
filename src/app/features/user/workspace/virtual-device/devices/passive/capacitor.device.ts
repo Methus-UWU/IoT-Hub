@@ -4,8 +4,8 @@ import {
   type DeviceDrawContext,
   type DevicePropertyDefinition,
 } from '../core/device-definition';
+import { bodyFromMm, u } from '../core/device-metrics';
 import { OUTLINE, PART, SILK } from '../core/device-palette';
-import { PIN_PITCH } from '../core/device-parts';
 import { pin } from '../core/device-pin';
 import { circle, line, rect, text, type Shape } from '../core/device-shape';
 
@@ -22,10 +22,15 @@ function trim(value: number): string {
 
 // ------------------------------------------------------------- ceramic disc
 
-const CERAMIC_W = 96;
-const CERAMIC_H = 96;
+/** A 5 mm disc on the 5.08 mm lead spacing these are supplied at. */
+const CERAMIC_BODY = bodyFromMm({ widthMm: 7, heightMm: 11 });
+const CERAMIC_W = CERAMIC_BODY.width;
+const CERAMIC_H = CERAMIC_BODY.height;
 const CERAMIC_CX = CERAMIC_W / 2;
-const CERAMIC_LEG_X0 = CERAMIC_CX - PIN_PITCH / 2;
+const CERAMIC_LEAD_PITCH = u(5.08);
+const CERAMIC_LEG_X0 = CERAMIC_CX - CERAMIC_LEAD_PITCH / 2;
+const CERAMIC_DISC_CY = u(3);
+const CERAMIC_DISC_R = u(2.5);
 
 const CERAMIC_PROPS: readonly DevicePropertyDefinition[] = [
   {
@@ -45,33 +50,34 @@ const CERAMIC_PROPS: readonly DevicePropertyDefinition[] = [
 function drawCeramic(context: DeviceDrawContext): readonly Shape[] {
   const farads = numberState(context, 'capacitance', 1e-7);
   return [
-    line(CERAMIC_LEG_X0, 44, CERAMIC_LEG_X0, CERAMIC_H, {
-      stroke: PART.metal,
-      strokeWidth: 4,
-      strokeLinecap: 'round',
+    ...[CERAMIC_LEG_X0, CERAMIC_LEG_X0 + CERAMIC_LEAD_PITCH].map((x) =>
+      line(x, CERAMIC_DISC_CY + u(1.6), x, CERAMIC_H, {
+        stroke: PART.metal,
+        strokeWidth: u(0.45),
+        strokeLinecap: 'round',
+      }),
+    ),
+    // Dipped ceramic disc.
+    circle(CERAMIC_CX, CERAMIC_DISC_CY, CERAMIC_DISC_R, {
+      fill: PART.ceramicDisc,
+      stroke: OUTLINE,
+      strokeWidth: u(0.15),
     }),
-    line(CERAMIC_LEG_X0 + PIN_PITCH, 44, CERAMIC_LEG_X0 + PIN_PITCH, CERAMIC_H, {
-      stroke: PART.metal,
-      strokeWidth: 4,
-      strokeLinecap: 'round',
-    }),
-    // Blue-brown ceramic blob.
-    circle(CERAMIC_CX, 30, 30, { fill: PART.ceramicDisc, stroke: OUTLINE, strokeWidth: 1.5 }),
-    text(CERAMIC_CX, 34, capCode(farads), {
-      size: 12,
+    text(CERAMIC_CX, CERAMIC_DISC_CY + u(0.4), capCode(farads), {
+      size: u(1.2),
       fill: '#3a2c12',
       anchor: 'middle',
       weight: 700,
       mono: true,
       detail: 'normal',
     }),
-    text(CERAMIC_CX, CERAMIC_H + 14, formatCapacitance(farads), {
-      size: 10.5,
+    text(CERAMIC_CX, CERAMIC_H + u(1.4), formatCapacitance(farads), {
+      size: u(1.1),
       fill: '#6b7280',
       anchor: 'middle',
       weight: 600,
       mono: true,
-      detail: 'normal',
+      detail: 'high',
     }),
   ];
 }
@@ -92,17 +98,16 @@ export const CAPACITOR_CERAMIC: VirtualDevice = {
   description: 'Small non-polarised capacitor for decoupling and filtering.',
   x: 300,
   y: 720,
-  width: CERAMIC_W,
-  height: CERAMIC_H,
+  ...CERAMIC_BODY,
   initiallyVisible: false,
   rotatable: true,
   interfaces: ['passive'],
   pins: [
     pin('1', CERAMIC_LEG_X0, CERAMIC_H, 'passive', { side: 'bottom' }),
-    pin('2', CERAMIC_LEG_X0 + PIN_PITCH, CERAMIC_H, 'passive', { side: 'bottom' }),
+    pin('2', CERAMIC_LEG_X0 + CERAMIC_LEAD_PITCH, CERAMIC_H, 'passive', { side: 'bottom' }),
   ],
   properties: CERAMIC_PROPS,
-  render: { draw: drawCeramic, bleed: { bottom: 18 } },
+  render: { draw: drawCeramic, bleed: { bottom: u(2) } },
   catalog: {
     categoryId: 'passive-components',
     category: 'Passive Components',
@@ -115,10 +120,17 @@ export const CAPACITOR_CERAMIC: VirtualDevice = {
 
 // ------------------------------------------------------- electrolytic can
 
-const ELECTRO_W = 100;
-const ELECTRO_H = 132;
+/** A 100 µF / 25 V radial can: 6.3 mm across, 11 mm tall, 2.5 mm lead pitch. */
+const ELECTRO_BODY = bodyFromMm({ widthMm: 8, heightMm: 15 });
+const ELECTRO_W = ELECTRO_BODY.width;
+const ELECTRO_H = ELECTRO_BODY.height;
 const ELECTRO_CX = ELECTRO_W / 2;
-const ELECTRO_LEG_X0 = ELECTRO_CX - PIN_PITCH / 2;
+const ELECTRO_LEAD_PITCH = u(2.5);
+const ELECTRO_LEG_X0 = ELECTRO_CX - ELECTRO_LEAD_PITCH / 2;
+const CAN_TOP = u(0.5);
+const CAN_HEIGHT = u(11);
+/** The cathode leg is the short one, under the stripe. */
+const ELECTRO_SHORT_LEG = ELECTRO_H - u(1.2);
 
 const ELECTRO_PROPS: readonly DevicePropertyDefinition[] = [
   {
@@ -148,72 +160,69 @@ const ELECTRO_PROPS: readonly DevicePropertyDefinition[] = [
 function drawElectrolytic(context: DeviceDrawContext): readonly Shape[] {
   const farads = numberState(context, 'capacitance', 1e-4);
   const volts = numberState(context, 'voltage', 25);
-  const bodyTop = 26;
+  const canBottom = CAN_TOP + CAN_HEIGHT;
 
   return [
     // Longer leg is positive; the stripe on the can marks the negative side.
-    line(ELECTRO_LEG_X0, bodyTop + 84, ELECTRO_LEG_X0, ELECTRO_H, {
+    line(ELECTRO_LEG_X0, canBottom - u(0.3), ELECTRO_LEG_X0, ELECTRO_H, {
       stroke: PART.metal,
-      strokeWidth: 4,
+      strokeWidth: u(0.45),
       strokeLinecap: 'round',
     }),
-    line(ELECTRO_LEG_X0 + PIN_PITCH, bodyTop + 84, ELECTRO_LEG_X0 + PIN_PITCH, ELECTRO_H - 12, {
-      stroke: PART.metal,
-      strokeWidth: 4,
-      strokeLinecap: 'round',
-    }),
+    line(
+      ELECTRO_LEG_X0 + ELECTRO_LEAD_PITCH,
+      canBottom - u(0.3),
+      ELECTRO_LEG_X0 + ELECTRO_LEAD_PITCH,
+      ELECTRO_SHORT_LEG,
+      { stroke: PART.metal, strokeWidth: u(0.45), strokeLinecap: 'round' },
+    ),
     // Aluminium can.
-    rect(14, bodyTop, ELECTRO_W - 28, 90, {
-      rx: 8,
+    rect(u(0.85), CAN_TOP, u(6.3), CAN_HEIGHT, {
+      rx: u(0.8),
       fill: PART.electrolytic,
       stroke: OUTLINE,
-      strokeWidth: 1.5,
+      strokeWidth: u(0.15),
     }),
     // Negative stripe with minus marks, over the shorter leg.
-    rect(ELECTRO_W - 34, bodyTop, 20, 90, { rx: 4, fill: '#9aa6bd', opacity: 0.9 }),
-    text(ELECTRO_W - 24, bodyTop + 30, '−', {
-      size: 12,
-      fill: '#1e2a3f',
-      anchor: 'middle',
-      weight: 800,
-      detail: 'normal',
-    }),
-    text(ELECTRO_W - 24, bodyTop + 52, '−', {
-      size: 12,
-      fill: '#1e2a3f',
-      anchor: 'middle',
-      weight: 800,
-      detail: 'normal',
-    }),
-    // Vent cross on the top.
-    line(24, bodyTop + 12, ELECTRO_W - 24, bodyTop + 12, {
+    rect(u(5.35), CAN_TOP, u(1.8), CAN_HEIGHT, { rx: u(0.4), fill: '#9aa6bd', opacity: 0.9 }),
+    ...[u(3.5), u(6)].map((y) =>
+      text(u(6.25), CAN_TOP + y, '−', {
+        size: u(1.2),
+        fill: '#1e2a3f',
+        anchor: 'middle',
+        weight: 800,
+        detail: 'normal',
+      }),
+    ),
+    // Scored vent on the top of the can.
+    line(u(1.6), CAN_TOP + u(1.2), u(5.2), CAN_TOP + u(1.2), {
       stroke: '#1a2436',
-      strokeWidth: 1,
+      strokeWidth: u(0.1),
       opacity: 0.5,
       detail: 'high',
     }),
-    text(ELECTRO_CX - 6, bodyTop + 52, formatCapacitance(farads), {
-      size: 9.5,
+    text(u(3.1), CAN_TOP + u(5), formatCapacitance(farads), {
+      size: u(0.95),
       fill: SILK.soft,
       anchor: 'middle',
       weight: 600,
       mono: true,
       detail: 'normal',
     }),
-    text(ELECTRO_CX - 6, bodyTop + 66, `${trim(volts)}V`, {
-      size: 9.5,
+    text(u(3.1), CAN_TOP + u(6.6), `${trim(volts)}V`, {
+      size: u(0.95),
       fill: SILK.soft,
       anchor: 'middle',
       weight: 600,
       mono: true,
       detail: 'normal',
     }),
-    text(ELECTRO_LEG_X0, ELECTRO_H + 2, '+', {
-      size: 12,
+    text(ELECTRO_LEG_X0 - u(0.9), ELECTRO_H - u(0.3), '+', {
+      size: u(1.2),
       fill: '#6b7280',
       anchor: 'middle',
       weight: 800,
-      detail: 'normal',
+      detail: 'high',
     }),
   ];
 }
@@ -225,8 +234,7 @@ export const CAPACITOR_ELECTROLYTIC: VirtualDevice = {
   description: 'Polarised bulk capacitor. The striped side is negative.',
   x: 300,
   y: 700,
-  width: ELECTRO_W,
-  height: ELECTRO_H,
+  ...ELECTRO_BODY,
   initiallyVisible: false,
   rotatable: true,
   operatingVoltage: { min: 0, max: 25, recommended: 25 },
@@ -236,7 +244,7 @@ export const CAPACITOR_ELECTROLYTIC: VirtualDevice = {
       side: 'bottom',
       description: 'Anode — the longer leg, must sit at the higher potential',
     }),
-    pin('−', ELECTRO_LEG_X0 + PIN_PITCH, ELECTRO_H - 12, 'passive', {
+    pin('−', ELECTRO_LEG_X0 + ELECTRO_LEAD_PITCH, ELECTRO_SHORT_LEG, 'passive', {
       side: 'bottom',
       description: 'Cathode — marked by the stripe',
     }),

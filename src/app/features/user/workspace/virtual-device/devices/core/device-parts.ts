@@ -4,13 +4,19 @@
  * Consistency is the whole point: every board gets its pin headers, mounting
  * holes and ICs from here, so parts drawn months apart still look like one kit.
  * Anything drawn more than twice across the catalog belongs in this file.
+ *
+ * Every dimension below is expressed through `u(millimetres)`. That is what
+ * makes a header drawn on a 20 mm sensor and a header drawn on a 50 mm board
+ * come out the same physical size — impossible while each part invented its own
+ * units.
  */
 
+import { HEADER_PITCH, u } from './device-metrics';
 import { LED_COLORS, OUTLINE, PART, PCB, SILK, type LedColorName } from './device-palette';
 import { circle, group, path, rect, repeat, text, type DetailLevel, type Shape } from './device-shape';
 
-/** Standard 2.54 mm header pitch expressed in canvas units. */
-export const PIN_PITCH = 19.5;
+/** Standard 2.54 mm header pitch, in drawing units. */
+export const PIN_PITCH = HEADER_PITCH;
 
 /** PCB body with a soft edge highlight instead of a heavy drop shadow. */
 export function board(
@@ -21,32 +27,32 @@ export function board(
   fill: string,
   options: { readonly rx?: number; readonly edge?: string } = {},
 ): readonly Shape[] {
-  const rx = options.rx ?? 8;
+  const rx = options.rx ?? u(1);
   return [
     rect(x, y, width, height, {
       rx,
       fill,
       stroke: OUTLINE,
-      strokeWidth: 1.5,
+      strokeWidth: u(0.15),
     }),
-    // A single 1px inner line reads as board thickness without a gradient.
-    rect(x + 2, y + 2, width - 4, height - 4, {
-      rx: Math.max(rx - 2, 0),
+    // A single hairline inside the edge reads as board thickness without a gradient.
+    rect(x + u(0.25), y + u(0.25), width - u(0.5), height - u(0.5), {
+      rx: Math.max(rx - u(0.25), 0),
       fill: 'none',
       stroke: options.edge ?? SILK.dim,
-      strokeWidth: 1,
+      strokeWidth: u(0.1),
       opacity: 0.25,
       detail: 'normal',
     }),
   ];
 }
 
-/** Plated mounting hole. */
-export function mountingHole(cx: number, cy: number, r = 6): Shape {
+/** Plated mounting hole. M3 clearance unless a part asks for something else. */
+export function mountingHole(cx: number, cy: number, r = u(1.7)): Shape {
   return group(
     [
-      circle(cx, cy, r, { fill: PART.solder, stroke: OUTLINE, strokeWidth: 1 }),
-      circle(cx, cy, r * 0.55, { fill: '#0b0e12' }),
+      circle(cx, cy, r, { fill: PART.solder, stroke: OUTLINE, strokeWidth: u(0.1) }),
+      circle(cx, cy, r * 0.62, { fill: '#0b0e12' }),
     ],
     { detail: 'normal' },
   );
@@ -65,34 +71,47 @@ export function femaleHeader(
 ): readonly Shape[] {
   const vertical = orientation === 'vertical';
   const length = count * pitch;
-  const thickness = pitch * 0.92;
+  // A real 0.1 in socket strip measures 2.5 mm across the plastic.
+  const thickness = u(2.5);
   const bodyX = vertical ? x - thickness / 2 : x - pitch / 2;
   const bodyY = vertical ? y - pitch / 2 : y - thickness / 2;
+  const rim = u(0.9);
+  const bore = u(0.55);
 
   return [
     rect(bodyX, bodyY, vertical ? thickness : length, vertical ? length : thickness, {
-      rx: 2,
+      rx: u(0.2),
       fill: PART.headerPlastic,
       stroke: OUTLINE,
-      strokeWidth: 1,
+      strokeWidth: u(0.1),
     }),
     ...repeat(
       count,
       { x: vertical ? 0 : pitch, y: vertical ? pitch : 0 },
       (_, holeX, holeY) => [
-        rect(holeX - 5.5, holeY - 5.5, 11, 11, {
-          rx: 1.5,
+        rect(holeX - rim, holeY - rim, rim * 2, rim * 2, {
+          rx: u(0.15),
           fill: PART.headerGoldDark,
           detail: 'normal',
         }),
-        rect(holeX - 3.5, holeY - 3.5, 7, 7, { rx: 1, fill: '#0a0c0f', detail: 'normal' }),
+        rect(holeX - bore, holeY - bore, bore * 2, bore * 2, {
+          rx: u(0.1),
+          fill: '#0a0c0f',
+          detail: 'normal',
+        }),
       ],
       { x, y },
     ),
   ];
 }
 
-/** A row of male header pins — square gold posts on a black base. */
+/**
+ * A row of male header pins — square gold posts on a black base.
+ *
+ * The post is drawn at 0.9 mm rather than the true 0.64 mm of the pin stock: at
+ * working zoom the exact figure collapses to one dark pixel, and a pin the user
+ * cannot see is a pin they cannot aim a wire at.
+ */
 export function maleHeader(
   x: number,
   y: number,
@@ -102,7 +121,8 @@ export function maleHeader(
 ): readonly Shape[] {
   const horizontal = orientation === 'horizontal';
   const length = count * pitch;
-  const thickness = pitch * 0.8;
+  const thickness = u(2.5);
+  const post = u(0.45);
 
   return [
     rect(
@@ -110,17 +130,17 @@ export function maleHeader(
       horizontal ? y - thickness / 2 : y - pitch / 2,
       horizontal ? length : thickness,
       horizontal ? thickness : length,
-      { rx: 2, fill: PART.headerPlastic, stroke: OUTLINE, strokeWidth: 1 },
+      { rx: u(0.2), fill: PART.headerPlastic, stroke: OUTLINE, strokeWidth: u(0.1) },
     ),
     ...repeat(
       count,
       { x: horizontal ? pitch : 0, y: horizontal ? 0 : pitch },
       (_, pinX, pinY) =>
-        rect(pinX - 3.5, pinY - 3.5, 7, 7, {
-          rx: 1,
+        rect(pinX - post, pinY - post, post * 2, post * 2, {
+          rx: u(0.1),
           fill: PART.headerGold,
           stroke: PART.headerGoldDark,
-          strokeWidth: 0.75,
+          strokeWidth: u(0.08),
           detail: 'normal',
         }),
       { x, y },
@@ -128,7 +148,7 @@ export function maleHeader(
   ];
 }
 
-/** Black DIP/QFN integrated circuit with a pin-1 dot and a part number. */
+/** Black surface-mount integrated circuit with a pin-1 dot and a part number. */
 export function chip(
   x: number,
   y: number,
@@ -137,16 +157,17 @@ export function chip(
   label: string,
   options: { readonly labelSize?: number; readonly fill?: string } = {},
 ): readonly Shape[] {
+  const labelSize = options.labelSize ?? u(1.1);
   return [
     rect(x, y, width, height, {
-      rx: 3,
+      rx: u(0.3),
       fill: options.fill ?? PART.icBlack,
       stroke: OUTLINE,
-      strokeWidth: 1,
+      strokeWidth: u(0.1),
     }),
-    circle(x + 9, y + 9, 3, { fill: PART.icShine, detail: 'normal' }),
-    text(x + width / 2, y + height / 2 + (options.labelSize ?? 11) * 0.35, label, {
-      size: options.labelSize ?? 11,
+    circle(x + u(0.9), y + u(0.9), u(0.3), { fill: PART.icShine, detail: 'normal' }),
+    text(x + width / 2, y + height / 2 + labelSize * 0.35, label, {
+      size: labelSize,
       fill: SILK.soft,
       anchor: 'middle',
       weight: 600,
@@ -171,30 +192,31 @@ export function dipChip(
   options: { readonly labelSize?: number; readonly fill?: string } = {},
 ): readonly Shape[] {
   const pitch = width / pinsPerSide;
-  const legWidth = Math.min(pitch * 0.5, 8);
-  const legHeight = 9;
+  const legWidth = Math.min(pitch * 0.5, u(0.8));
+  const legHeight = u(1.1);
   const legInset = (pitch - legWidth) / 2;
   const notchR = height * 0.16;
   const centreY = y + height / 2;
+  const labelSize = options.labelSize ?? u(1.1);
+  // Legs overlap the body by this much so they read as emerging from beneath it.
+  const tuck = u(0.35);
 
-  // Legs sit under the body: the 3-unit overlap is hidden once the body is
-  // drawn on top, so each leg reads as emerging from beneath the package.
   const legs = repeat(
     pinsPerSide,
     { x: pitch },
     (_, legX) => [
-      rect(legX + legInset, y - legHeight + 3, legWidth, legHeight, {
-        rx: 1.5,
+      rect(legX + legInset, y - legHeight + tuck, legWidth, legHeight, {
+        rx: u(0.15),
         fill: PART.metal,
         stroke: PART.metalDark,
-        strokeWidth: 0.75,
+        strokeWidth: u(0.08),
         detail: 'normal',
       }),
-      rect(legX + legInset, y + height - 3, legWidth, legHeight, {
-        rx: 1.5,
+      rect(legX + legInset, y + height - tuck, legWidth, legHeight, {
+        rx: u(0.15),
         fill: PART.metal,
         stroke: PART.metalDark,
-        strokeWidth: 0.75,
+        strokeWidth: u(0.08),
         detail: 'normal',
       }),
     ],
@@ -204,18 +226,18 @@ export function dipChip(
   return [
     ...legs,
     rect(x, y, width, height, {
-      rx: 4,
+      rx: u(0.4),
       fill: options.fill ?? PART.icBlack,
       stroke: OUTLINE,
-      strokeWidth: 1,
+      strokeWidth: u(0.1),
     }),
     path(`M ${x} ${centreY - notchR} A ${notchR} ${notchR} 0 0 1 ${x} ${centreY + notchR} Z`, {
       fill: PART.icShine,
       detail: 'normal',
     }),
-    circle(x + 13, y + 13, 3, { fill: PART.icShine, detail: 'normal' }),
-    text(x + width / 2, y + height / 2 + (options.labelSize ?? 11) * 0.35, label, {
-      size: options.labelSize ?? 11,
+    circle(x + u(1.3), y + u(1.3), u(0.3), { fill: PART.icShine, detail: 'normal' }),
+    text(x + width / 2, y + height / 2 + labelSize * 0.35, label, {
+      size: labelSize,
       fill: SILK.soft,
       anchor: 'middle',
       weight: 600,
@@ -225,13 +247,13 @@ export function dipChip(
   ];
 }
 
-/** Surface-mount indicator LED, lit or dark. */
+/** Surface-mount indicator LED, lit or dark. 0805 package unless told otherwise. */
 export function indicatorLed(
   cx: number,
   cy: number,
   color: LedColorName,
   on: boolean,
-  r = 5,
+  r = u(0.6),
 ): readonly Shape[] {
   const tone = LED_COLORS[color];
   const shapes: Shape[] = [];
@@ -241,7 +263,7 @@ export function indicatorLed(
     circle(cx, cy, r, {
       fill: on ? tone.on : tone.off,
       stroke: OUTLINE,
-      strokeWidth: 0.75,
+      strokeWidth: u(0.08),
     }),
   );
   return shapes;
@@ -262,7 +284,7 @@ export function silkLabel(
   } = {},
 ): Shape {
   return text(x, y, content, {
-    size: options.size ?? 11,
+    size: options.size ?? u(1.2),
     fill: options.fill ?? SILK.white,
     anchor: options.anchor ?? 'middle',
     weight: options.weight ?? 600,
@@ -273,8 +295,10 @@ export function silkLabel(
 }
 
 /**
- * Pin name printed next to a header hole. Small but never below 9 units, which
- * is the point where labels stop being legible at 100 % zoom.
+ * Pin name printed next to a header hole.
+ *
+ * 1.2 mm is about the smallest silkscreen a board house will print, and also
+ * the smallest that survives the canvas render at 100 % zoom.
  */
 export function pinLabel(
   x: number,
@@ -287,9 +311,7 @@ export function pinLabel(
   // labels covering the artwork. Boards that print their pinout on the silk
   // (an Uno) pass `normal` so the names stay visible at working zoom.
   detail: DetailLevel = 'high',
-  // Boards with a tight header-to-body gap can shrink the label so long names
-  // (RESET, IOREF) clear the pin hole instead of printing over it.
-  size = 9.5,
+  size = u(1.2),
 ): Shape {
   return text(x, y, content, {
     size,
@@ -310,41 +332,47 @@ export function usbConnector(
   height: number,
   variant: 'micro' | 'type-c' | 'type-b' = 'micro',
 ): readonly Shape[] {
-  const inset = variant === 'type-b' ? 6 : 4;
+  const inset = variant === 'type-b' ? u(0.8) : u(0.5);
   return [
     rect(x, y, width, height, {
-      rx: variant === 'type-c' ? height / 2 : 3,
+      rx: variant === 'type-c' ? height / 2 : u(0.3),
       fill: PART.metal,
       stroke: PART.metalDark,
-      strokeWidth: 1.25,
+      strokeWidth: u(0.13),
     }),
-    rect(x + inset, y + inset, Math.max(width - inset * 2, 2), Math.max(height - inset * 2, 2), {
-      rx: variant === 'type-c' ? (height - inset * 2) / 2 : 2,
-      fill: '#4a5058',
-      detail: 'normal',
-    }),
+    rect(
+      x + inset,
+      y + inset,
+      Math.max(width - inset * 2, u(0.2)),
+      Math.max(height - inset * 2, u(0.2)),
+      {
+        rx: variant === 'type-c' ? (height - inset * 2) / 2 : u(0.2),
+        fill: '#4a5058',
+        detail: 'normal',
+      },
+    ),
   ];
 }
 
-/** Tactile reset button: metal cap on a dark base. */
+/** Tactile reset button: metal cap on a dark base. 6 mm part by default. */
 export function tactileButton(
   cx: number,
   cy: number,
-  size = 22,
+  size = u(6),
   pressed = false,
 ): readonly Shape[] {
   const half = size / 2;
   return [
     rect(cx - half, cy - half, size, size, {
-      rx: 2,
+      rx: u(0.2),
       fill: PART.plasticBlack,
       stroke: OUTLINE,
-      strokeWidth: 1,
+      strokeWidth: u(0.1),
     }),
     circle(cx, cy, half * 0.62, {
       fill: pressed ? PART.metalDark : PART.metalLight,
       stroke: PART.metalDark,
-      strokeWidth: 1,
+      strokeWidth: u(0.1),
     }),
   ];
 }
@@ -367,7 +395,7 @@ export function pcbAntenna(x: number, y: number, width: number, height: number):
         d,
         fill: 'none',
         stroke: PCB.white,
-        strokeWidth: 3,
+        strokeWidth: u(0.35),
         strokeLinejoin: 'miter',
       },
     ],
@@ -378,13 +406,77 @@ export function pcbAntenna(x: number, y: number, width: number, height: number):
 /** Electrolytic capacitor seen from above. */
 export function electrolyticCap(cx: number, cy: number, r: number): readonly Shape[] {
   return [
-    circle(cx, cy, r, { fill: PART.electrolytic, stroke: OUTLINE, strokeWidth: 1 }),
+    circle(cx, cy, r, { fill: PART.electrolytic, stroke: OUTLINE, strokeWidth: u(0.1) }),
     circle(cx, cy, r * 0.66, { fill: '#1e2a3f', detail: 'normal' }),
     text(cx, cy + r * 0.3, '−', {
       size: r,
       fill: SILK.soft,
       anchor: 'middle',
       weight: 700,
+      detail: 'normal',
+    }),
+  ];
+}
+
+/**
+ * Two-terminal axial part: a body with a wire lead out of each end.
+ *
+ * Resistors, diodes and film capacitors share this silhouette, and drawing them
+ * from one function is what keeps their leads at a single gauge.
+ */
+export function axialBody(
+  cx: number,
+  cy: number,
+  bodyWidth: number,
+  bodyHeight: number,
+  leadLength: number,
+  fill: string,
+  options: { readonly rx?: number; readonly stroke?: string } = {},
+): readonly Shape[] {
+  const halfWidth = bodyWidth / 2;
+  const lead = u(0.28);
+  // Leads run a little under the body so no seam shows where they meet it.
+  const tuck = u(0.5);
+
+  return [
+    rect(cx - halfWidth - leadLength, cy - lead / 2, leadLength + tuck, lead, {
+      fill: PART.solder,
+    }),
+    rect(cx + halfWidth - tuck, cy - lead / 2, leadLength + tuck, lead, {
+      fill: PART.solder,
+    }),
+    rect(cx - halfWidth, cy - bodyHeight / 2, bodyWidth, bodyHeight, {
+      rx: options.rx ?? bodyHeight * 0.35,
+      fill,
+      stroke: options.stroke ?? OUTLINE,
+      strokeWidth: u(0.1),
+    }),
+  ];
+}
+
+/**
+ * Radial through-hole part seen from above: a round can with two legs below it.
+ *
+ * Electrolytics, buzzers and small motors all present this way on a diagram.
+ */
+export function radialCan(
+  cx: number,
+  cy: number,
+  radius: number,
+  fill: string,
+  options: { readonly rim?: string; readonly top?: string } = {},
+): readonly Shape[] {
+  return [
+    circle(cx, cy, radius, {
+      fill,
+      stroke: options.rim ?? OUTLINE,
+      strokeWidth: u(0.15),
+    }),
+    circle(cx, cy, radius * 0.82, {
+      fill: 'none',
+      stroke: options.top ?? SILK.dim,
+      strokeWidth: u(0.1),
+      opacity: 0.35,
       detail: 'normal',
     }),
   ];

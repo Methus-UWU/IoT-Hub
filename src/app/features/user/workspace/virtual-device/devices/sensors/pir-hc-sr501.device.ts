@@ -5,23 +5,37 @@ import {
   type DeviceDrawContext,
   type DevicePropertyDefinition,
 } from '../core/device-definition';
+import { bodyFromMm, HEADER_PITCH, u } from '../core/device-metrics';
 import { OUTLINE, PART, PCB, SILK } from '../core/device-palette';
-import { board, chip, maleHeader, PIN_PITCH, silkLabel } from '../core/device-parts';
+import { board, maleHeader, silkLabel } from '../core/device-parts';
 import { pin } from '../core/device-pin';
-import { circle, path, rect, repeat, text, type Shape } from '../core/device-shape';
+import { circle, path, repeat, text, type Shape } from '../core/device-shape';
 import {
   propertyBoolean,
   propertyNumber,
   type DeviceBehavior,
 } from '../core/device-simulation';
 
-const WIDTH = 200;
-const HEIGHT = 210;
+/**
+ * HC-SR501 passive infrared motion detector.
+ *
+ * A 32 × 24 mm board almost entirely covered by a 23 mm Fresnel dome — which is
+ * exactly what the real module looks like from above, and why only the corners
+ * of green solder mask and the two trimmers show. Drawing it any other way would
+ * make the dome look like a decoration rather than the sensor itself.
+ */
+
+const BODY = bodyFromMm({ widthMm: 32, heightMm: 24 });
+const WIDTH = BODY.width;
+const HEIGHT = BODY.height;
+
+/** Fresnel dome: 23 mm across, sitting slightly proud of the top edge. */
 const LENS_CX = WIDTH / 2;
-const LENS_CY = 84;
-const LENS_R = 74;
-const PIN_Y = HEIGHT;
-const PIN_START_X = WIDTH / 2 - PIN_PITCH;
+const LENS_CY = u(10);
+const LENS_R = u(11.5);
+
+const PIN_Y = u(22.6);
+const PIN_START_X = WIDTH / 2 - HEADER_PITCH;
 
 const PROPERTIES: readonly DevicePropertyDefinition[] = [
   {
@@ -79,84 +93,98 @@ function draw(context: DeviceDrawContext): readonly Shape[] {
   const sensitivity = numberState(context, 'sensitivity', 60);
 
   return [
-    ...board(0, 30, WIDTH, HEIGHT - 30, PCB.green, { rx: 8, edge: PCB.greenDark }),
+    ...board(0, 0, WIDTH, HEIGHT, PCB.green, { rx: u(0.8), edge: PCB.greenDark }),
 
-    // Support components peeking out from under the lens.
-    ...chip(24, 132, 60, 26, 'BISS0001', { labelSize: 7 }),
-    circle(150, 146, 13, {
-      fill: PART.plasticBlack,
-      stroke: OUTLINE,
-      strokeWidth: 1,
-      detail: 'normal',
-    }),
-    circle(180, 146, 13, {
-      fill: PART.plasticBlack,
-      stroke: OUTLINE,
-      strokeWidth: 1,
-      detail: 'normal',
-    }),
-    silkLabel(150, 168, 'Sx', { size: 8, fill: SILK.soft, detail: 'high' }),
-    silkLabel(180, 168, 'Tx', { size: 8, fill: SILK.soft, detail: 'high' }),
+    // Sensitivity and delay trimmers, on the strips of board the dome leaves
+    // visible. On the real module they are on the back; here they have to be
+    // reachable, and this is the only place they fit.
+    ...[u(3.4), WIDTH - u(3.4)].map((cx, index) => [
+      circle(cx, u(20.4), u(2.4), {
+        fill: index === 0 ? '#e0b544' : '#2f6fbf',
+        stroke: OUTLINE,
+        strokeWidth: u(0.12),
+        detail: 'normal',
+      }),
+      circle(cx, u(20.4), u(1.4), { fill: PART.metalLight, detail: 'normal' }),
+    ]).flat(),
+    silkLabel(u(3.4), u(23.6), 'Sx', { size: u(1), fill: SILK.soft, detail: 'high' }),
+    silkLabel(WIDTH - u(3.4), u(23.6), 'Tx', { size: u(1), fill: SILK.soft, detail: 'high' }),
 
     // Fresnel dome: faceted white plastic, the part's defining feature.
     circle(LENS_CX, LENS_CY, LENS_R, {
       fill: '#f4f5f7',
       stroke: '#b7bcc4',
-      strokeWidth: 2,
+      strokeWidth: u(0.25),
     }),
-    circle(LENS_CX, LENS_CY, LENS_R - 10, {
+    circle(LENS_CX, LENS_CY, LENS_R - u(1), {
       fill: '#eceef1',
       stroke: '#c9ced6',
-      strokeWidth: 1,
+      strokeWidth: u(0.12),
       detail: 'normal',
     }),
     // Radial facet lines.
     ...repeat(8, {}, (index) => {
       const angle = (index * Math.PI) / 8;
-      const dx = Math.cos(angle) * (LENS_R - 8);
-      const dy = Math.sin(angle) * (LENS_R - 8);
-      return path(
-        `M ${LENS_CX - dx} ${LENS_CY - dy} L ${LENS_CX + dx} ${LENS_CY + dy}`,
-        { stroke: '#d3d8de', strokeWidth: 1.25, detail: 'normal' },
-      );
+      const dx = Math.cos(angle) * (LENS_R - u(0.8));
+      const dy = Math.sin(angle) * (LENS_R - u(0.8));
+      return path(`M ${LENS_CX - dx} ${LENS_CY - dy} L ${LENS_CX + dx} ${LENS_CY + dy}`, {
+        stroke: '#d3d8de',
+        strokeWidth: u(0.15),
+        detail: 'normal',
+      });
     }),
     // Concentric facet rings.
-    circle(LENS_CX, LENS_CY, LENS_R * 0.62, {
-      fill: 'none',
-      stroke: '#d3d8de',
-      strokeWidth: 1.25,
-      detail: 'normal',
-    }),
-    circle(LENS_CX, LENS_CY, LENS_R * 0.3, {
-      fill: 'none',
-      stroke: '#d3d8de',
-      strokeWidth: 1.25,
-      detail: 'normal',
-    }),
+    ...[0.62, 0.3].map((fraction) =>
+      circle(LENS_CX, LENS_CY, LENS_R * fraction, {
+        fill: 'none',
+        stroke: '#d3d8de',
+        strokeWidth: u(0.15),
+        detail: 'normal',
+      }),
+    ),
 
     // Detection indicator. Only lit while triggered, never a permanent glow.
     ...(motion
       ? [
-          circle(LENS_CX, LENS_CY, LENS_R + 12, { fill: '#22c55e', opacity: 0.22 }),
-          circle(LENS_CX, LENS_CY, 16, { fill: '#22c55e', opacity: 0.55 }),
+          circle(LENS_CX, LENS_CY, LENS_R + u(1.2), { fill: '#22c55e', opacity: 0.22 }),
+          circle(LENS_CX, LENS_CY, u(1.8), { fill: '#22c55e', opacity: 0.55 }),
         ]
       : []),
 
-    ...maleHeader(PIN_START_X, PIN_Y - 12, 3, 'horizontal'),
-    silkLabel(WIDTH / 2, HEIGHT - 26, 'HC-SR501', { size: 10, fill: SILK.soft }),
+    ...maleHeader(PIN_START_X, PIN_Y, 3, 'horizontal'),
+    ...['VCC', 'OUT', 'GND'].map((name, index) =>
+      text(PIN_START_X + index * HEADER_PITCH, PIN_Y - u(1.9), name, {
+        size: u(0.9),
+        fill: SILK.white,
+        anchor: 'middle',
+        mono: true,
+        weight: 600,
+        detail: 'high',
+      }),
+    ),
 
-    text(WIDTH / 2, 200, motion ? 'MOTION' : `${Math.round(sensitivity)}%`, {
-      size: 9,
+    // Board name along the left margin, the only silk the dome leaves room for.
+    text(u(1.4), HEIGHT / 2, 'HC-SR501', {
+      size: u(1.1),
+      fill: SILK.soft,
+      anchor: 'middle',
+      mono: true,
+      weight: 600,
+      rotate: -90,
+      detail: 'normal',
+    }),
+    text(WIDTH - u(1.4), HEIGHT / 2, motion ? 'MOTION' : `${Math.round(sensitivity)}%`, {
+      size: u(1.1),
       fill: motion ? '#4ade80' : SILK.dim,
       anchor: 'middle',
-      weight: 700,
       mono: true,
+      weight: 700,
+      rotate: -90,
       detail: 'normal',
     }),
   ];
 }
 
-/** HC-SR501 passive infrared motion detector. */
 export const PIR_HC_SR501: VirtualDevice = {
   id: 'pir-hc-sr501',
   name: 'PIR motion sensor',
@@ -164,8 +192,7 @@ export const PIR_HC_SR501: VirtualDevice = {
   description: 'Detects body heat moving across its field of view and pulses OUT high.',
   x: 700,
   y: 620,
-  width: WIDTH,
-  height: HEIGHT,
+  ...BODY,
   initiallyVisible: false,
   operatingVoltage: { min: 4.5, max: 20, recommended: 5 },
   interfaces: ['digital'],
@@ -175,18 +202,19 @@ export const PIR_HC_SR501: VirtualDevice = {
       description: '4.5–20 V supply',
       voltage: 5,
     }),
-    pin('OUT', PIN_START_X + PIN_PITCH, PIN_Y, 'digital', {
+    pin('OUT', PIN_START_X + HEADER_PITCH, PIN_Y, 'digital', {
       side: 'bottom',
       direction: 'output',
       description: '3.3 V logic high while motion is detected',
     }),
-    pin('GND', PIN_START_X + PIN_PITCH * 2, PIN_Y, 'gnd', {
+    pin('GND', PIN_START_X + HEADER_PITCH * 2, PIN_Y, 'gnd', {
       side: 'bottom',
       description: 'Ground reference',
     }),
   ],
   properties: PROPERTIES,
-  render: { draw },
+  // The dome stands proud of the top edge, as it does on the real module.
+  render: { draw, bleed: { top: u(2) } },
   catalog: {
     categoryId: 'sensors',
     category: 'Sensors',

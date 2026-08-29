@@ -1,14 +1,22 @@
 import type { VirtualDevice } from '../../models/virtual-device.model';
 import type { DeviceDrawContext } from '../core/device-definition';
+import { bodyFromMm, HEADER_PITCH, u } from '../core/device-metrics';
 import { OUTLINE, PART, SILK } from '../core/device-palette';
-import { PIN_PITCH } from '../core/device-parts';
 import { pin } from '../core/device-pin';
 import { path, rect, text, type Shape } from '../core/device-shape';
 
-const WIDTH = 96;
-const HEIGHT = 118;
+/**
+ * TO-92: a 4.7 × 4.5 mm half-round package on three legs. The legs leave the
+ * package at 1.27 mm and are formed out to 2.54 mm, which is the spacing
+ * everything in this catalog plugs into.
+ */
+const BODY = bodyFromMm({ widthMm: 6.5, heightMm: 11 });
+const WIDTH = BODY.width;
+const HEIGHT = BODY.height;
 const CX = WIDTH / 2;
-const PIN_START_X = CX - PIN_PITCH;
+const BODY_TOP = u(0.5);
+const BODY_BOTTOM = u(5);
+const PIN_START_X = CX - HEADER_PITCH;
 
 type Polarity = 'npn' | 'pnp';
 
@@ -23,34 +31,46 @@ type Polarity = 'npn' | 'pnp';
 function createTransistor(polarity: Polarity, model: string): VirtualDevice {
   function draw(_context: DeviceDrawContext): readonly Shape[] {
     return [
-      // Three legs.
+      // Three legs, splaying from the package to the 0.1 in grid.
       ...[0, 1, 2].map((index) =>
-        rect(PIN_START_X + index * PIN_PITCH - 2, 66, 4, HEIGHT - 66, {
-          fill: PART.metal,
-          detail: 'normal',
-        }),
+        path(
+          `M ${CX + (index - 1) * u(1.27)} ${BODY_BOTTOM - u(0.3)}` +
+            ` L ${PIN_START_X + index * HEADER_PITCH} ${u(7)}` +
+            ` L ${PIN_START_X + index * HEADER_PITCH} ${HEIGHT}`,
+          {
+            fill: 'none',
+            stroke: PART.metal,
+            strokeWidth: u(0.4),
+            strokeLinecap: 'round',
+            strokeLinejoin: 'round',
+          },
+        ),
       ),
-      // Half-round black body with the flat face forward.
+      // Half-round black body: domed back, flat face forward.
       path(
-        `M 16 66 A ${CX - 16} ${CX - 16} 0 0 1 ${WIDTH - 16} 66 L ${WIDTH - 16} 70 L 16 70 Z`,
-        { fill: PART.icBlack, stroke: OUTLINE, strokeWidth: 1.5 },
+        `M ${CX - u(2.35)} ${BODY_BOTTOM}` +
+          ` V ${BODY_TOP + u(2.35)}` +
+          ` A ${u(2.35)} ${u(2.35)} 0 0 1 ${CX + u(2.35)} ${BODY_TOP + u(2.35)}` +
+          ` V ${BODY_BOTTOM} Z`,
+        { fill: PART.icBlack, stroke: OUTLINE, strokeWidth: u(0.15) },
       ),
-      rect(16, 24, WIDTH - 32, 44, {
-        rx: 4,
-        fill: PART.icBlack,
-        stroke: OUTLINE,
-        strokeWidth: 1.5,
+      // The moulded flat, which is how you read the pinout in hand.
+      path(`M ${CX - u(2.35)} ${BODY_BOTTOM - u(0.5)} H ${CX + u(2.35)}`, {
+        fill: 'none',
+        stroke: PART.icShine,
+        strokeWidth: u(0.12),
+        detail: 'normal',
       }),
-      text(CX, 44, model, {
-        size: 8.5,
+      text(CX, BODY_TOP + u(2.4), model, {
+        size: u(0.9),
         fill: SILK.soft,
         anchor: 'middle',
         weight: 600,
         mono: true,
         detail: 'normal',
       }),
-      text(CX, 56, polarity.toUpperCase(), {
-        size: 7.5,
+      text(CX, BODY_TOP + u(3.6), polarity.toUpperCase(), {
+        size: u(0.8),
         fill: SILK.dim,
         anchor: 'middle',
         weight: 700,
@@ -59,8 +79,8 @@ function createTransistor(polarity: Polarity, model: string): VirtualDevice {
       }),
       // E / B / C markers.
       ...['E', 'B', 'C'].map((label, index) =>
-        text(PIN_START_X + index * PIN_PITCH, HEIGHT - 2, label, {
-          size: 8,
+        text(PIN_START_X + index * HEADER_PITCH, HEIGHT - u(0.2), label, {
+          size: u(0.9),
           fill: '#6b7280',
           anchor: 'middle',
           weight: 700,
@@ -81,8 +101,7 @@ function createTransistor(polarity: Polarity, model: string): VirtualDevice {
         : 'High-side switch: pulling the base low lets current flow from emitter to collector.',
     x: 340,
     y: 720,
-    width: WIDTH,
-    height: HEIGHT,
+    ...BODY,
     initiallyVisible: false,
     interfaces: ['analog'],
     pins: [
@@ -90,17 +109,17 @@ function createTransistor(polarity: Polarity, model: string): VirtualDevice {
         side: 'bottom',
         description: 'Emitter',
       }),
-      pin('B', PIN_START_X + PIN_PITCH, HEIGHT, 'digital', {
+      pin('B', PIN_START_X + HEADER_PITCH, HEIGHT, 'digital', {
         side: 'bottom',
         direction: 'input',
         description: 'Base — the control terminal, drive through a resistor',
       }),
-      pin('C', PIN_START_X + PIN_PITCH * 2, HEIGHT, 'passive', {
+      pin('C', PIN_START_X + HEADER_PITCH * 2, HEIGHT, 'passive', {
         side: 'bottom',
         description: 'Collector — switches the load',
       }),
     ],
-    render: { draw, bleed: { bottom: 6 } },
+    render: { draw },
     catalog: {
       categoryId: 'analog',
       category: 'Analog',

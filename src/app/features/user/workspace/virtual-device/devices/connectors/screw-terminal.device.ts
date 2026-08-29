@@ -1,13 +1,16 @@
 import type { DevicePin, VirtualDevice } from '../../models/virtual-device.model';
 import type { DeviceDrawContext } from '../core/device-definition';
+import { u, UNITS_PER_MM } from '../core/device-metrics';
 import { OUTLINE, PART } from '../core/device-palette';
-import { PIN_PITCH } from '../core/device-parts';
 import { pin } from '../core/device-pin';
 import { line, path, rect, repeat, type Shape } from '../core/device-shape';
 
-const POLE_PITCH = PIN_PITCH * 1.4;
-const MARGIN = 12;
-const HEIGHT = 92;
+/** KF301 blocks are on a 5 mm pitch — not the 2.54 mm of a pin header. */
+const POLE_PITCH = u(5);
+/** 10 mm body, plus 2 mm of solder pin below it. */
+const BODY_TOP = u(1);
+const BODY_HEIGHT = u(10);
+const HEIGHT = u(12);
 
 /**
  * Screw terminal block.
@@ -17,8 +20,8 @@ const HEIGHT = 92;
  * battery to one side and a load to the other and current flows through.
  */
 function createScrewTerminal(poles: number): VirtualDevice {
-  const width = MARGIN * 2 + (poles - 1) * POLE_PITCH + POLE_PITCH;
-  const firstX = MARGIN + POLE_PITCH / 2;
+  const width = poles * POLE_PITCH;
+  const firstX = POLE_PITCH / 2;
 
   const pins: DevicePin[] = [
     ...Array.from({ length: poles }, (_, index) =>
@@ -37,28 +40,36 @@ function createScrewTerminal(poles: number): VirtualDevice {
 
   function draw(_context: DeviceDrawContext): readonly Shape[] {
     return [
-      rect(0, 8, width, HEIGHT - 16, {
-        rx: 5,
+      rect(0, BODY_TOP, width, BODY_HEIGHT, {
+        rx: u(0.5),
         fill: '#1f6f4a',
         stroke: OUTLINE,
-        strokeWidth: 1.5,
+        strokeWidth: u(0.15),
       }),
       ...repeat(poles, { x: POLE_PITCH }, (_, x) => [
         // Wire entry funnel.
-        path(`M ${x - 9} 14 L ${x + 9} 14 L ${x + 5} 30 L ${x - 5} 30 Z`, {
-          fill: '#17583b',
-          detail: 'normal',
-        }),
+        path(
+          `M ${x - u(1.6)} ${BODY_TOP + u(0.4)} L ${x + u(1.6)} ${BODY_TOP + u(0.4)}` +
+            ` L ${x + u(1)} ${BODY_TOP + u(2.4)} L ${x - u(1)} ${BODY_TOP + u(2.4)} Z`,
+          { fill: '#17583b', detail: 'normal' },
+        ),
         // Screw head with its slot.
-        rect(x - 9, 34, 18, 18, {
-          rx: 2,
+        rect(x - u(1.5), BODY_TOP + u(3.4), u(3), u(3), {
+          rx: u(0.25),
           fill: PART.metalLight,
           stroke: PART.metalDark,
-          strokeWidth: 1,
+          strokeWidth: u(0.12),
         }),
-        line(x - 6, 43, x + 6, 43, { stroke: '#5a616b', strokeWidth: 2, detail: 'normal' }),
+        line(x - u(1), BODY_TOP + u(4.9), x + u(1), BODY_TOP + u(4.9), {
+          stroke: '#5a616b',
+          strokeWidth: u(0.25),
+          detail: 'normal',
+        }),
         // Solder pin stub.
-        rect(x - 2, HEIGHT - 12, 4, 12, { fill: PART.metal, detail: 'normal' }),
+        rect(x - u(0.3), BODY_TOP + BODY_HEIGHT - u(0.4), u(0.6), u(1.4), {
+          fill: PART.metal,
+          detail: 'normal',
+        }),
       ], { x: firstX, y: 0 }),
     ];
   }
@@ -82,10 +93,12 @@ function createScrewTerminal(poles: number): VirtualDevice {
     y: 740,
     width,
     height: HEIGHT,
+    // One 5 mm pole per screw, so the block grows exactly as the real one does.
+    physicalSize: { widthMm: width / UNITS_PER_MM, heightMm: HEIGHT / UNITS_PER_MM },
     initiallyVisible: false,
     interfaces: ['passive'],
     pins,
-    render: { draw, bleed: { top: 8, bottom: 6 } },
+    render: { draw },
     simulation: createBehavior,
     catalog: {
       categoryId: 'connectors',

@@ -4,18 +4,25 @@ import {
   type DeviceDrawContext,
   type DevicePropertyDefinition,
 } from '../core/device-definition';
+import { bodyFromMm, u } from '../core/device-metrics';
 import { pin } from '../core/device-pin';
 import { line, rect, type Shape } from '../core/device-shape';
 import type { DeviceBehavior } from '../core/device-simulation';
 import type { VirtualDevice } from '../../models/virtual-device.model';
 
-/** Body sits between two axial leads; the leads are the connection points. */
-const LEAD = 24;
+/**
+ * A 1/4 W axial resistor: a 6.5 × 2.4 mm ceramic body between two leads. Small
+ * enough that on a canvas beside an ESP32 it reads as the speck it really is,
+ * which is the point of drawing it to scale at all.
+ */
+const LEAD = u(2.5);
 const BODY_X = LEAD;
-const BODY_WIDTH = 72;
-const WIDTH = BODY_WIDTH + LEAD * 2;
-const HEIGHT = 32;
+const BODY_WIDTH = u(6.5);
+const BODY = bodyFromMm({ widthMm: 11.5, heightMm: 2.6 });
+const WIDTH = BODY.width;
+const HEIGHT = BODY.height;
 const MID_Y = HEIGHT / 2;
+const BODY_HALF = u(1.2);
 
 /** IEC 60062 band colours, indexed by digit. */
 const DIGIT_COLORS = [
@@ -140,28 +147,32 @@ function draw(context: DeviceDrawContext): readonly Shape[] {
   ];
   // Three bands clustered left, the tolerance band set apart on the right —
   // the visual gap is how you tell which end to read from.
-  const bandX = [BODY_X + 15, BODY_X + 26, BODY_X + 37, BODY_X + 54];
+  const bandX = [BODY_X + u(1.2), BODY_X + u(2.1), BODY_X + u(3), BODY_X + u(5.1)];
 
   return [
     // Axial leads.
     line(0, MID_Y, BODY_X, MID_Y, {
       stroke: '#b8b8b8',
-      strokeWidth: 4,
+      strokeWidth: u(0.5),
       strokeLinecap: 'square',
     }),
     line(WIDTH, MID_Y, BODY_X + BODY_WIDTH, MID_Y, {
       stroke: '#b8b8b8',
-      strokeWidth: 4,
+      strokeWidth: u(0.5),
       strokeLinecap: 'square',
     }),
 
-    // Wokwi uses a clean capsule with no dark outline around the ceramic body.
-    rect(BODY_X, MID_Y - 11, BODY_WIDTH, 22, { rx: 11, fill: '#dec29f' }),
+    // A clean capsule: the moulded body has no hard outline in the flesh, and
+    // giving it one makes the colour bands harder to read at small sizes.
+    rect(BODY_X, MID_Y - BODY_HALF, BODY_WIDTH, BODY_HALF * 2, {
+      rx: BODY_HALF,
+      fill: '#dec29f',
+    }),
 
     // Flat IEC colour bands. Their positions remain independent of the value,
     // while their colours are derived from the configured resistance.
     ...bandColors.map((color, index) =>
-      rect(bandX[index], MID_Y - 11, index === 3 ? 6 : 7, 22, {
+      rect(bandX[index], MID_Y - BODY_HALF, index === 3 ? u(0.5) : u(0.6), BODY_HALF * 2, {
         fill: color,
         opacity: 1,
       }),
@@ -177,8 +188,7 @@ export const RESISTOR: VirtualDevice = {
   description: 'Limits current. Colour bands follow the configured resistance.',
   x: 120,
   y: 700,
-  width: WIDTH,
-  height: HEIGHT,
+  ...BODY,
   initiallyVisible: false,
   rotatable: true,
   pins: [

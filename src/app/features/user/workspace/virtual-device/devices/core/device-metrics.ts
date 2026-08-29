@@ -30,6 +30,48 @@ import type { VirtualDevice } from '../../models/virtual-device.model';
  */
 export const PIXELS_PER_MM = 8;
 
+/**
+ * Drawing units per millimetre.
+ *
+ * Every part is authored on this one grid, so a coordinate is a real
+ * measurement: 25.4 units is a tenth of an inch, which is the pitch of every
+ * header in the catalog. Before this existed each part invented its own units
+ * and `drawingScaleFor` had to reconcile them one at a time — which it can only
+ * do when the drawn aspect ratio already matches the physical one, a condition
+ * nothing enforced.
+ *
+ * Ten was chosen so the smallest feature worth drawing — a 0.1 mm silkscreen
+ * line — is still a whole number, while the largest part stays inside four
+ * digits.
+ */
+export const UNITS_PER_MM = 10;
+
+/** Converts a millimetre measurement to drawing units. */
+export function u(millimetres: number): number {
+  return millimetres * UNITS_PER_MM;
+}
+
+/** Standard 0.1 in header pitch, in drawing units. */
+export const HEADER_PITCH = u(2.54);
+
+/**
+ * Body size for a part authored on the shared grid.
+ *
+ * Deriving `width`/`height` from the millimetres rather than typing both means
+ * the drawn aspect ratio cannot drift from the declared one.
+ */
+export function bodyFromMm(size: PhysicalSize): {
+  width: number;
+  height: number;
+  physicalSize: PhysicalSize;
+} {
+  return {
+    width: u(size.widthMm),
+    height: u(size.heightMm),
+    physicalSize: size,
+  };
+}
+
 export interface PhysicalSize {
   readonly widthMm: number;
   readonly heightMm: number;

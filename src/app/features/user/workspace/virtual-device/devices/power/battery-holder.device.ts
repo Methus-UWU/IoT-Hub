@@ -4,8 +4,8 @@ import {
   type DeviceDrawContext,
   type DevicePropertyDefinition,
 } from '../core/device-definition';
+import { u, UNITS_PER_MM } from '../core/device-metrics';
 import { OUTLINE, PART, SILK } from '../core/device-palette';
-import { PIN_PITCH } from '../core/device-parts';
 import { pin } from '../core/device-pin';
 import { line, rect, repeat, text, type Shape } from '../core/device-shape';
 import { propertyNumber, type DeviceBehavior } from '../core/device-simulation';
@@ -16,7 +16,15 @@ interface BatteryOptions {
   readonly cells: number;
   readonly cellVolts: number;
   readonly chemistry: string;
+  /** Cell dimensions. An AA is 14.5 × 50.5 mm; an 18650 is 18.6 × 65.2 mm. */
+  readonly cellMm: { readonly diameter: number; readonly length: number };
 }
+
+/** Clearance between cells and around the pack, in millimetres. */
+const CELL_GAP = 1;
+const PACK_MARGIN = 1;
+/** How far the flying leads hang below the holder. */
+const LEAD_LENGTH = 4;
 
 /**
  * A standalone power source.
@@ -27,9 +35,11 @@ interface BatteryOptions {
  */
 function createBatteryHolder(options: BatteryOptions): VirtualDevice {
   const packVolts = options.cells * options.cellVolts;
-  const cellWidth = 44;
-  const width = 40 + options.cells * cellWidth;
-  const height = 96;
+  // The holder is exactly as big as the cells it carries, which is what makes
+  // an 18650 pack visibly taller than an AA pack rather than a recoloured copy.
+  const cellPitch = u(options.cellMm.diameter + CELL_GAP);
+  const width = u(PACK_MARGIN * 2) + options.cells * cellPitch;
+  const height = u(options.cellMm.length + 5.5);
 
   const properties: readonly DevicePropertyDefinition[] = [
     {
@@ -49,54 +59,68 @@ function createBatteryHolder(options: BatteryOptions): VirtualDevice {
   function draw(context: DeviceDrawContext): readonly Shape[] {
     const volts = numberState(context, 'voltage', packVolts);
     return [
-      rect(0, 8, width, height - 8, {
-        rx: 6,
+      rect(0, 0, width, height, {
+        rx: u(1),
         fill: '#2b2f36',
         stroke: OUTLINE,
-        strokeWidth: 1.5,
+        strokeWidth: u(0.2),
       }),
-      // Cells.
-      ...repeat(options.cells, { x: cellWidth }, (_, x) => [
-        rect(x, 22, cellWidth - 8, height - 44, {
-          rx: 4,
+
+      // Cells, each drawn at its real diameter with a spring at one end and a
+      // button contact at the other.
+      ...repeat(options.cells, { x: cellPitch }, (_, x) => [
+        rect(x, u(2.5), u(options.cellMm.diameter), u(options.cellMm.length), {
+          rx: u(0.6),
           fill: '#3a4049',
           stroke: '#20242a',
-          strokeWidth: 1,
+          strokeWidth: u(0.12),
           detail: 'normal',
         }),
-        // Nub end.
-        rect(x + cellWidth - 12, 34, 5, height - 66, { fill: PART.metal, detail: 'normal' }),
-      ], { x: 24, y: 0 }),
+        rect(
+          x + u(options.cellMm.diameter) / 2 - u(1.4),
+          u(2.5),
+          u(2.8),
+          u(1.4),
+          { rx: u(0.3), fill: PART.metal, detail: 'normal' },
+        ),
+        rect(
+          x,
+          u(2.5) + u(options.cellMm.length) - u(1),
+          u(options.cellMm.diameter),
+          u(1),
+          { fill: PART.metalDark, opacity: 0.6, detail: 'high' },
+        ),
+      ], { x: u(PACK_MARGIN), y: 0 }),
 
-      // Terminal leads.
-      line(14, height, 14, height + 18, {
+      // Flying leads.
+      line(u(2.5), height - u(1), u(2.5), height + u(LEAD_LENGTH), {
         stroke: PART.wireRed,
-        strokeWidth: 4,
+        strokeWidth: u(0.5),
         strokeLinecap: 'round',
       }),
-      line(width - 14, height, width - 14, height + 18, {
+      line(width - u(2.5), height - u(1), width - u(2.5), height + u(LEAD_LENGTH), {
         stroke: PART.wireBlack,
-        strokeWidth: 4,
+        strokeWidth: u(0.5),
         strokeLinecap: 'round',
       }),
 
-      text(width / 2, 20, `${options.name} · ${volts.toFixed(1)}V`, {
-        size: 9.5,
+      text(width / 2, u(1.8), `${volts.toFixed(1)}V`, {
+        size: u(1.4),
         fill: SILK.soft,
         anchor: 'middle',
         weight: 600,
         mono: true,
         detail: 'normal',
       }),
-      text(14, height - 6, '+', {
-        size: 13,
+      text(u(2.5), height - u(1.8), '+', {
+        size: u(1.6),
         fill: '#fca5a5',
         anchor: 'middle',
         weight: 800,
         detail: 'normal',
       }),
-      text(width - 14, height - 6, '−', {
-        size: 13,
+      text(width - u(2.5), height - u(1.8), '−', {
+        size: u(1.6),
         fill: '#cbd5e1',
         anchor: 'middle',
         weight: 800,
@@ -124,22 +148,25 @@ function createBatteryHolder(options: BatteryOptions): VirtualDevice {
     y: 760,
     width,
     height,
+    // Derived from the cells, so the declared millimetres and the drawing can
+    // never disagree about how big the pack is.
+    physicalSize: { widthMm: width / UNITS_PER_MM, heightMm: height / UNITS_PER_MM },
     initiallyVisible: false,
     operatingVoltage: { min: 0, max: packVolts, recommended: packVolts },
     interfaces: ['power'],
     pins: [
-      pin('+', 14, height + 18, 'vcc', {
+      pin('+', u(2.5), height + u(LEAD_LENGTH), 'vcc', {
         side: 'bottom',
         description: 'Positive terminal',
         voltage: packVolts,
       }),
-      pin('-', width - 14, height + 18, 'gnd', {
+      pin('-', width - u(2.5), height + u(LEAD_LENGTH), 'gnd', {
         side: 'bottom',
         description: 'Negative terminal',
       }),
     ],
     properties,
-    render: { draw, bleed: { bottom: 22 } },
+    render: { draw, bleed: { bottom: u(LEAD_LENGTH + 0.5) } },
     simulation: createBehavior,
     catalog: {
       categoryId: 'power',
@@ -158,6 +185,7 @@ export const BATTERY_AA_2 = createBatteryHolder({
   cells: 2,
   cellVolts: 1.5,
   chemistry: 'Alkaline',
+  cellMm: { diameter: 14.5, length: 50.5 },
 });
 
 export const BATTERY_AA_4 = createBatteryHolder({
@@ -166,6 +194,7 @@ export const BATTERY_AA_4 = createBatteryHolder({
   cells: 4,
   cellVolts: 1.5,
   chemistry: 'Alkaline',
+  cellMm: { diameter: 14.5, length: 50.5 },
 });
 
 export const BATTERY_18650 = createBatteryHolder({
@@ -174,4 +203,5 @@ export const BATTERY_18650 = createBatteryHolder({
   cells: 1,
   cellVolts: 3.7,
   chemistry: 'Li-ion',
+  cellMm: { diameter: 18.6, length: 65.2 },
 });

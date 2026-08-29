@@ -29,109 +29,9 @@
   border-bottom: 1px solid #454545;
   background: #202020;
   box-shadow: 0 2px 10px rgb(0 0 0 / 0.22);
-}
-
-.project-title,
-.project-title > span:last-child,
-.simulation-actions,
-.simulation-state,
-.topbar-tools {
+}.topbar-tools {
   display: flex;
   align-items: center;
-}
-
-.project-title {
-  min-width: 0;
-  gap: 0.6rem;
-}
-
-.project-chip {
-  display: grid;
-  width: 2rem;
-  height: 2rem;
-  flex: none;
-  place-items: center;
-  border-radius: 0.55rem;
-  color: #fff;
-  background: #5f45e8;
-  font-size: 0.56rem;
-  font-weight: 800;
-}
-
-.project-title > span:last-child {
-  min-width: 0;
-  flex-direction: column;
-  align-items: flex-start;
-}
-
-.project-title strong,
-.project-title small {
-  max-width: 15rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.project-title strong {
-  color: #f9fafb;
-  font-size: 0.7rem;
-}
-
-.project-title small {
-  margin-top: 0.12rem;
-  color: #929292;
-  font-size: 0.52rem;
-}
-
-.simulation-actions {
-  gap: 0.7rem;
-}
-
-.play-button {
-  display: flex;
-  min-height: 2.35rem;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0 0.9rem;
-  border-radius: 0.55rem;
-  color: #fff;
-  background: #16a34a;
-  box-shadow: 0 4px 12px rgb(22 163 74 / 0.22);
-  font-size: 0.62rem;
-  font-weight: 700;
-}
-
-.play-button:hover {
-  background: #15803d;
-}
-.play-button-running {
-  background: #dc2626;
-  box-shadow: 0 4px 12px rgb(220 38 38 / 0.2);
-}
-.play-button-running:hover {
-  background: #b91c1c;
-}
-.play-button svg {
-  width: 0.9rem;
-  height: 0.9rem;
-}
-
-.simulation-state {
-  gap: 0.32rem;
-  color: #a3a3a3;
-  font-size: 0.54rem;
-}
-
-.simulation-state i {
-  width: 0.4rem;
-  height: 0.4rem;
-  border-radius: 50%;
-  background: #737373;
-}
-
-.simulation-state i.state-online {
-  background: #22c55e;
-  box-shadow: 0 0 0 3px rgb(34 197 94 / 0.12);
 }
 
 .topbar-tools {
@@ -208,15 +108,6 @@
 }
 .tool-rail .add-part-button:hover {
   background: #1d4ed8;
-}
-.rail-divider {
-  width: 1.65rem;
-  height: 1px;
-  margin: 0.18rem 0;
-  background: #484848;
-}
-.rail-spacer {
-  flex: 1;
 }
 
 .canvas-workspace {
@@ -385,21 +276,10 @@ path.wire-preview {
   stroke-width: 1.25;
   stroke-dasharray: none;
 }
-.lcd-text {
-  font-family: monospace;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-}
 
 #lcd-character-pixels rect {
   fill: #315500;
   opacity: 0.7;
-}
-
-.lcd-pin-one {
-  fill: #fff;
-  font-size: 7px;
-  font-weight: 750;
 }
 
 .lcd-parallel-pin text,
@@ -412,57 +292,6 @@ path.wire-preview {
 
 .lcd-parallel-pin text {
   font-size: 6px;
-}
-
-.relay-text,
-.relay-state {
-  fill: #fff;
-  font-size: 10px;
-  font-weight: 750;
-}
-.relay-state {
-  font-size: 8px;
-}
-
-.relay-micro-label,
-.relay-terminal-label {
-  fill: #fff;
-  font-size: 7px;
-  font-weight: 750;
-}
-
-.relay-coil[role='button'] {
-  cursor: pointer;
-  outline: none;
-}
-
-.relay-coil[role='button']:focus-visible {
-  stroke: #fff;
-  stroke-width: 3;
-}
-
-.relay-real-label {
-  fill: #fff;
-  font-size: 10px;
-  font-weight: 750;
-}
-
-.relay-real-title {
-  fill: #fff;
-  font-size: 25px;
-  font-weight: 500;
-}
-
-.relay-real-subtitle {
-  fill: #fff;
-  font-size: 11px;
-  letter-spacing: 0.06em;
-}
-
-.relay-terminal-side-label {
-  fill: #fff;
-  font-size: 7px;
-  font-weight: 750;
 }
 
 .relay-input-pin text {
@@ -673,35 +502,6 @@ path.wire-preview {
   font-size: 0.56rem;
 }
 
-.range-control span {
-  display: flex;
-  justify-content: space-between;
-  color: #bdbdbd;
-  font-size: 0.55rem;
-}
-.range-control input {
-  width: 100%;
-  margin-top: 0.6rem;
-  accent-color: #22c55e;
-}
-.action-button {
-  width: 100%;
-  min-height: 2.2rem;
-  border-radius: 0.45rem;
-  color: #fff;
-  background: #3f3f3f;
-  font-size: 0.57rem;
-  font-weight: 650;
-}
-.action-button:hover:not(:disabled) {
-  background: #525252;
-}
-.action-button:disabled,
-.range-control input:disabled {
-  cursor: not-allowed;
-  opacity: 0.35;
-}
-
 .part-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -889,18 +689,8 @@ input:focus-visible {
     gap: 0.45rem;
     padding: 0.45rem 0.55rem;
   }
-  .project-title {
-    grid-area: title;
-  }
   .topbar-tools {
     grid-area: tools;
-  }
-  .simulation-actions {
-    grid-area: simulation;
-    justify-content: space-between;
-  }
-  .play-button {
-    flex: 1;
   }
   .tool-rail {
     padding-inline: 0.25rem;
@@ -944,21 +734,6 @@ input:focus-visible {
   border-color: #e1e1e1;
   background: #fff;
   box-shadow: 0 2px 10px rgb(43 43 43 / 0.04);
-}
-
-.project-chip {
-  color: #fff;
-  background: #2b2b2b;
-}
-
-.project-title strong {
-  color: #2b2b2b;
-  font-size: 0.84rem;
-}
-
-.project-title small,
-.simulation-state {
-  color: #808080;
 }
 
 .topbar-tools button {
@@ -1424,21 +1199,11 @@ input:focus-visible {
 .pin-map button:hover {
   border-color: #afafaf;
   background: #f1f1f1;
-}
-
-.range-control span {
-  color: #545454;
-}
-
-.action-button,
-.part-actions button {
+}.part-actions button {
   color: #2b2b2b;
   border-color: #d8d8d8;
   background: #f1f1f1;
-}
-
-.action-button:hover:not(:disabled),
-.part-actions button:hover {
+}.part-actions button:hover {
   background: #e1e1e1;
 }
 
@@ -1473,19 +1238,8 @@ input:focus-visible {
     gap: 0.45rem;
     padding: 0.5rem 0.65rem;
   }
-
-  .project-title {
-    grid-area: title;
-  }
   .topbar-tools {
     grid-area: tools;
-  }
-  .simulation-actions {
-    grid-area: simulation;
-    justify-content: space-between;
-  }
-  .play-button {
-    flex: 1;
   }
   .summary-row {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1535,24 +1289,6 @@ input:focus-visible {
   border-bottom: 1px solid #e1e1e1;
   background: #fff;
   box-shadow: 0 2px 10px rgb(43 43 43 / 0.05);
-}
-
-.project-chip {
-  display: grid;
-}
-
-.project-title strong {
-  font-size: 0.78rem;
-  letter-spacing: -0.015em;
-}
-
-.project-title small {
-  max-width: 15rem;
-  margin-top: 0.12rem;
-  overflow: hidden;
-  font-size: 0.5rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .topbar-tools {
@@ -1738,7 +1474,6 @@ input:focus-visible {
   }
 }
 
-
 /* Wire-lock toggle and canvas-level alerts. */
 .wire-mode-cell {
   display: flex;
@@ -1792,7 +1527,6 @@ input:focus-visible {
   text-decoration: underline;
 }
 
-
 /* Placeholder while a project's saved layout is being fetched. */
 .canvas-loading {
   position: absolute;
@@ -1827,7 +1561,6 @@ input:focus-visible {
     animation-duration: 2.4s;
   }
 }
-
 
 /* Undo/redo controls in the status strip. */
 .history-cell {

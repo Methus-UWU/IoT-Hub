@@ -1,53 +1,52 @@
 import type { VirtualDevice } from '../../models/virtual-device.model';
 import type { DeviceDrawContext } from '../core/device-definition';
 import { OUTLINE, PART, SILK } from '../core/device-palette';
+import { bodyFromMm, u } from '../core/device-metrics';
 import { pin } from '../core/device-pin';
-import { line, path, rect, text, type Shape } from '../core/device-shape';
+import { line, rect, text, type Shape } from '../core/device-shape';
 import { type DeviceBehavior } from '../core/device-simulation';
 
-const LEAD = 30;
-const BODY_W = 84;
-const WIDTH = BODY_W + LEAD * 2;
-const HEIGHT = 44;
+/** DO-41 glass body: 5.2 mm long, 2.7 mm across, on axial leads. */
+const LEAD = u(3);
+const BODY_W = u(5.2);
+const BODY = bodyFromMm({ widthMm: 11.2, heightMm: 3.4 });
+const WIDTH = BODY.width;
+const HEIGHT = BODY.height;
 const MID_Y = HEIGHT / 2;
 const BODY_X = LEAD;
+const BODY_HALF = u(1.35);
 
 function draw(_context: DeviceDrawContext): readonly Shape[] {
   return [
-    line(0, MID_Y, BODY_X, MID_Y, { stroke: PART.metal, strokeWidth: 4, strokeLinecap: 'round' }),
+    line(0, MID_Y, BODY_X, MID_Y, {
+      stroke: PART.metal,
+      strokeWidth: u(0.5),
+      strokeLinecap: 'round',
+    }),
     line(WIDTH, MID_Y, BODY_X + BODY_W, MID_Y, {
       stroke: PART.metal,
-      strokeWidth: 4,
+      strokeWidth: u(0.5),
       strokeLinecap: 'round',
     }),
     // Black glass body.
-    rect(BODY_X, MID_Y - 13, BODY_W, 26, {
-      rx: 4,
+    rect(BODY_X, MID_Y - BODY_HALF, BODY_W, BODY_HALF * 2, {
+      rx: u(0.4),
       fill: PART.icBlack,
       stroke: OUTLINE,
-      strokeWidth: 1.5,
+      strokeWidth: u(0.15),
     }),
-    // Cathode band, on the right — current flows toward it.
-    rect(BODY_X + BODY_W - 16, MID_Y - 13, 6, 26, { fill: '#d6d9de' }),
-    text(BODY_X + BODY_W / 2 - 4, MID_Y + 4, '1N4007', {
-      size: 9,
+    // Cathode band, on the right — current flows toward it. This stripe is the
+    // only thing on a real diode that says which way round it goes.
+    rect(BODY_X + BODY_W - u(1.2), MID_Y - BODY_HALF, u(0.6), BODY_HALF * 2, {
+      fill: '#d6d9de',
+    }),
+    text(BODY_X + BODY_W / 2 - u(0.4), MID_Y + u(0.35), '1N4007', {
+      size: u(0.9),
       fill: SILK.soft,
       anchor: 'middle',
       weight: 600,
       mono: true,
       detail: 'normal',
-    }),
-    // Schematic triangle-and-bar hint above the body.
-    path(`M ${BODY_X + 22} ${MID_Y - 22} l 14 6 l -14 6 z`, {
-      fill: '#94a3b8',
-      opacity: 0.7,
-      detail: 'high',
-    }),
-    line(BODY_X + 40, MID_Y - 22, BODY_X + 40, MID_Y - 10, {
-      stroke: '#94a3b8',
-      strokeWidth: 1.5,
-      opacity: 0.7,
-      detail: 'high',
     }),
   ];
 }
@@ -94,8 +93,7 @@ export const DIODE_1N4007: VirtualDevice = {
   description: 'Lets current pass one way only. The banded end is the cathode.',
   x: 300,
   y: 740,
-  width: WIDTH,
-  height: HEIGHT,
+  ...BODY,
   initiallyVisible: false,
   rotatable: true,
   interfaces: ['passive'],
