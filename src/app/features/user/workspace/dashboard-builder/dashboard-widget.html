@@ -1,0 +1,367 @@
+<article
+  class="dashboard-widget"
+  [class.widget-selected]="selected()"
+  [class.widget-moving]="moving()"
+  [class.widget-invalid]="invalid()"
+  [class.widget-soft]="widget().settings.background === 'soft'"
+  [class.widget-dark]="widget().settings.background === 'dark'"
+  [class.widget-preview]="!editMode()"
+  [style.--widget-accent]="widget().settings.accent"
+  [attr.data-widget-id]="widget().id"
+  [attr.aria-label]="widget().title + ', ' + positionLabel()"
+  (click)="requestSelection($event)"
+>
+  @if (widget().settings.showHeader || editMode()) {
+    <header class="widget-header">
+      @if (editMode()) {
+        <button
+          type="button"
+          class="widget-drag-handle"
+          [class.handle-locked]="widget().settings.locked"
+          [attr.aria-label]="
+            (widget().settings.locked ? 'Locked widget ' : 'Move widget ') +
+            widget().title +
+            '. Use arrow keys to move and Shift plus arrow keys to resize.'
+          "
+          [attr.aria-disabled]="widget().settings.locked"
+          (pointerdown)="beginMove($event)"
+          (keydown)="handleHeaderKeydown($event)"
+        >
+          <app-dashboard-icon [name]="widget().settings.locked ? 'lock' : 'move'" />
+        </button>
+      }
+
+      <div class="widget-heading">
+        <strong>{{ widget().title }}</strong>
+        <i
+          class="state-dot"
+          [class.state-not-online]="widget().state !== 'online'"
+          [attr.title]="stateLabel()"
+          aria-hidden="true"
+        ></i>
+      </div>
+
+      @if (editMode()) {
+        <button
+          type="button"
+          class="widget-menu-trigger widget-settings-trigger"
+          [attr.data-widget-id]="widget().id"
+          [attr.aria-label]="'Configure ' + widget().title"
+          [attr.title]="'Configure ' + widget().title"
+          (click)="requestAction('configure', $event)"
+        >
+          <app-dashboard-icon name="more" />
+        </button>
+      }
+    </header>
+  }
+
+  <div class="widget-content">
+    @switch (widget().type) {
+      @case ('value') {
+        <div class="value-widget">
+          <div class="value-main">
+            <strong>{{ displayValue() }}</strong>
+            <span><i aria-hidden="true">↗</i> 2.4% today</span>
+          </div>
+          <svg
+            class="mini-sparkline"
+            viewBox="0 0 120 42"
+            preserveAspectRatio="none"
+            aria-hidden="true"
+          >
+            <defs>
+              <linearGradient [attr.id]="'spark-' + widget().id" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="var(--widget-accent)" stop-opacity=".22" />
+                <stop offset="1" stop-color="var(--widget-accent)" stop-opacity="0" />
+              </linearGradient>
+            </defs>
+            <path
+              d="M1 36C12 32 15 24 25 27s15 7 24-2 16-14 25-8 12 10 21 2 14-13 24-15v38H1Z"
+              [attr.fill]="'url(#spark-' + widget().id + ')'"
+            />
+            <path
+              d="M1 36C12 32 15 24 25 27s15 7 24-2 16-14 25-8 12 10 21 2 14-13 24-15"
+              fill="none"
+              stroke="var(--widget-accent)"
+              stroke-width="2"
+              stroke-linecap="round"
+            />
+          </svg>
+        </div>
+      }
+      @case ('gauge') {
+        <div class="gauge-widget">
+          <div class="gauge-dial">
+            <svg class="gauge-svg" viewBox="0 0 100 100" aria-hidden="true">
+              <circle
+                class="gauge-track"
+                cx="50"
+                cy="50"
+                r="40"
+                pathLength="100"
+                stroke-dasharray="75 25"
+                transform="rotate(135 50 50)"
+              />
+              <circle
+                class="gauge-value"
+                cx="50"
+                cy="50"
+                r="40"
+                pathLength="100"
+                [attr.stroke-dasharray]="gaugeArc() + ' 100'"
+                transform="rotate(135 50 50)"
+              />
+            </svg>
+            <div class="gauge-readout">
+              <strong>{{ displayValue() }}</strong>
+              <span>Comfortable</span>
+            </div>
+          </div>
+        </div>
+      }
+      @case ('switch') {
+        <div class="switch-widget">
+          <span class="control-icon"><app-dashboard-icon name="action" /></span>
+          <div>
+            <strong>{{ widget().settings.controlValue > 0 ? 'Running' : 'Stopped' }}</strong>
+            <small>{{ widget().subtitle }}</small>
+          </div>
+          <button
+            type="button"
+            class="toggle-control"
+            [class.toggle-on]="widget().settings.controlValue > 0"
+            [disabled]="widget().state !== 'online'"
+            [attr.aria-label]="'Toggle ' + widget().title"
+            [attr.aria-pressed]="widget().settings.controlValue > 0"
+            (click)="toggleSwitch($event)"
+          >
+            <span></span>
+          </button>
+        </div>
+      }
+      @case ('slider') {
+        <div class="slider-widget">
+          <div>
+            <strong>{{ displayValue() }}</strong
+            ><span>Target output</span>
+          </div>
+          <input
+            type="range"
+            min="0"
+            max="100"
+            [value]="widget().settings.controlValue"
+            [style.--range-fill]="rangeFill() + '%'"
+            [disabled]="widget().state !== 'online'"
+            [attr.aria-label]="widget().title"
+            (input)="updateRange($event)"
+          />
+          <div class="range-labels"><span>Off</span><span>Maximum</span></div>
+        </div>
+      }
+      @case ('button') {
+        <div class="button-widget">
+          <button
+            type="button"
+            [class.button-held]="buttonHeld()"
+            [disabled]="widget().state !== 'online'"
+            [attr.aria-pressed]="buttonHeld()"
+            (pointerdown)="pressButton($event)"
+            (pointerup)="releaseButton()"
+            (pointerleave)="releaseButton()"
+            (pointercancel)="releaseButton()"
+            (keydown)="buttonKeydown($event)"
+            (keyup)="buttonKeyup($event)"
+          >
+            <app-dashboard-icon [name]="buttonHeld() ? 'check' : 'action'" />
+            {{ widget().title }}
+          </button>
+          <span>{{ buttonHeld() ? 'Holding…' : 'Press and hold' }}</span>
+        </div>
+      }
+      @case ('numeric-input') {
+        <div class="stepper-widget">
+          <span class="stepper-label">{{ widget().subtitle || 'Set point' }}</span>
+          <div class="stepper-control">
+            <button
+              type="button"
+              class="stepper-btn"
+              [disabled]="widget().state !== 'online'"
+              [attr.aria-label]="'Decrease ' + widget().title"
+              (click)="stepNumeric(-1, $event)"
+            >
+              <app-dashboard-icon name="minus" />
+            </button>
+            <span class="stepper-value">
+              <strong>{{ displayValue() }}</strong>
+            </span>
+            <button
+              type="button"
+              class="stepper-btn"
+              [disabled]="widget().state !== 'online'"
+              [attr.aria-label]="'Increase ' + widget().title"
+              (click)="stepNumeric(1, $event)"
+            >
+              <app-dashboard-icon name="plus" />
+            </button>
+          </div>
+        </div>
+      }
+      @case ('progress') {
+        <div class="progress-widget">
+          <div>
+            <span>{{ widget().subtitle }}</span
+            ><strong>{{ displayValue() }}</strong>
+          </div>
+          <span class="progress-track"
+            ><i [style.width.%]="widget().settings.controlValue"></i
+          ></span>
+          <small>Updated just now</small>
+        </div>
+      }
+      @case ('status') {
+        <div class="status-widget">
+          <span class="status-orbit"><i></i></span>
+          <div>
+            <strong>{{ stateLabel() }}</strong
+            ><small>{{ widget().subtitle }}</small>
+          </div>
+        </div>
+      }
+      @case ('led') {
+        <div class="led-widget">
+          <span [class.led-on]="widget().settings.controlValue > 0"></span>
+          <strong>{{ widget().settings.controlValue > 0 ? 'Active' : 'Inactive' }}</strong>
+        </div>
+      }
+      @case ('line-chart') {
+        <div class="chart-widget">
+          <div class="chart-summary">
+            <div><span>Average</span><strong>27.8°C</strong></div>
+            <div><span>Peak</span><strong>31.2°C</strong></div>
+            <span class="chart-live"><i></i> Live</span>
+          </div>
+          <div class="line-chart-area">
+            <span class="axis-label axis-high">32°</span>
+            <span class="axis-label axis-mid">26°</span>
+            <span class="axis-label axis-low">20°</span>
+            <svg
+              viewBox="0 0 560 170"
+              preserveAspectRatio="none"
+              role="img"
+              aria-label="Temperature rose from 24 to 29 degrees during the selected period"
+            >
+              <defs>
+                <linearGradient [attr.id]="'chart-' + widget().id" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stop-color="var(--widget-accent)" stop-opacity=".24" />
+                  <stop offset="1" stop-color="var(--widget-accent)" stop-opacity="0" />
+                </linearGradient>
+              </defs>
+              <path class="chart-grid-line" d="M0 20h560M0 82h560M0 145h560" />
+              <path
+                d="M0 135C35 125 56 90 92 99s54 30 88 2 58-70 96-54 44 53 78 38 49-51 85-36 53 56 121 10v111H0Z"
+                [attr.fill]="'url(#chart-' + widget().id + ')'"
+              />
+              <path
+                class="chart-line"
+                d="M0 135C35 125 56 90 92 99s54 30 88 2 58-70 96-54 44 53 78 38 49-51 85-36 53 56 121 10"
+              />
+              <circle
+                cx="439"
+                cy="49"
+                r="4"
+                fill="white"
+                stroke="var(--widget-accent)"
+                stroke-width="3"
+              />
+            </svg>
+          </div>
+          <div class="chart-times">
+            <span>12 AM</span><span>6 AM</span><span>12 PM</span><span>6 PM</span><span>Now</span>
+          </div>
+        </div>
+      }
+      @case ('bar-chart') {
+        <div class="bar-widget" role="img" aria-label="Bar chart showing seven recent readings">
+          @for (height of [44, 72, 56, 88, 66, 78, 52]; track $index) {
+            <span [style.height.%]="height"><i></i></span>
+          }
+        </div>
+      }
+      @case ('pie-chart') {
+        <div class="pie-widget" role="img" aria-label="Pie chart showing Primary at 64 percent">
+          <span></span>
+          <div><strong>64%</strong><small>Primary</small></div>
+        </div>
+      }
+      @case ('table') {
+        <div class="table-widget" role="table" aria-label="Recent device activity">
+          <div class="table-head" role="row">
+            <span role="columnheader">Device</span><span role="columnheader">Reading</span
+            ><span role="columnheader">Status</span>
+          </div>
+          <div class="table-row" role="row">
+            <span role="cell"><i class="device-dot dot-green"></i>Greenhouse A</span
+            ><strong role="cell">28.4°C</strong><small role="cell">Online</small>
+          </div>
+          <div class="table-row" role="row">
+            <span role="cell"><i class="device-dot dot-blue"></i>Water tank</span
+            ><strong role="cell">74%</strong><small role="cell">Online</small>
+          </div>
+          <div class="table-row" role="row">
+            <span role="cell"><i class="device-dot dot-orange"></i>Ventilation</span
+            ><strong role="cell">72%</strong><small role="cell">Online</small>
+          </div>
+          <div class="table-row" role="row">
+            <span role="cell"><i class="device-dot dot-gray"></i>Gate sensor</span
+            ><strong role="cell">Closed</strong><small role="cell">2m ago</small>
+          </div>
+        </div>
+      }
+      @case ('event-log') {
+        <div class="event-widget">
+          <p>
+            <i class="event-ok"></i
+            ><span><strong>Device connected</strong><small>Greenhouse A · now</small></span>
+          </p>
+          <p>
+            <i class="event-warn"></i
+            ><span><strong>Humidity threshold</strong><small>Sensor 04 · 8m ago</small></span>
+          </p>
+          <p>
+            <i></i
+            ><span><strong>Schedule completed</strong><small>Irrigation · 24m ago</small></span>
+          </p>
+        </div>
+      }
+      @case ('terminal') {
+        <div class="terminal-widget">
+          <code
+            ><span>10:42:08</span> device online<br /><span>10:42:11</span> temp=28.4 humidity=68<br /><span
+              >10:42:14</span
+            >
+            publish telemetry ✓<br /><b>›</b> listening for events_</code
+          >
+        </div>
+      }
+      @case ('text') {
+        <div class="text-widget">
+          <strong>{{ widget().title }}</strong>
+          <p>{{ widget().subtitle || 'Add supporting text for this section of the dashboard.' }}</p>
+        </div>
+      }
+      @case ('divider') {
+        <div class="divider-widget">
+          <span></span><strong>{{ widget().title }}</strong
+          ><span></span>
+        </div>
+      }
+    }
+  </div>
+
+  @if (editMode() && !widget().settings.locked) {
+    <span class="widget-resize-handle" aria-hidden="true" (pointerdown)="beginResize($event)">
+      <app-dashboard-icon name="resize" />
+    </span>
+  }
+</article>

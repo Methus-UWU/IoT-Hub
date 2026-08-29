@@ -621,6 +621,20 @@ export class VirtualDevicePage {
 
   constructor() {
     afterNextRender(() => this.centerCanvasAtZoom(1));
+
+    // Inside a project the canvas shows that project and nothing else. The
+    // starter circuit — board, LCD, servo — is demo content for the standalone
+    // experience, and it must never appear in a user's real project, including
+    // during the moment before the saved layout arrives.
+    if (this.persistedProjectId) {
+      this.usesPersistedLayout.set(true);
+      this.deviceInstances.set([]);
+      this.placements.set({});
+      this.connections.set([]);
+      this.deviceStates.set({});
+      this.relayChannelStates.set({});
+    }
+
     void this.restorePersistedComponents();
 
     // A drag in progress when the user navigates away would otherwise be lost:
@@ -643,7 +657,6 @@ export class VirtualDevicePage {
 
     try {
       const stored = await this.canvasPersistence.load(projectId);
-      if (stored.length === 0) return;
 
       const instances: DeviceInstance[] = [];
       const placements: Record<string, DevicePlacement> = {};
@@ -670,9 +683,6 @@ export class VirtualDevicePage {
         }
       }
 
-      if (instances.length === 0) return;
-
-      this.usesPersistedLayout.set(true);
       void this.refreshUsage();
       this.deviceInstances.set(instances);
       this.placements.set(placements);

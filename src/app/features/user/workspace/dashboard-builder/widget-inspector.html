@@ -1,0 +1,484 @@
+<aside class="inspector" [class.inspector-widget-selected]="widget()" aria-label="Widget inspector">
+  <header class="inspector-header">
+    <div>
+      <span class="inspector-kicker">Configure</span>
+      <h2>{{ selectionCount() > 0 ? 'Widget settings' : 'Dashboard settings' }}</h2>
+    </div>
+    <button
+      type="button"
+      class="close-panel"
+      aria-label="Close inspector"
+      (click)="closeRequested.emit()"
+    >
+      <app-dashboard-icon name="close" />
+    </button>
+  </header>
+
+  @if (selectionCount() > 1) {
+    <div class="multi-selection">
+      <span class="multi-icon"><app-dashboard-icon name="grid" /></span>
+      <h3>{{ selectionCount() }} widgets selected</h3>
+      <p>Apply layout actions to the current selection.</p>
+      <div class="multi-actions">
+        <button
+          type="button"
+          [disabled]="layoutLocked()"
+          (click)="bulkActionRequested.emit('align-left')"
+        >
+          <app-dashboard-icon name="align-left" />
+          Align left
+        </button>
+        <button
+          type="button"
+          [disabled]="layoutLocked()"
+          (click)="bulkActionRequested.emit('align-top')"
+        >
+          <app-dashboard-icon name="align-top" />
+          Align top
+        </button>
+        <button
+          type="button"
+          [disabled]="layoutLocked()"
+          (click)="bulkActionRequested.emit('duplicate')"
+        >
+          <app-dashboard-icon name="duplicate" />
+          Duplicate
+        </button>
+        <button
+          type="button"
+          class="danger-action"
+          [disabled]="layoutLocked()"
+          (click)="bulkActionRequested.emit('delete')"
+        >
+          <app-dashboard-icon name="trash" />
+          Delete
+        </button>
+      </div>
+    </div>
+  } @else if (widget(); as selectedWidget) {
+    <div class="selected-summary">
+      <span class="selected-icon"><app-dashboard-icon [name]="selectedWidgetIcon()" /></span>
+      <span>
+        <strong>{{ selectedWidget.title }}</strong>
+        <small>{{ selectedWidget.type }} · {{ breakpoint() }}</small>
+      </span>
+      <span class="selected-state"><i></i>{{ selectedWidget.state }}</span>
+    </div>
+
+    <div class="inspector-tabs" role="tablist" aria-label="Widget settings sections">
+      @for (tab of tabs; track tab.id; let tabIndex = $index) {
+        <button
+          type="button"
+          role="tab"
+          [id]="'inspector-tab-' + tab.id"
+          [attr.aria-selected]="activeTab() === tab.id"
+          aria-controls="inspector-panel"
+          [class.inspector-tab-active]="activeTab() === tab.id"
+          [attr.tabindex]="activeTab() === tab.id ? 0 : -1"
+          [attr.aria-label]="tab.label"
+          [attr.title]="tab.label"
+          (click)="selectTab(tab.id)"
+          (keydown)="handleTabKeydown($event, tabIndex)"
+        >
+          <app-dashboard-icon [name]="tab.icon" />
+          <span>{{ tab.label }}</span>
+        </button>
+      }
+    </div>
+
+    <div
+      class="inspector-scroll"
+      role="tabpanel"
+      id="inspector-panel"
+      [attr.aria-labelledby]="'inspector-tab-' + activeTab()"
+    >
+      @switch (activeTab()) {
+        @case ('general') {
+          <section class="inspector-section">
+            <div class="section-heading">
+              <span><app-dashboard-icon name="settings" /></span>
+              <div>
+                <h3>General</h3>
+                <p>Name and positioning</p>
+              </div>
+            </div>
+
+            <label class="field-label">
+              <span>Widget title</span>
+              <input
+                type="text"
+                [value]="selectedWidget.title"
+                (change)="patchText('title', $event)"
+              />
+            </label>
+            <label class="field-label">
+              <span>Supporting text</span>
+              <input
+                type="text"
+                [value]="selectedWidget.subtitle"
+                placeholder="Optional description"
+                (change)="patchText('subtitle', $event)"
+              />
+            </label>
+          </section>
+
+          <section class="inspector-section">
+            <div class="section-title-row">
+              <h3>Grid position</h3>
+              <span>{{ breakpoint() }}</span>
+            </div>
+            @if (selectedLayout(); as layout) {
+              <div class="layout-fields">
+                <label
+                  ><span>X</span
+                  ><input
+                    type="number"
+                    min="0"
+                    [value]="layout.x"
+                    [disabled]="layoutLocked() || selectedWidget.settings.locked"
+                    (change)="updateLayout('x', $event)"
+                /></label>
+                <label
+                  ><span>Y</span
+                  ><input
+                    type="number"
+                    min="0"
+                    [value]="layout.y"
+                    [disabled]="layoutLocked() || selectedWidget.settings.locked"
+                    (change)="updateLayout('y', $event)"
+                /></label>
+                <label
+                  ><span>Width</span
+                  ><input
+                    type="number"
+                    min="1"
+                    [value]="layout.cols"
+                    [disabled]="layoutLocked() || selectedWidget.settings.locked"
+                    (change)="updateLayout('cols', $event)"
+                /></label>
+                <label
+                  ><span>Height</span
+                  ><input
+                    type="number"
+                    min="1"
+                    [value]="layout.rows"
+                    [disabled]="layoutLocked() || selectedWidget.settings.locked"
+                    (change)="updateLayout('rows', $event)"
+                /></label>
+              </div>
+            }
+            <p class="field-help">
+              <app-dashboard-icon name="info" /> Coordinates are zero-based in the saved dashboard
+              JSON.
+            </p>
+          </section>
+        }
+
+        @case ('data') {
+          <section class="inspector-section">
+            <div class="section-heading">
+              <span><app-dashboard-icon name="data" /></span>
+              <div>
+                <h3>Data source</h3>
+                <p>Connect this widget to telemetry</p>
+              </div>
+            </div>
+            <label class="field-label">
+              <span>Device</span>
+              <select [value]="selectedWidget.deviceId" (change)="patchText('deviceId', $event)">
+                <option value="greenhouse-01">Greenhouse sensor</option>
+                <option value="climate-controller">Climate controller</option>
+                <option value="pump-controller">Pump controller</option>
+                <option value="all-devices">All devices</option>
+              </select>
+            </label>
+            <label class="field-label">
+              <span>Datastream</span>
+              <input
+                type="text"
+                [value]="selectedWidget.datasource"
+                (change)="patchText('datasource', $event)"
+              />
+            </label>
+            <label class="field-label">
+              <span>Runtime state</span>
+              <select [value]="selectedWidget.state" (change)="patchState($event)">
+                <option value="online">Online</option>
+                <option value="offline">Offline</option>
+                <option value="loading">Loading</option>
+                <option value="stale">Stale</option>
+                <option value="error">Error</option>
+                <option value="pending">Pending</option>
+              </select>
+            </label>
+          </section>
+
+          <section class="binding-preview">
+            <span><app-dashboard-icon name="device" /></span>
+            <div>
+              <strong>Binding active</strong
+              ><small>{{ selectedWidget.deviceId }} / {{ selectedWidget.datasource }}</small>
+            </div>
+            <i aria-hidden="true"></i>
+          </section>
+        }
+
+        @case ('appearance') {
+          <section class="inspector-section">
+            <div class="section-heading">
+              <span><app-dashboard-icon name="palette" /></span>
+              <div>
+                <h3>Appearance</h3>
+                <p>Color and display format</p>
+              </div>
+            </div>
+
+            <fieldset class="color-fieldset">
+              <legend>Accent color</legend>
+              <div class="color-options">
+                @for (color of accentOptions; track color) {
+                  <button
+                    type="button"
+                    [style.background]="color"
+                    [class.color-selected]="selectedWidget.settings.accent === color"
+                    [attr.aria-label]="'Use accent color ' + color"
+                    [attr.aria-pressed]="selectedWidget.settings.accent === color"
+                    (click)="patchSetting('accent', color)"
+                  >
+                    @if (selectedWidget.settings.accent === color) {
+                      <app-dashboard-icon name="check" />
+                    }
+                  </button>
+                }
+                <label class="custom-color" title="Custom color">
+                  <span class="sr-only">Custom accent color</span>
+                  <input
+                    type="color"
+                    [value]="selectedWidget.settings.accent"
+                    (input)="patchInputSetting('accent', $event)"
+                  />
+                  <app-dashboard-icon name="plus" />
+                </label>
+              </div>
+            </fieldset>
+
+            <fieldset class="background-options">
+              <legend>Card background</legend>
+              <div>
+                @for (background of backgroundOptions; track background) {
+                  <button
+                    type="button"
+                    [class.background-selected]="selectedWidget.settings.background === background"
+                    [attr.aria-pressed]="selectedWidget.settings.background === background"
+                    (click)="patchSetting('background', background)"
+                  >
+                    <i [class]="'background-swatch swatch-' + background"></i>
+                    {{ background }}
+                  </button>
+                }
+              </div>
+            </fieldset>
+
+            <label class="toggle-row">
+              <span><strong>Show widget header</strong><small>Title and online state</small></span>
+              <input
+                type="checkbox"
+                [checked]="selectedWidget.settings.showHeader"
+                (change)="patchCheckboxSetting('showHeader', $event)"
+              />
+            </label>
+
+            <div class="paired-fields">
+              <label class="field-label"
+                ><span>Unit</span
+                ><input
+                  type="text"
+                  [value]="selectedWidget.settings.unit"
+                  placeholder="e.g. °C"
+                  (change)="patchInputSetting('unit', $event)"
+              /></label>
+              <label class="field-label"
+                ><span>Decimals</span
+                ><input
+                  type="number"
+                  min="0"
+                  max="4"
+                  [value]="selectedWidget.settings.decimals"
+                  (change)="patchNumberSetting('decimals', $event)"
+              /></label>
+            </div>
+          </section>
+        }
+
+        @case ('interaction') {
+          <section class="inspector-section">
+            <div class="section-heading">
+              <span><app-dashboard-icon name="action" /></span>
+              <div>
+                <h3>Interaction</h3>
+                <p>Controls and editor actions</p>
+              </div>
+            </div>
+            <label class="field-label">
+              <span>Preview value</span>
+              <input
+                type="number"
+                [value]="selectedWidget.settings.controlValue"
+                (change)="patchNumberSetting('controlValue', $event)"
+              />
+            </label>
+            <button type="button" class="action-row" (click)="requestAction('toggle-lock')">
+              <span
+                ><app-dashboard-icon [name]="selectedWidget.settings.locked ? 'unlock' : 'lock'"
+              /></span>
+              <span
+                ><strong>{{
+                  selectedWidget.settings.locked ? 'Unlock widget' : 'Lock widget'
+                }}</strong
+                ><small>{{
+                  selectedWidget.settings.locked
+                    ? 'Allow layout changes'
+                    : 'Prevent moving and resizing'
+                }}</small></span
+              >
+              <app-dashboard-icon name="chevron" />
+            </button>
+            <button
+              type="button"
+              class="action-row"
+              [disabled]="layoutLocked()"
+              (click)="requestAction('duplicate')"
+            >
+              <span><app-dashboard-icon name="duplicate" /></span>
+              <span
+                ><strong>Duplicate widget</strong><small>Create a copy on every layout</small></span
+              >
+              <app-dashboard-icon name="chevron" />
+            </button>
+            <button type="button" class="action-row" (click)="requestAction('copy')">
+              <span><app-dashboard-icon name="copy" /></span>
+              <span><strong>Copy widget</strong><small>Paste with Ctrl or ⌘ + V</small></span>
+              <app-dashboard-icon name="chevron" />
+            </button>
+            <button
+              type="button"
+              class="action-row danger-row"
+              [disabled]="layoutLocked()"
+              (click)="requestAction('delete')"
+            >
+              <span><app-dashboard-icon name="trash" /></span>
+              <span><strong>Delete widget</strong><small>Remove from all layouts</small></span>
+              <app-dashboard-icon name="chevron" />
+            </button>
+          </section>
+        }
+
+        @case ('access') {
+          <section class="inspector-section">
+            <div class="section-heading">
+              <span><app-dashboard-icon name="permissions" /></span>
+              <div>
+                <h3>Permissions</h3>
+                <p>Who can see and control this widget</p>
+              </div>
+            </div>
+            <label class="toggle-row"
+              ><span
+                ><strong>Visible to viewers</strong
+                ><small>Show on the published dashboard</small></span
+              ><input type="checkbox" checked disabled
+            /></label>
+            <label class="toggle-row"
+              ><span
+                ><strong>Allow control</strong
+                ><small>Viewers can use interactive controls</small></span
+              ><input type="checkbox" checked disabled
+            /></label>
+            <label class="toggle-row"
+              ><span
+                ><strong>Require online device</strong
+                ><small>Disable controls while offline</small></span
+              ><input type="checkbox" checked disabled
+            /></label>
+          </section>
+          <div class="access-note">
+            <app-dashboard-icon name="lock" /><span
+              ><strong>Inherited project access</strong
+              ><small>Permissions are read-only here and managed at the project level.</small></span
+            >
+          </div>
+        }
+      }
+    </div>
+  } @else {
+    <div class="dashboard-settings-scroll">
+      <div class="settings-hero">
+        <span><app-dashboard-icon name="grid" /></span>
+        <h3>Dashboard defaults</h3>
+        <p>Select a widget to edit it, or configure settings that apply to the entire dashboard.</p>
+      </div>
+
+      <section class="settings-card">
+        <div class="settings-card-heading">
+          <span><app-dashboard-icon name="data" /></span>
+          <div>
+            <h3>Data source</h3>
+            <p>Which devices are included</p>
+          </div>
+        </div>
+        <label class="field-label"
+          ><span>Device scope</span
+          ><select [value]="deviceScope()" (change)="updateDashboardSetting('deviceScope', $event)">
+            <option>All devices</option>
+            <option>Greenhouse sensors</option>
+            <option>Climate controllers</option>
+            <option>Pump controllers</option>
+          </select></label
+        >
+      </section>
+
+      <section class="settings-card">
+        <div class="settings-card-heading">
+          <span><app-dashboard-icon name="calendar" /></span>
+          <div>
+            <h3>Default date range</h3>
+            <p>Applied when the dashboard opens</p>
+          </div>
+        </div>
+        <div class="range-options" role="group" aria-label="Default dashboard date range">
+          @for (range of ['1h', '24h', '7d', '30d']; track range) {
+            <button
+              type="button"
+              [class.range-active]="dateRange() === range"
+              [attr.aria-pressed]="dateRange() === range"
+              (click)="dashboardSettingsChanged.emit({ field: 'dateRange', value: range })"
+            >
+              {{ range }}
+            </button>
+          }
+        </div>
+      </section>
+
+      <section class="settings-card">
+        <div class="settings-card-heading">
+          <span><app-dashboard-icon name="permissions" /></span>
+          <div>
+            <h3>Access</h3>
+            <p>Project members with viewer access</p>
+          </div>
+        </div>
+        <div class="access-avatars">
+          <span>AK</span><span>MP</span><span>JL</span><i>+4</i
+          ><button type="button" disabled title="Managed in project members">Manage</button>
+        </div>
+      </section>
+
+      <div class="settings-tip">
+        <app-dashboard-icon name="info" /><span
+          ><strong>Nothing selected</strong
+          ><small>Select a card on the canvas to open its properties.</small></span
+        >
+      </div>
+    </div>
+  }
+</aside>
