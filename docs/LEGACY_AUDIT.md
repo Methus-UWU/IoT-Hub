@@ -3,7 +3,7 @@
 Read-only audit of the existing repository. No source code, packages, files, or database schema were modified while producing this document.
 
 - Audit date: 2026-08-28
-- Scope: `iot-hub-fe/` (Angular), `iot-hub-be/` (NestJS + Prisma)
+- Scope: `frontend/` (Angular), `backend/` (NestJS + Prisma)
 - Target architecture: Angular + NestJS + Supabase (PostgreSQL / Auth / Storage)
 - Related documents: `docs/ARCHITECTURE.md`, `docs/SECURITY.md`, `docs/DATABASE.md`, `docs/API.md`
 
@@ -13,16 +13,16 @@ Read-only audit of the existing repository. No source code, packages, files, or 
 
 | Item | Value |
 | --- | --- |
-| Root repository | `iot-hub/` — tracks nothing yet; `iot-hub-be/` and `iot-hub-fe/` appear as untracked |
-| Frontend repository | `iot-hub-fe/.git` — 2 commits, large uncommitted working tree |
-| Backend repository | `iot-hub-be/.git` — **0 commits**, everything untracked |
+| Root repository | `iot-hub/` — tracks nothing yet; `backend/` and `frontend/` appear as untracked |
+| Frontend repository | `frontend/.git` — 2 commits, large uncommitted working tree |
+| Backend repository | `backend/.git` — **0 commits**, everything untracked |
 | Frontend stack | Angular 22, Tailwind CSS 4, Monaco Editor, `marked`, RxJS 7, TypeScript 6 |
 | Backend stack | NestJS 11, Prisma 7 (`pg` driver adapter + read-replica extension), Passport JWT, bcrypt, class-validator |
 | Frontend source files | 196 files, ~45,600 lines of `.ts` / `.html` / `.css` |
 | Backend source files | 38 TypeScript files, ~2,870 lines (excluding the generated Prisma client) |
 | Automated tests | 1 backend spec (`workspace.service.spec.ts`), 0 frontend specs |
 
-Three nested Git repositories exist with no submodule or workspace configuration linking them. The root repository cannot track `iot-hub-be/` or `iot-hub-fe/` as ordinary directories while their inner `.git` directories are present. This must be resolved before any migration branch strategy is meaningful.
+Three nested Git repositories exist with no submodule or workspace configuration linking them. The root repository cannot track `backend/` or `frontend/` as ordinary directories while their inner `.git` directories are present. This must be resolved before any migration branch strategy is meaningful.
 
 ---
 
@@ -62,10 +62,10 @@ The structure already matches the conventions in `AGENTS.md`: standalone compone
 | Admin user management | `/api/admin/users` | Real |
 | Admin AI assistant | `/api/admin/ai/*` | Real |
 | Web IDE files, build, devices, serial | `/api/projects/:projectId/workspace/*` | Real |
-| Admin database overview / backups / restore | `admin/database/*`, `admin/backups` | **No backend exists** |
-| Admin integrations | `admin/integrations` | **No backend exists** |
-| Admin settings | `admin/settings` | **No backend exists** |
-| Admin server monitoring / system logs | — | Fully client-side simulation (`server-monitoring.service.ts` generates random metrics on a 5 s `interval`) |
+| Admin database overview | `admin/database/overview` | Resolved 2026-09-06: real read-only metrics; unsupported backup/restore UI retired. See [page brief](pages/admin-database.md). |
+| Admin integrations | `admin/integrations` | Resolved 2026-09-29: read-only operational configuration and PostgreSQL connectivity status. |
+| Admin settings | — | Retired 2026-09-29: the unused form promised maintenance enforcement and alert delivery that did not exist. |
+| Admin dashboard / server monitoring / system logs | `admin/monitoring/snapshot` | Resolved 2026-09-29: measured API-process resources, database-backed counts, PostgreSQL health, and a bounded request-log buffer. |
 | Projects list | — | `localStorage` + hardcoded `MOCK_PROJECTS` (`projects/project.store.ts`) |
 | Dashboard builder | — | `localStorage` only |
 | Virtual device simulator | — | Fully client-side, no persistence contract |
@@ -160,7 +160,7 @@ The workspace, project, device, datastream, and dashboard hierarchy described in
 
 | # | Issue |
 | --- | --- |
-| D1 | **The seed file contains a real plaintext password** (`Nong4548!`) for `admin1@gmail.com`, `user1@gmail.com`, and `user2@gmail.com` in `prisma/seeds/user.seed.ts`. It is committed source, not a generated value |
+| D1 | **The seed file contains a real plaintext password** for `admin1@gmail.com`, `user1@gmail.com`, and `user2@gmail.com` in `prisma/seeds/user.seed.ts`. It is committed source, not a generated value |
 | D2 | No repository layer; Prisma calls are spread through five services |
 | D3 | `AdminUsersService.list()` is unbounded — no pagination, no limit. It also fetches a nested session per user, so the query cost grows with the user count |
 | D4 | Read-replica routing is configured but no replica is deployed; the read path is untested |
@@ -203,7 +203,7 @@ Also reusable and worth keeping: `shared/pipes/file-size.pipe.ts`, `shared/pipes
 | P5 | The refresh-token lifetime is expressed three times (`'7d'`, `REFRESH_TOKEN_LIFETIME_MS`, `REFRESH_COOKIE_MAX_AGE`) across two files | `auth.service.ts:23-24`, `auth.controller.ts:28` |
 | P6 | The user projection `{ id, username, email, isActive, role }` is repeated in `getMe` and `updateMe` | `auth.service.ts:205, 240` |
 | P7 | The OpenRouter-backed providers (Meta, Gemma, NVIDIA) are three near-identical classes differing only in labels and model lists | `ai-provider.adapters.ts:406-506` |
-| P8 | Six frontend stores repeat the same `_loading` / `_error` / `_busyId` Signal scaffolding and `subscribe({ next, error })` block | `admin/*/**.store.ts`, `admin/profile`, `admin/settings` |
+| P8 | Several frontend stores repeat the same `_loading` / `_error` Signal scaffolding and `subscribe({ next, error })` block | `admin/*/**.store.ts`, `admin/profile` |
 | P9 | `localStorage` read/write with try-catch is hand-rolled in five places instead of one storage service | `project.store.ts`, `project-workspace.page.ts`, `dashboard-builder.page.ts`, `ai-assistant.store.ts`, `device-preference.service.ts` |
 | P10 | Thai error strings are inlined in stores rather than centralised | all admin stores |
 
@@ -227,11 +227,11 @@ Ordered by severity. Severity assumes the current code deployed as-is to a multi
 
 ### S4 — High: live API keys are present in a working-tree `.env`
 
-`iot-hub-be/.env` holds real `GEMINI_API_KEY` and `OPENROUTER_API_KEY` values plus both JWT secrets and the database URL. The file is matched by `iot-hub-be/.gitignore`, so it is not currently tracked — but the backend repository has zero commits and the root repository does not track the directory at all, so that protection has never actually been exercised. **These keys should be rotated regardless, because they exist in plaintext on a developer workstation and were readable during this audit.**
+`backend/.env` holds real `GEMINI_API_KEY` and `OPENROUTER_API_KEY` values plus both JWT secrets and the database URL. The file is matched by `backend/.gitignore`, so it is not currently tracked — but the backend repository has zero commits and the root repository does not track the directory at all, so that protection has never actually been exercised. **These keys should be rotated regardless, because they exist in plaintext on a developer workstation and were readable during this audit.**
 
 ### S5 — High: a real password is committed in the seed file
 
-`prisma/seeds/user.seed.ts` seeds three accounts, including an `admin` account, with the literal password `Nong4548!`. Anyone with repository access holds admin credentials for every environment seeded from this file.
+`prisma/seeds/user.seed.ts` seeds three accounts, including an `admin` account, with a literal plaintext password (now redacted from this document). Anyone with repository access holds admin credentials for every environment seeded from this file.
 
 ### S6 — Low (corrected from High): unsanitised markdown relies on an implicit framework control
 
@@ -293,7 +293,7 @@ The refresh cookie is `sameSite=lax` and the refresh endpoint is `POST`, which b
 | F8 | Two components exceed 1,000 lines (`virtual-device.page.ts` 2,157; `project-workspace.page.ts` 1,501); change detection and bundle cost both suffer | — |
 | F9 | The admin user list has no pagination | `admin-users.service.ts:26` |
 | F10 | `listFiles()` walks the project tree and `stat()`s each entry on every call, and the build path calls `readFile()` once per file sequentially | `workspace.service.ts:36,197` |
-| F11 | `iot-hub-fe/dist/` holds 275 MB of build and scratch output, including a full Chrome browser profile (`chrome-sonar/`) | — |
+| F11 | `frontend/dist/` holds 275 MB of build and scratch output, including a full Chrome browser profile (`chrome-sonar/`) | — |
 
 ---
 
@@ -303,7 +303,7 @@ The refresh cookie is `sameSite=lax` and the refresh endpoint is `POST`, which b
 2. **Half the admin UI has no backend.** Database, integrations, settings, server monitoring, and system logs are simulated; the mock interceptor that once served them is disabled in both environments.
 3. **Effectively no test coverage.** One backend spec file; zero frontend specs across ~45,000 lines.
 4. **`AGENTS.md` describes Supabase, WebSocket, and isolated build workers. None exist.** The only occurrence of the word "Supabase" in the entire source tree is a fake service name in the monitoring mock.
-5. **Two documentation trees disagree**: `docs/` at the root describes the target platform; `iot-hub-fe/AGENTS.md` and `iot-hub-fe/docs/architecture/` describe the legacy frontend.
+5. **Two documentation trees disagree**: `docs/` at the root describes the target platform; `frontend/AGENTS.md` and `frontend/docs/architecture/` describe the legacy frontend.
 6. **Mixed-language comments and strings** — Thai comments and Thai user-facing strings are inlined in TypeScript, against the English-code rule in `AGENTS.md`, with no i18n layer.
 7. **No CI**, no lint gate, no type-check gate, no formatting gate.
 8. **`useMockApi` is a build-time boolean**, so mock and real modes cannot coexist per feature during an incremental migration.
@@ -347,7 +347,7 @@ Keep the module, change its internals.
 | `admin-users.service.ts` | Add pagination; extract the projection constant; move the password policy into a shared validator |
 | `project-workspace.page.ts` (1,501 lines) | Split into file-explorer, editor-host, build-panel, serial-panel, and AI-panel components plus a `WorkspaceStore` |
 | `virtual-device.page.ts` (2,157 lines) | Split into canvas, palette, inspector, and simulation-host components |
-| The six admin stores | Extract a generic `createAsyncStore()` or base signal-store helper (fixes P8) |
+| The remaining admin stores | Extract a generic `createAsyncStore()` or base signal-store helper (fixes P8) |
 | The five `localStorage` call sites | One injectable `BrowserStorageService` (fixes P9) |
 | `markdown.pipe.ts` | Sanitise `marked` output through DOMPurify or Angular's sanitiser before binding (fixes S6) |
 | Thai UI strings | Move into an i18n resource layer; keep code English-only |
@@ -369,7 +369,7 @@ Keep the module, change its internals.
 | `dashboard-builder` `localStorage` persistence | `dashboards` / `dashboard_widgets` tables | |
 | Serial-output HTTP polling | A WebSocket gateway | Fixes F1 |
 | The single `role_id` column | An explicit `workspace_members` table with a role per workspace, plus a policy layer and RLS | Enables everything in section 5 that is currently absent |
-| `iot-hub-fe/dist/` (275 MB, includes a Chrome profile) | Clean, gitignored build output | |
+| `frontend/dist/` (275 MB, includes a Chrome profile) | Clean, gitignored build output | |
 | `prisma/seeds/user.seed.ts` hardcoded password | Environment-supplied or generated seed credentials | Fixes S5 |
 
 ---
@@ -379,7 +379,7 @@ Keep the module, change its internals.
 These do not depend on any architectural decision and should not wait for one.
 
 1. **Rotate `GEMINI_API_KEY` and `OPENROUTER_API_KEY`** (S4).
-2. **Change the `Nong4548!` password everywhere it was seeded, and remove it from the seed source** (S5).
+2. **Change the previously hardcoded seed password everywhere it was seeded, and remove it from the seed source** (S5).
 3. **Set `WORKSPACE_ALLOW_ANONYMOUS=false` and `NODE_ENV` explicitly in every environment** (S3, S12).
 4. **Stop exposing the build endpoint**, or restrict it to trusted accounts, until an isolated worker exists (S1, S2).
 5. **Sanitise the markdown pipe output** (S6).
@@ -434,7 +434,7 @@ Updated 2026-08-28, after Phases 0 and 1.
 | P8, P9 frontend duplication | **Open** — deferred, see `docs/ARCHITECTURE.md` |
 | D2 no repository layer | **Fixed** — Phase 1 |
 | F3, F4, F5, F6 build/serial performance | **Fixed by deletion**; returns as a queued job in Phase 4 |
-| F11 275 MB in `iot-hub-fe/dist/` | **Open** — gitignored, safe to delete manually |
+| F11 275 MB in `frontend/dist/` | **Open** — gitignored, safe to delete manually |
 
 ## Correction to the repository shape section
 

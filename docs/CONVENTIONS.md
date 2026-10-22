@@ -14,6 +14,13 @@ Use English for:
 * API routes
 * technical documentation
 
+Use Thai for text the end user reads: UI labels, empty states, guide content, and
+device descriptions. `DEVICE_CATEGORY_OPTIONS` in `device-library.models.ts` was
+already written this way; `features/user/documents/` follows it. The rule above
+still holds for everything around that copy — identifiers, file names, and the
+comments explaining them stay English, so a Thai string is always a value, never
+a symbol.
+
 ## TypeScript
 
 Use strict mode.

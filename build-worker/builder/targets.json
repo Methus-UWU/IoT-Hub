@@ -1,0 +1,23 @@
+{
+  "comment": "Platforms and boards baked into the builder image. A build runs with --network=none, so anything not installed here cannot be used. Keep in step with buildable boards (flash) in backend/src/modules/projects/board-catalog.ts.",
+  "platforms": {
+    "espressif32": {
+      "spec": "platformio/espressif32@6.12.0",
+      "warmupBoard": "esp32dev",
+      "boards": [
+        "esp32dev",
+        "esp32doit-devkit-v1",
+        "esp32cam"
+      ]
+    },
+    "atmelavr": {
+      "spec": "platformio/atmelavr@5.1.0",
+      "warmupBoard": "uno",
+      "boards": [
+        "uno",
+        "nanoatmega328",
+        "megaatmega2560"
+      ]
+    }
+  }
+}

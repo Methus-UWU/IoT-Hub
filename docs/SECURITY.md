@@ -60,6 +60,13 @@ Policies should consider:
 
 RLS complements backend authorization.
 
+Data API privileges are deny-first. Migration
+`20260926000000_harden_data_api_privileges` revokes the default table grants from
+`anon` and `authenticated`, grants back read access where an explicit policy permits it,
+and keeps all application writes behind NestJS authorization and DTO validation. It also
+revokes public schema creation, and removes public RPC access from internal functions.
+Only the workspace/project access helpers remain executable by authenticated users.
+
 It does not replace application-level business rules.
 
 ## Secrets
@@ -216,43 +223,65 @@ a human. It is not aspirational — every claim below corresponds to shipped cod
 | AI system context is an explicit allowlist with no host identity | `ai/system-context.service.ts` |
 | Assistant markdown is sanitized before rendering | `markdown.pipe.ts` |
 
-## Temporary capability limitations
+## Firmware builds (Phase 4, 2026-10-02)
 
-**Firmware build, serial monitor, and host device listing are disabled.**
+The legacy implementation compiled user-supplied projects with `execFile` inside the
+API process and passed the child the entire `process.env` — database URL, both JWT
+secrets, every AI key. A user-controlled `platformio.ini` runs arbitrary Python
+through `extra_scripts`, so the endpoint was remote code execution with full access
+to platform secrets, and it exposed every serial port on the API host to any user.
+That code is deleted. Builds now follow `docs/adr/ADR-002-build-isolation.md`:
 
-The previous implementation compiled user-supplied projects with `execFile` inside
-the API process and passed the child the entire `process.env`, which contained the
-database URL, both JWT secrets, and every AI provider key. A user-controlled
-`platformio.ini` can execute arbitrary code through directives such as
-`extra_scripts`, so the endpoint was remote code execution with full access to
-platform secrets. The same services also exposed every serial port on the API host
-to any authenticated user, with no ownership check.
+```
+Angular → API (queue row) → build-dispatcher → builder container → API (result)
+                                                        Web Serial ← browser ← artifact
+```
 
-Current behaviour:
-
-| Endpoint | Behaviour |
+| Control | Where |
 | --- | --- |
-| `GET  /api/projects/:projectId/workspace/toolchain` | Reports `available: false` |
-| `POST /api/projects/:projectId/workspace/build` | `503 BUILD_TEMPORARILY_DISABLED` |
-| `GET  /api/projects/:projectId/workspace/devices` | Empty list with an explanatory message |
-| `POST /api/projects/:projectId/workspace/serial/start` | `503 SERIAL_TEMPORARILY_DISABLED` |
-| `GET  /api/projects/:projectId/workspace/serial/output` | Idle stream, so a polling client stops cleanly |
+| The API never starts a process or evaluates code; a source-level test fails if any API file imports `child_process`/`worker_threads`/`cluster`, spreads `process.env`, or calls `eval`/`new Function` | `src/common/security/no-process-spawn.spec.ts` |
+| One builder container per build: `--network=none`, `--read-only`, `--user=1000:1000`, `--cap-drop=ALL`, `no-new-privileges`, memory = swap limit, CPU, pid, open-file, and tmpfs size limits, killed after `BUILD_TIMEOUT_MS` | `build-worker/dispatcher/src/builder-container.ts` |
+| The container receives only the source files on stdin. No host mount, no environment from the dispatcher, no credential of any kind | same |
+| A project's `platformio.ini` never reaches PlatformIO. The builder writes its own from an allowlist of preinstalled platforms and boards; everything (toolchains, frameworks, catalog libraries) is baked into the image, because the build has no network | `build-worker/builder/build.py`, `targets.json` |
+| Source paths are re-validated in the container with the project-file segment rules; only `src/`, `include/`, `lib/` are accepted | `build.py` |
+| The dispatcher holds the Docker socket (root-equivalent on the host) and therefore nothing else: no database URL, no Supabase key, no AI key. Its one credential is `BUILD_WORKER_TOKEN`, which can only claim a job and report its result | `compose.yaml` (`build-dispatcher`), `build-worker.guard.ts` |
+| Worker routes return 404 when no token is configured, compare tokens over SHA-256 digests in constant time, and are not routed by nginx (`/api/internal/` → 404) | `build-worker.guard.ts`, `deploy/nginx.conf` |
+| A worker result is untrusted data: shaped by user code, so it is size-bounded, the image set must match the platform exactly, and flash offsets come from the API, never from the worker | `build-worker.service.ts`, `build-plan.ts` |
+| Builds and artifacts are workspace-scoped: `editor` to build or cancel, `viewer` to read or download, plus the project-in-workspace check | `builds.controller.ts` |
+| Build minutes are enforced per plan before a build is queued; one active build per project | `entitlement.service.ts`, `prisma-build-job.repository.ts` |
+| The server never touches the user's hardware. Flashing and the serial monitor use Web Serial in the browser, which asks the user to pick the port | `frontend/.../workspace/firmware/` |
 
-File read, write, list, and delete are unaffected and remain available.
+Verified against the real image on 2026-10-02: a library `extraScript` running in
+the build could not open a socket, could not write to `/opt` or `/`, and ran as
+uid 1000.
 
-The capability returns in Phase 4 as a queued job run by an isolated, ephemeral,
-non-root, resource-limited worker that never receives platform credentials.
-Physical flashing moves to the browser (Web Serial) or a trusted local agent — a
-server-side worker must not reach a user's hardware. A regression test in
-`workspace-firmware.service.spec.ts` fails if any file in the workspace module
-imports a process-spawning module or spreads `process.env` into a child.
+### Library Manager
+
+Registry libraries are installed as project files (ADR-006), so the builder keeps
+`--network=none`. The API does the download, and it treats both the registry and the
+archive as untrusted.
+
+| Control | Where |
+| --- | --- |
+| Outbound requests go only to `https://api.registry.platformio.org` and archive URLs on `*.platformio.org` over HTTPS. Redirects are followed by hand and re-checked; no credentials, no other ports (SSRF) | `src/modules/libraries/library-registry.ts` |
+| Archives are capped at 4 MB while streaming, must match the registry's SHA-256, and inflate to at most 24 MB | same, `library-archive.ts` |
+| The tar reader is in memory and touches no filesystem. It reads regular files only and ignores links and devices. Paths must pass the project-file segment rules, and `..` is refused | `library-archive.ts`, `project-file-path.ts` |
+| Only sources, headers, the manifest, and the license are kept. Files containing a NUL byte are dropped. A library adds at most 300 files and 4 MB, and the project quota is checked in the write transaction | `library-archive.ts`, `prisma-project.repository.ts` |
+| `build.extraScript` and `scripts` are stripped from `library.json` | `sanitizeLibraryJson` |
+| Only folders with the manager's marker are replaced or removed; a user's own `lib/` code is never overwritten | `libraries.service.ts` |
+| `viewer` lists installed libraries; `editor` installs and removes them. Registry routes need a signed-in user and are throttled | `libraries.controller.ts`, `security.config.ts` |
+
+Residual risk: the boundary is the host kernel (Option A of ADR-002). A container
+escape from the builder lands on the Docker host, which also runs the API. Move the
+builder to a separate host or a microVM executor before offering builds to
+unauthenticated users.
 
 ## Manual actions required
 
 These cannot be performed from the repository and are the operator's responsibility.
 
 1. **Rotate `GEMINI_API_KEY` and `OPENROUTER_API_KEY`.** Real values are present in
-   the untracked local `iot-hub-be/.env`. They were never committed, but they exist
+   the untracked local `backend/.env`. They were never committed, but they exist
    in plaintext on at least one workstation. Rotate at the provider, then update the
    local file.
 2. **Rotate `JWT_ACCESS_SECRET` and `JWT_REFRESH_SECRET`** if the same values were
@@ -261,7 +290,7 @@ These cannot be performed from the repository and are the operator's responsibil
    was removed from `prisma/seeds/user.seed.ts` before that file's first commit, so
    it is not in Git history, but any database already seeded from the old file still
    holds it — including an `admin` account. A stale copy also existed in the
-   untracked `iot-hub-be/dist/` build output, which was deleted.
+   untracked `backend/dist/` build output, which was deleted.
 4. **Set `CORS_ORIGINS` in every deployed environment.** Production serves no browser
    origin when it is unset.
 5. **Set `NODE_ENV=production` in production.** Several controls read it.
@@ -306,6 +335,14 @@ row keyed by `auth.users.id`.
 | Workspace permission | `AuthorizationService.requireWorkspaceRole`, from the database |
 | Account suspension | Supabase ban **and** the `is_active` profile flag |
 | RLS | Enabled on `users`, `workspaces`, `workspace_members`, `roles` |
+
+Only a verdict about the token ends a session. `SupabaseAuthGuard` answers 401 for
+an expired, forged, or foreign token, but 503 when the JWKS cannot be fetched. On
+the client, the interceptor signs the user out only when Supabase rejects the
+refresh token, never on a network fault. The role guards log out only on a 401
+from `/auth/me`; other failures are retried. Before this, a restarting API or a
+dropped connection logged the user out while their Supabase session was still
+valid.
 
 Findings closed by this cutover: A1, A2, A4, A5, A6, A7, A9, S11, S12, S13, and A3
 (Turnstile removed rather than left as a decorative control).

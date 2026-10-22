@@ -96,6 +96,15 @@ For major architectural decisions:
 Read relevant files inside:
 `docs/adr/`
 
+For carrying out a work item — making a page real, auditing a page, the AI
+generator, UI redesign, splitting a large file, deleting suspected dead code, or a
+failing command:
+
+Read:
+`docs/agent/README.md`
+
+It routes to the right file; do not read the whole pack.
+
 Do not load unrelated documentation.
 
 ## Critical Security Rules

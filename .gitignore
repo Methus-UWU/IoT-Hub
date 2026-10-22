@@ -8,3 +8,12 @@ dist/
 # OS and editor
 .DS_Store
 Thumbs.db
+
+# Scratch work, logs, and machine-local settings
+.tmp/
+*.log
+.claude/settings.local.json
+.mcp.json
+
+# Generated copy of docs/ (scripts/export-devdoc.mjs)
+devdoc/

@@ -1,0 +1,6 @@
+# Build context for the builder and dispatcher images.
+**/node_modules
+**/test
+**/__pycache__
+**/.env
+**/.env.*

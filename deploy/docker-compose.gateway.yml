@@ -1,0 +1,5 @@
+# Install this wrapper at C:/Code/docker-container/unity-hub-website/docker-compose.yml.
+# Keep the production definition in the application repository as its single source.
+name: unity-hub-website
+include:
+  - path: C:/Code/website/iot-hub/compose.yaml

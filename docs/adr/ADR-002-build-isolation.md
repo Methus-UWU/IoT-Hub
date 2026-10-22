@@ -1,6 +1,6 @@
 # ADR-002: Firmware Build Isolation
 
-- Status: **Proposed — blocked on an infrastructure decision by the platform owner**
+- Status: **Accepted — implemented 2026-10-02**
 - Date: 2026-08-28
 - Related: `docs/SECURITY.md`, `docs/ARCHITECTURE.md` (Phase 4), `docs/LEGACY_AUDIT.md` (S1, S2, Q3)
 
@@ -98,25 +98,61 @@ identical under all three options.
 Revisit if untrusted builds become available to unauthenticated users, or if a
 tenant-isolation requirement arrives that a shared kernel cannot satisfy.
 
-## Decision Required
+## Decision (2026-10-02)
 
-The platform owner must choose the isolation mechanism. This ADR moves to Accepted
-once that choice is recorded here, together with:
+The platform owner chose, on 2026-10-02:
 
-- where workers run (same host, separate host, or managed service);
-- the queue technology (PostgreSQL-backed job table, or Redis);
-- concurrent build budget and per-build resource limits;
-- artifact retention policy in Supabase Storage.
+| Question | Decision |
+| --- | --- |
+| Isolation mechanism | **Option A** — one Docker container per build on the existing host |
+| Queue | **PostgreSQL job table** (`build_jobs`), claimed with `FOR UPDATE SKIP LOCKED` |
+| Flashing | **Web Serial in the browser** — esptool-js for ESP32, STK500v1 for Uno/Nano |
+| Where workers run | Same host as the API, as the `build-dispatcher` Compose service |
+| Concurrency and limits | 1 build at a time by default (`BUILD_CONCURRENCY`); per build 1.5 GB RAM (no swap), 1 CPU, 256 pids, 768 MB workspace tmpfs, 300 s timeout |
 
-Until then the build endpoint stays disabled and returns
-`503 BUILD_TEMPORARILY_DISABLED`. That state is safe and can be held indefinitely.
+How the requirements above are met:
 
-## Consequences of the current disabled state
+1. Hostile input: the project's `platformio.ini` is never used; the builder
+   generates one from `build-worker/builder/targets.json`. Library `extraScript`s
+   still run, inside the container.
+2. No secrets: the builder container gets source files on stdin and nothing else.
+   The dispatcher, which holds the Docker socket, holds only `BUILD_WORKER_TOKEN`:
+   it talks to the API's worker routes instead of to the database, so the socket
+   and a database credential never share a process.
+3. Limits: see the table; `--network=none` because every platform, toolchain,
+   framework, and catalog library is preinstalled in the image.
+4. No other user's files, no host filesystem: no mounts at all; read-only root;
+   writable state only on size-limited tmpfs.
+5. Ephemeral: `docker run --rm`, one container per build.
+6. No terminal: nothing but the builder entrypoint runs.
+7–8. The API inserts a queued row and returns 202.
+9. **Deferred:** the browser polls `GET .../builds/:id` until Phase 6 adds the
+   WebSocket gateway and `build.status.changed`.
+10. Build is separated from flash: the server never sees a serial port.
 
-- The Web IDE edits and stores files but cannot compile. Users see an explicit
-  banner rather than a broken build.
-- Serial monitoring is unavailable until flashing moves to Web Serial or a local
-  agent, which is a Phase 4 deliverable rather than a regression to be undone.
-- A regression test in `workspace-firmware.service.spec.ts` fails if any file in the
-  workspace module reintroduces a process-spawning import or spreads `process.env`
-  into a child, so the vulnerability cannot return unnoticed.
+### Deviation: artifacts in Postgres, not Supabase Storage
+
+Images are stored in `build_artifacts` (`BYTEA`), not Storage. Only the newest
+successful build of each project keeps them, they are at most about 1.5 MB, and
+in Postgres they cascade with the project and are written in the same transaction
+that marks the build succeeded. Storage objects do not cascade, so a deleted
+project would leave orphaned firmware behind. Revisit if images grow (OTA bundles,
+filesystem images) or retention needs to grow beyond one build per project.
+
+### Consequences
+
+- Builds are off until `BUILD_WORKER_TOKEN` is set for both the API and the
+  dispatcher; `POST .../builds` answers `503 BUILD_WORKER_NOT_CONFIGURED`.
+- Supported boards are those with `flash` in the board catalog: ESP32 DevKit V1,
+  ESP32 DevKit 38-pin, ESP32-CAM, ESP32-WROOM-32, Arduino Uno, Nano, and Mega 2560
+  (Mega builds; the browser offers its `.hex` as a download, since STK500v2 is not
+  implemented). ESP32-S3, ESP8266, and MicroPython are refused with
+  `BUILD_NOT_SUPPORTED` until their platforms are added to the image.
+- Web Serial exists only in Chromium desktop browsers; elsewhere the IDE says so.
+- Since 2026-10-11, registry libraries can also arrive as project files under
+  `lib/`, installed by the Library Manager without network access in the builder
+  (ADR-006). The baked list remains the set available to every project by default.
+- The builder image is about 2.2 GB. Adding a platform or library is an image
+  rebuild, by design: a build cannot download anything.
+- `src/common/security/no-process-spawn.spec.ts` replaces the workspace-module
+  regression test and now covers the whole API source tree.

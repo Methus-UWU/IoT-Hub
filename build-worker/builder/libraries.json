@@ -1,0 +1,18 @@
+{
+  "comment": "Arduino libraries baked into the builder image and found by #include through lib_extra_dirs. Mirrors the platformio ids in the frontend library catalog (simulation/firmware/libraries/library-catalog.ts).",
+  "libraries": [
+    "adafruit/Adafruit BME280 Library",
+    "adafruit/Adafruit ILI9341",
+    "adafruit/Adafruit SSD1306@^2.5.9",
+    "adafruit/DHT sensor library@^1.4.6",
+    "adafruit/RTClib",
+    "smougenot/TM1637",
+    "madhephaestus/ESP32Servo@^3.0.5",
+    "marcoschwartz/LiquidCrystal_I2C@^1.1.4",
+    "miguelbalboa/MFRC522",
+    "milesburton/DallasTemperature@^3.11.0",
+    "paulstoffregen/XPT2046_Touchscreen",
+    "wayoda/LedControl",
+    "arduino-libraries/Servo"
+  ]
+}

@@ -1,0 +1,135 @@
+name: unity-hub-website
+
+services:
+  nestjs:
+    image: unity-hub-api:${IMAGE_TAG:-production}
+    build:
+      context: .
+      target: backend-production
+    container_name: unity-hub-nestjs
+    restart: unless-stopped
+    init: true
+    env_file:
+      - ${BACKEND_ENV_FILE:-./backend/.env}
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      CORS_ORIGINS: https://unity-hub.connectdb.xyz
+      FRONTEND_URL: https://unity-hub.connectdb.xyz
+      # nginx and the gateway reach the API over private Docker networks.
+      TRUST_PROXY: "loopback, uniquelocal"
+      WORKSPACE_ROOT: /app/.workspace-data
+      WORKSPACE_ALLOW_ANONYMOUS: "false"
+      # One value shared with build-dispatcher; empty keeps firmware builds off.
+      BUILD_WORKER_TOKEN: ${BUILD_WORKER_TOKEN:-}
+    volumes:
+      # Preserve existing workspace files; application source is baked into the image.
+      - type: bind
+        source: ${WORKSPACE_DATA_PATH:-./backend/.workspace-data}
+        target: /app/.workspace-data
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 1g
+    cpus: 2
+    pids_limit: 128
+    stop_grace_period: 30s
+    networks: [internal]
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+  unity-hub-nginx:
+    image: unity-hub-web:${IMAGE_TAG:-production}
+    build:
+      context: .
+      target: frontend-production
+    container_name: unity-hub-nginx
+    restart: unless-stopped
+    depends_on:
+      nestjs:
+        condition: service_healthy
+    expose: ["80"]
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    sysctls:
+      net.ipv4.ip_unprivileged_port_start: "0"
+    mem_limit: 128m
+    cpus: 1
+    pids_limit: 64
+    networks: [web, internal]
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+  # Firmware builds (docs/adr/ADR-002-build-isolation.md). The dispatcher claims
+  # jobs from the API with BUILD_WORKER_TOKEN and starts one builder container
+  # per build on the host daemon: --network=none, read-only root, no
+  # capabilities, non-root, memory/CPU/pid/time limited.
+  #
+  # The Docker socket is root-equivalent on the host. That is why this service
+  # holds no other secret — no database URL, no Supabase key, no AI key — and
+  # never runs user code itself; the builder containers do, without the socket.
+  build-dispatcher:
+    image: unity-hub-build-dispatcher:${IMAGE_TAG:-production}
+    build:
+      context: ./build-worker
+      target: dispatcher
+    container_name: unity-hub-build-dispatcher
+    restart: unless-stopped
+    init: true
+    profiles: [builds]
+    depends_on:
+      nestjs:
+        condition: service_healthy
+    environment:
+      BUILD_API_URL: http://nestjs:3000/api
+      BUILD_WORKER_TOKEN: ${BUILD_WORKER_TOKEN:?Set BUILD_WORKER_TOKEN to enable firmware builds}
+      BUILDER_IMAGE: unity-hub-builder:${IMAGE_TAG:-production}
+      BUILD_CONCURRENCY: ${BUILD_CONCURRENCY:-1}
+    volumes:
+      - type: bind
+        source: /var/run/docker.sock
+        target: /var/run/docker.sock
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 256m
+    cpus: 0.5
+    pids_limit: 64
+    networks: [internal]
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+  # Image only: started by the dispatcher, one container per build. Its own
+  # profile keeps `up --profile builds` from leaving an exited container behind.
+  # Build it with `docker compose --profile builder-image build build-builder`.
+  build-builder:
+    image: unity-hub-builder:${IMAGE_TAG:-production}
+    build:
+      context: ./build-worker
+      target: builder
+    profiles: [builder-image]
+    entrypoint: ["true"]
+    restart: "no"
+    network_mode: none
+
+networks:
+  # Outbound connectivity is required for Supabase and OpenRouter.
+  internal:
+  web:
+    external: true

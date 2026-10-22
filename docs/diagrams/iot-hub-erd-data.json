@@ -1,0 +1,3415 @@
+{
+  "publicTables": 33,
+  "totalFields": 262,
+  "width": 2320,
+  "height": 9734,
+  "tables": [
+    {
+      "name": "roles",
+      "fields": [
+        {
+          "prop": "id",
+          "name": "id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": true,
+          "unique": false,
+          "y": 569
+        },
+        {
+          "prop": "name",
+          "name": "name",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": true,
+          "y": 599
+        },
+        {
+          "prop": "createdAt",
+          "name": "created_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 629
+        },
+        {
+          "prop": "updatedAt",
+          "name": "updated_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 659
+        }
+      ],
+      "uniques": []
+    },
+    {
+      "name": "users",
+      "fields": [
+        {
+          "prop": "id",
+          "name": "id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": true,
+          "unique": false,
+          "fk": true,
+          "y": 569
+        },
+        {
+          "prop": "roleId",
+          "name": "role_id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "fk": true,
+          "y": 599
+        },
+        {
+          "prop": "username",
+          "name": "username",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": true,
+          "y": 629
+        },
+        {
+          "prop": "displayName",
+          "name": "display_name",
+          "type": "VARCHAR(60)",
+          "list": false,
+          "nullable": true,
+          "pk": false,
+          "unique": false,
+          "y": 659
+        },
+        {
+          "prop": "bio",
+          "name": "bio",
+          "type": "VARCHAR(280)",
+          "list": false,
+          "nullable": true,
+          "pk": false,
+          "unique": false,
+          "y": 689
+        },
+        {
+          "prop": "email",
+          "name": "email",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": true,
+          "y": 719
+        },
+        {
+          "prop": "isActive",
+          "name": "is_active",
+          "type": "BOOLEAN",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 749
+        },
+        {
+          "prop": "createdAt",
+          "name": "created_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 779
+        },
+        {
+          "prop": "updatedAt",
+          "name": "updated_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 809
+        }
+      ],
+      "uniques": []
+    },
+    {
+      "name": "workspaces",
+      "fields": [
+        {
+          "prop": "id",
+          "name": "id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": true,
+          "unique": false,
+          "y": 1249
+        },
+        {
+          "prop": "ownerId",
+          "name": "owner_id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "fk": true,
+          "y": 1279
+        },
+        {
+          "prop": "name",
+          "name": "name",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 1309
+        },
+        {
+          "prop": "slug",
+          "name": "slug",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": true,
+          "y": 1339
+        },
+        {
+          "prop": "createdAt",
+          "name": "created_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 1369
+        },
+        {
+          "prop": "updatedAt",
+          "name": "updated_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 1399
+        }
+      ],
+      "uniques": []
+    },
+    {
+      "name": "workspace_members",
+      "fields": [
+        {
+          "prop": "id",
+          "name": "id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": true,
+          "unique": false,
+          "y": 1249
+        },
+        {
+          "prop": "workspaceId",
+          "name": "workspace_id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "fk": true,
+          "y": 1279
+        },
+        {
+          "prop": "userId",
+          "name": "user_id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "fk": true,
+          "y": 1309
+        },
+        {
+          "prop": "role",
+          "name": "role",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 1339
+        },
+        {
+          "prop": "createdAt",
+          "name": "created_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 1369
+        },
+        {
+          "prop": "updatedAt",
+          "name": "updated_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 1399
+        }
+      ],
+      "uniques": [
+        [
+          "workspace_id",
+          "user_id"
+        ]
+      ]
+    },
+    {
+      "name": "projects",
+      "fields": [
+        {
+          "prop": "id",
+          "name": "id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": true,
+          "unique": false,
+          "y": 1864
+        },
+        {
+          "prop": "workspaceId",
+          "name": "workspace_id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "fk": true,
+          "y": 1894
+        },
+        {
+          "prop": "name",
+          "name": "name",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 1924
+        },
+        {
+          "prop": "slug",
+          "name": "slug",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 1954
+        },
+        {
+          "prop": "description",
+          "name": "description",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 1984
+        },
+        {
+          "prop": "board",
+          "name": "board",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 2014
+        },
+        {
+          "prop": "framework",
+          "name": "framework",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 2044
+        },
+        {
+          "prop": "createdAt",
+          "name": "created_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 2074
+        },
+        {
+          "prop": "updatedAt",
+          "name": "updated_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 2104
+        }
+      ],
+      "uniques": [
+        [
+          "workspace_id",
+          "slug"
+        ]
+      ]
+    },
+    {
+      "name": "project_files",
+      "fields": [
+        {
+          "prop": "id",
+          "name": "id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": true,
+          "unique": false,
+          "y": 1864
+        },
+        {
+          "prop": "projectId",
+          "name": "project_id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "fk": true,
+          "y": 1894
+        },
+        {
+          "prop": "path",
+          "name": "path",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 1924
+        },
+        {
+          "prop": "content",
+          "name": "content",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 1954
+        },
+        {
+          "prop": "contentHash",
+          "name": "content_hash",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 1984
+        },
+        {
+          "prop": "sizeBytes",
+          "name": "size_bytes",
+          "type": "INTEGER",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 2014
+        },
+        {
+          "prop": "version",
+          "name": "version",
+          "type": "INTEGER",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 2044
+        },
+        {
+          "prop": "createdAt",
+          "name": "created_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 2074
+        },
+        {
+          "prop": "updatedAt",
+          "name": "updated_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 2104
+        }
+      ],
+      "uniques": [
+        [
+          "project_id",
+          "path"
+        ]
+      ]
+    },
+    {
+      "name": "plans",
+      "fields": [
+        {
+          "prop": "id",
+          "name": "id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": true,
+          "unique": false,
+          "y": 3115
+        },
+        {
+          "prop": "code",
+          "name": "code",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": true,
+          "y": 3145
+        },
+        {
+          "prop": "name",
+          "name": "name",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 3175
+        },
+        {
+          "prop": "rank",
+          "name": "rank",
+          "type": "INTEGER",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 3205
+        },
+        {
+          "prop": "createdAt",
+          "name": "created_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 3235
+        },
+        {
+          "prop": "updatedAt",
+          "name": "updated_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 3265
+        }
+      ],
+      "uniques": []
+    },
+    {
+      "name": "plan_limits",
+      "fields": [
+        {
+          "prop": "id",
+          "name": "id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": true,
+          "unique": false,
+          "y": 3115
+        },
+        {
+          "prop": "planId",
+          "name": "plan_id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "fk": true,
+          "y": 3145
+        },
+        {
+          "prop": "key",
+          "name": "key",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 3175
+        },
+        {
+          "prop": "value",
+          "name": "value",
+          "type": "INTEGER",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 3205
+        },
+        {
+          "prop": "createdAt",
+          "name": "created_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 3235
+        },
+        {
+          "prop": "updatedAt",
+          "name": "updated_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 3265
+        }
+      ],
+      "uniques": [
+        [
+          "plan_id",
+          "key"
+        ]
+      ]
+    },
+    {
+      "name": "user_subscriptions",
+      "fields": [
+        {
+          "prop": "id",
+          "name": "id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": true,
+          "unique": false,
+          "y": 3115
+        },
+        {
+          "prop": "userId",
+          "name": "user_id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": true,
+          "fk": true,
+          "y": 3145
+        },
+        {
+          "prop": "planId",
+          "name": "plan_id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "fk": true,
+          "y": 3175
+        },
+        {
+          "prop": "status",
+          "name": "status",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 3205
+        },
+        {
+          "prop": "createdAt",
+          "name": "created_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 3235
+        },
+        {
+          "prop": "updatedAt",
+          "name": "updated_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 3265
+        }
+      ],
+      "uniques": []
+    },
+    {
+      "name": "project_components",
+      "fields": [
+        {
+          "prop": "id",
+          "name": "id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": true,
+          "unique": false,
+          "y": 2375
+        },
+        {
+          "prop": "projectId",
+          "name": "project_id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "fk": true,
+          "y": 2405
+        },
+        {
+          "prop": "definitionId",
+          "name": "definition_id",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 2435
+        },
+        {
+          "prop": "label",
+          "name": "label",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 2465
+        },
+        {
+          "prop": "x",
+          "name": "x",
+          "type": "DOUBLE PRECISION",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 2495
+        },
+        {
+          "prop": "y",
+          "name": "y",
+          "type": "DOUBLE PRECISION",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 2525
+        },
+        {
+          "prop": "rotation",
+          "name": "rotation",
+          "type": "INTEGER",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 2555
+        },
+        {
+          "prop": "state",
+          "name": "state",
+          "type": "JSONB",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 2585
+        },
+        {
+          "prop": "createdAt",
+          "name": "created_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 2615
+        },
+        {
+          "prop": "updatedAt",
+          "name": "updated_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 2645
+        }
+      ],
+      "uniques": []
+    },
+    {
+      "name": "project_connections",
+      "fields": [
+        {
+          "prop": "id",
+          "name": "id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": true,
+          "unique": false,
+          "y": 2375
+        },
+        {
+          "prop": "projectId",
+          "name": "project_id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "fk": true,
+          "y": 2405
+        },
+        {
+          "prop": "fromComponentId",
+          "name": "from_component_id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "fk": true,
+          "y": 2435
+        },
+        {
+          "prop": "toComponentId",
+          "name": "to_component_id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "fk": true,
+          "y": 2465
+        },
+        {
+          "prop": "fromPinId",
+          "name": "from_pin_id",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 2495
+        },
+        {
+          "prop": "toPinId",
+          "name": "to_pin_id",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 2525
+        },
+        {
+          "prop": "color",
+          "name": "color",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 2555
+        },
+        {
+          "prop": "kind",
+          "name": "kind",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 2585
+        },
+        {
+          "prop": "waypoints",
+          "name": "waypoints",
+          "type": "JSONB",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 2615
+        },
+        {
+          "prop": "createdAt",
+          "name": "created_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 2645
+        },
+        {
+          "prop": "updatedAt",
+          "name": "updated_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 2675
+        }
+      ],
+      "uniques": []
+    },
+    {
+      "name": "build_jobs",
+      "fields": [
+        {
+          "prop": "id",
+          "name": "id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": true,
+          "unique": false,
+          "y": 5626
+        },
+        {
+          "prop": "projectId",
+          "name": "project_id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "fk": true,
+          "y": 5656
+        },
+        {
+          "prop": "requestedBy",
+          "name": "requested_by",
+          "type": "UUID",
+          "list": false,
+          "nullable": true,
+          "pk": false,
+          "unique": false,
+          "fk": true,
+          "y": 5686
+        },
+        {
+          "prop": "status",
+          "name": "status",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 5716
+        },
+        {
+          "prop": "boardId",
+          "name": "board_id",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 5746
+        },
+        {
+          "prop": "platform",
+          "name": "platform",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 5776
+        },
+        {
+          "prop": "platformBoard",
+          "name": "platform_board",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 5806
+        },
+        {
+          "prop": "source",
+          "name": "source",
+          "type": "JSONB",
+          "list": false,
+          "nullable": true,
+          "pk": false,
+          "unique": false,
+          "y": 5836
+        },
+        {
+          "prop": "sourceHash",
+          "name": "source_hash",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 5866
+        },
+        {
+          "prop": "failureReason",
+          "name": "failure_reason",
+          "type": "TEXT",
+          "list": false,
+          "nullable": true,
+          "pk": false,
+          "unique": false,
+          "y": 5896
+        },
+        {
+          "prop": "log",
+          "name": "log",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 5926
+        },
+        {
+          "prop": "durationMs",
+          "name": "duration_ms",
+          "type": "INTEGER",
+          "list": false,
+          "nullable": true,
+          "pk": false,
+          "unique": false,
+          "y": 5956
+        },
+        {
+          "prop": "createdAt",
+          "name": "created_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 5986
+        },
+        {
+          "prop": "startedAt",
+          "name": "started_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": true,
+          "pk": false,
+          "unique": false,
+          "y": 6016
+        },
+        {
+          "prop": "finishedAt",
+          "name": "finished_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": true,
+          "pk": false,
+          "unique": false,
+          "y": 6046
+        },
+        {
+          "prop": "leaseExpiresAt",
+          "name": "lease_expires_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": true,
+          "pk": false,
+          "unique": false,
+          "y": 6076
+        }
+      ],
+      "uniques": []
+    },
+    {
+      "name": "build_artifacts",
+      "fields": [
+        {
+          "prop": "id",
+          "name": "id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": true,
+          "unique": false,
+          "y": 5626
+        },
+        {
+          "prop": "buildJobId",
+          "name": "build_job_id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "fk": true,
+          "y": 5656
+        },
+        {
+          "prop": "name",
+          "name": "name",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 5686
+        },
+        {
+          "prop": "flashOffset",
+          "name": "flash_offset",
+          "type": "INTEGER",
+          "list": false,
+          "nullable": true,
+          "pk": false,
+          "unique": false,
+          "y": 5716
+        },
+        {
+          "prop": "sizeBytes",
+          "name": "size_bytes",
+          "type": "INTEGER",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 5746
+        },
+        {
+          "prop": "sha256",
+          "name": "sha256",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 5776
+        },
+        {
+          "prop": "createdAt",
+          "name": "created_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 5806
+        }
+      ],
+      "uniques": [
+        [
+          "build_job_id",
+          "name"
+        ]
+      ]
+    },
+    {
+      "name": "community_tags",
+      "fields": [
+        {
+          "prop": "id",
+          "name": "id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": true,
+          "unique": false,
+          "y": 3730
+        },
+        {
+          "prop": "slug",
+          "name": "slug",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": true,
+          "y": 3760
+        },
+        {
+          "prop": "name",
+          "name": "name",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 3790
+        },
+        {
+          "prop": "description",
+          "name": "description",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 3820
+        },
+        {
+          "prop": "postCount",
+          "name": "post_count",
+          "type": "INTEGER",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 3850
+        },
+        {
+          "prop": "createdAt",
+          "name": "created_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 3880
+        },
+        {
+          "prop": "updatedAt",
+          "name": "updated_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 3910
+        }
+      ],
+      "uniques": []
+    },
+    {
+      "name": "community_posts",
+      "fields": [
+        {
+          "prop": "id",
+          "name": "id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": true,
+          "unique": false,
+          "y": 3730
+        },
+        {
+          "prop": "authorId",
+          "name": "author_id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "fk": true,
+          "y": 3760
+        },
+        {
+          "prop": "acceptedCommentId",
+          "name": "accepted_comment_id",
+          "type": "UUID",
+          "list": false,
+          "nullable": true,
+          "pk": false,
+          "unique": true,
+          "fk": true,
+          "y": 3790
+        },
+        {
+          "prop": "kind",
+          "name": "kind",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 3820
+        },
+        {
+          "prop": "title",
+          "name": "title",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 3850
+        },
+        {
+          "prop": "slug",
+          "name": "slug",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": true,
+          "y": 3880
+        },
+        {
+          "prop": "body",
+          "name": "body",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 3910
+        },
+        {
+          "prop": "status",
+          "name": "status",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 3940
+        },
+        {
+          "prop": "score",
+          "name": "score",
+          "type": "INTEGER",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 3970
+        },
+        {
+          "prop": "commentCount",
+          "name": "comment_count",
+          "type": "INTEGER",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 4000
+        },
+        {
+          "prop": "viewCount",
+          "name": "view_count",
+          "type": "INTEGER",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 4030
+        },
+        {
+          "prop": "createdAt",
+          "name": "created_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 4060
+        },
+        {
+          "prop": "updatedAt",
+          "name": "updated_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 4090
+        },
+        {
+          "prop": "lastActivityAt",
+          "name": "last_activity_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 4120
+        }
+      ],
+      "uniques": []
+    },
+    {
+      "name": "community_comments",
+      "fields": [
+        {
+          "prop": "id",
+          "name": "id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": true,
+          "unique": false,
+          "y": 3730
+        },
+        {
+          "prop": "postId",
+          "name": "post_id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "fk": true,
+          "y": 3760
+        },
+        {
+          "prop": "authorId",
+          "name": "author_id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "fk": true,
+          "y": 3790
+        },
+        {
+          "prop": "parentId",
+          "name": "parent_id",
+          "type": "UUID",
+          "list": false,
+          "nullable": true,
+          "pk": false,
+          "unique": false,
+          "fk": true,
+          "y": 3820
+        },
+        {
+          "prop": "body",
+          "name": "body",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 3850
+        },
+        {
+          "prop": "score",
+          "name": "score",
+          "type": "INTEGER",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 3880
+        },
+        {
+          "prop": "createdAt",
+          "name": "created_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 3910
+        },
+        {
+          "prop": "updatedAt",
+          "name": "updated_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 3940
+        }
+      ],
+      "uniques": []
+    },
+    {
+      "name": "community_post_tags",
+      "fields": [
+        {
+          "prop": "postId",
+          "name": "post_id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": true,
+          "unique": false,
+          "fk": true,
+          "y": 4366
+        },
+        {
+          "prop": "tagId",
+          "name": "tag_id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": true,
+          "unique": false,
+          "fk": true,
+          "y": 4396
+        },
+        {
+          "prop": "createdAt",
+          "name": "created_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 4426
+        }
+      ],
+      "uniques": []
+    },
+    {
+      "name": "community_votes",
+      "fields": [
+        {
+          "prop": "id",
+          "name": "id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": true,
+          "unique": false,
+          "y": 4366
+        },
+        {
+          "prop": "userId",
+          "name": "user_id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "fk": true,
+          "y": 4396
+        },
+        {
+          "prop": "postId",
+          "name": "post_id",
+          "type": "UUID",
+          "list": false,
+          "nullable": true,
+          "pk": false,
+          "unique": false,
+          "fk": true,
+          "y": 4426
+        },
+        {
+          "prop": "commentId",
+          "name": "comment_id",
+          "type": "UUID",
+          "list": false,
+          "nullable": true,
+          "pk": false,
+          "unique": false,
+          "fk": true,
+          "y": 4456
+        },
+        {
+          "prop": "value",
+          "name": "value",
+          "type": "SMALLINT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 4486
+        },
+        {
+          "prop": "createdAt",
+          "name": "created_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 4516
+        },
+        {
+          "prop": "updatedAt",
+          "name": "updated_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 4546
+        }
+      ],
+      "uniques": [
+        [
+          "user_id",
+          "post_id"
+        ],
+        [
+          "user_id",
+          "comment_id"
+        ]
+      ]
+    },
+    {
+      "name": "login_events",
+      "fields": [
+        {
+          "prop": "id",
+          "name": "id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": true,
+          "unique": false,
+          "y": 5036
+        },
+        {
+          "prop": "userId",
+          "name": "user_id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "fk": true,
+          "y": 5066
+        },
+        {
+          "prop": "sessionId",
+          "name": "session_id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": true,
+          "y": 5096
+        },
+        {
+          "prop": "ipAddress",
+          "name": "ip_address",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 5126
+        },
+        {
+          "prop": "userAgent",
+          "name": "user_agent",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 5156
+        },
+        {
+          "prop": "createdAt",
+          "name": "created_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 5186
+        }
+      ],
+      "uniques": []
+    },
+    {
+      "name": "search_history",
+      "fields": [
+        {
+          "prop": "id",
+          "name": "id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": true,
+          "unique": false,
+          "y": 5036
+        },
+        {
+          "prop": "userId",
+          "name": "user_id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "fk": true,
+          "y": 5066
+        },
+        {
+          "prop": "scope",
+          "name": "scope",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 5096
+        },
+        {
+          "prop": "query",
+          "name": "query",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 5126
+        },
+        {
+          "prop": "createdAt",
+          "name": "created_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 5156
+        }
+      ],
+      "uniques": [
+        [
+          "user_id",
+          "scope",
+          "query"
+        ]
+      ]
+    },
+    {
+      "name": "project_datastreams",
+      "fields": [
+        {
+          "prop": "id",
+          "name": "id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": true,
+          "unique": false,
+          "y": 6516
+        },
+        {
+          "prop": "projectId",
+          "name": "project_id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "fk": true,
+          "y": 6546
+        },
+        {
+          "prop": "componentId",
+          "name": "component_id",
+          "type": "UUID",
+          "list": false,
+          "nullable": true,
+          "pk": false,
+          "unique": false,
+          "fk": true,
+          "y": 6576
+        },
+        {
+          "prop": "key",
+          "name": "key",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 6606
+        },
+        {
+          "prop": "name",
+          "name": "name",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 6636
+        },
+        {
+          "prop": "dataType",
+          "name": "data_type",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 6666
+        },
+        {
+          "prop": "unit",
+          "name": "unit",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 6696
+        },
+        {
+          "prop": "min",
+          "name": "min",
+          "type": "DOUBLE PRECISION",
+          "list": false,
+          "nullable": true,
+          "pk": false,
+          "unique": false,
+          "y": 6726
+        },
+        {
+          "prop": "max",
+          "name": "max",
+          "type": "DOUBLE PRECISION",
+          "list": false,
+          "nullable": true,
+          "pk": false,
+          "unique": false,
+          "y": 6756
+        },
+        {
+          "prop": "source",
+          "name": "source",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 6786
+        },
+        {
+          "prop": "createdAt",
+          "name": "created_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 6816
+        },
+        {
+          "prop": "updatedAt",
+          "name": "updated_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 6846
+        }
+      ],
+      "uniques": [
+        [
+          "project_id",
+          "key"
+        ]
+      ]
+    },
+    {
+      "name": "project_dashboards",
+      "fields": [
+        {
+          "prop": "id",
+          "name": "id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": true,
+          "unique": false,
+          "y": 6516
+        },
+        {
+          "prop": "projectId",
+          "name": "project_id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": true,
+          "fk": true,
+          "y": 6546
+        },
+        {
+          "prop": "templateId",
+          "name": "template_id",
+          "type": "UUID",
+          "list": false,
+          "nullable": true,
+          "pk": false,
+          "unique": false,
+          "fk": true,
+          "y": 6576
+        },
+        {
+          "prop": "name",
+          "name": "name",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 6606
+        },
+        {
+          "prop": "document",
+          "name": "document",
+          "type": "JSONB",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 6636
+        },
+        {
+          "prop": "version",
+          "name": "version",
+          "type": "INTEGER",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 6666
+        },
+        {
+          "prop": "createdAt",
+          "name": "created_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 6696
+        },
+        {
+          "prop": "updatedAt",
+          "name": "updated_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 6726
+        },
+        {
+          "prop": "templateVersion",
+          "name": "template_version",
+          "type": "INTEGER",
+          "list": false,
+          "nullable": true,
+          "pk": false,
+          "unique": false,
+          "y": 6756
+        }
+      ],
+      "uniques": []
+    },
+    {
+      "name": "dashboard_templates",
+      "fields": [
+        {
+          "prop": "id",
+          "name": "id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": true,
+          "unique": false,
+          "y": 7117
+        },
+        {
+          "prop": "workspaceId",
+          "name": "workspace_id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "fk": true,
+          "y": 7147
+        },
+        {
+          "prop": "createdBy",
+          "name": "created_by",
+          "type": "UUID",
+          "list": false,
+          "nullable": true,
+          "pk": false,
+          "unique": false,
+          "fk": true,
+          "y": 7177
+        },
+        {
+          "prop": "name",
+          "name": "name",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 7207
+        },
+        {
+          "prop": "description",
+          "name": "description",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 7237
+        },
+        {
+          "prop": "boardId",
+          "name": "board_id",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 7267
+        },
+        {
+          "prop": "visibility",
+          "name": "visibility",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 7297
+        },
+        {
+          "prop": "latestVersion",
+          "name": "latest_version",
+          "type": "INTEGER",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 7327
+        },
+        {
+          "prop": "createdAt",
+          "name": "created_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 7357
+        },
+        {
+          "prop": "updatedAt",
+          "name": "updated_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 7387
+        }
+      ],
+      "uniques": []
+    },
+    {
+      "name": "dashboard_template_versions",
+      "fields": [
+        {
+          "prop": "templateId",
+          "name": "template_id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": true,
+          "unique": false,
+          "fk": true,
+          "y": 7117
+        },
+        {
+          "prop": "version",
+          "name": "version",
+          "type": "INTEGER",
+          "list": false,
+          "nullable": false,
+          "pk": true,
+          "unique": false,
+          "y": 7147
+        },
+        {
+          "prop": "createdBy",
+          "name": "created_by",
+          "type": "UUID",
+          "list": false,
+          "nullable": true,
+          "pk": false,
+          "unique": false,
+          "fk": true,
+          "y": 7177
+        },
+        {
+          "prop": "document",
+          "name": "document",
+          "type": "JSONB",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 7207
+        },
+        {
+          "prop": "datastreams",
+          "name": "datastreams",
+          "type": "JSONB",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 7237
+        },
+        {
+          "prop": "createdAt",
+          "name": "created_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 7267
+        }
+      ],
+      "uniques": []
+    },
+    {
+      "name": "ai_profiles",
+      "fields": [
+        {
+          "prop": "id",
+          "name": "id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": true,
+          "unique": false,
+          "y": 8507
+        },
+        {
+          "prop": "ownerId",
+          "name": "owner_id",
+          "type": "UUID",
+          "list": false,
+          "nullable": true,
+          "pk": false,
+          "unique": false,
+          "fk": true,
+          "y": 8537
+        },
+        {
+          "prop": "name",
+          "name": "name",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 8567
+        },
+        {
+          "prop": "description",
+          "name": "description",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 8597
+        },
+        {
+          "prop": "model",
+          "name": "model",
+          "type": "TEXT",
+          "list": false,
+          "nullable": true,
+          "pk": false,
+          "unique": false,
+          "y": 8627
+        },
+        {
+          "prop": "tier",
+          "name": "tier",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 8657
+        },
+        {
+          "prop": "instructions",
+          "name": "instructions",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 8687
+        },
+        {
+          "prop": "createdAt",
+          "name": "created_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 8717
+        },
+        {
+          "prop": "updatedAt",
+          "name": "updated_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 8747
+        }
+      ],
+      "uniques": []
+    },
+    {
+      "name": "ai_conversations",
+      "fields": [
+        {
+          "prop": "id",
+          "name": "id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": true,
+          "unique": false,
+          "y": 8507
+        },
+        {
+          "prop": "userId",
+          "name": "user_id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "fk": true,
+          "y": 8537
+        },
+        {
+          "prop": "projectId",
+          "name": "project_id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "fk": true,
+          "y": 8567
+        },
+        {
+          "prop": "profileId",
+          "name": "profile_id",
+          "type": "UUID",
+          "list": false,
+          "nullable": true,
+          "pk": false,
+          "unique": false,
+          "fk": true,
+          "y": 8597
+        },
+        {
+          "prop": "title",
+          "name": "title",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 8627
+        },
+        {
+          "prop": "createdAt",
+          "name": "created_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 8657
+        },
+        {
+          "prop": "updatedAt",
+          "name": "updated_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 8687
+        }
+      ],
+      "uniques": []
+    },
+    {
+      "name": "ai_messages",
+      "fields": [
+        {
+          "prop": "id",
+          "name": "id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": true,
+          "unique": false,
+          "y": 8507
+        },
+        {
+          "prop": "conversationId",
+          "name": "conversation_id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "fk": true,
+          "y": 8537
+        },
+        {
+          "prop": "role",
+          "name": "role",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 8567
+        },
+        {
+          "prop": "content",
+          "name": "content",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 8597
+        },
+        {
+          "prop": "plan",
+          "name": "plan",
+          "type": "JSONB",
+          "list": false,
+          "nullable": true,
+          "pk": false,
+          "unique": false,
+          "y": 8627
+        },
+        {
+          "prop": "planState",
+          "name": "plan_state",
+          "type": "TEXT",
+          "list": false,
+          "nullable": true,
+          "pk": false,
+          "unique": false,
+          "y": 8657
+        },
+        {
+          "prop": "planError",
+          "name": "plan_error",
+          "type": "TEXT",
+          "list": false,
+          "nullable": true,
+          "pk": false,
+          "unique": false,
+          "y": 8687
+        },
+        {
+          "prop": "model",
+          "name": "model",
+          "type": "TEXT",
+          "list": false,
+          "nullable": true,
+          "pk": false,
+          "unique": false,
+          "y": 8717
+        },
+        {
+          "prop": "createdAt",
+          "name": "created_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 8747
+        }
+      ],
+      "uniques": []
+    },
+    {
+      "name": "devices",
+      "fields": [
+        {
+          "prop": "id",
+          "name": "id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": true,
+          "unique": false,
+          "y": 7827
+        },
+        {
+          "prop": "projectId",
+          "name": "project_id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "fk": true,
+          "y": 7857
+        },
+        {
+          "prop": "createdBy",
+          "name": "created_by",
+          "type": "UUID",
+          "list": false,
+          "nullable": true,
+          "pk": false,
+          "unique": false,
+          "fk": true,
+          "y": 7887
+        },
+        {
+          "prop": "name",
+          "name": "name",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 7917
+        },
+        {
+          "prop": "tokenHash",
+          "name": "token_hash",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": true,
+          "y": 7947
+        },
+        {
+          "prop": "tokenHint",
+          "name": "token_hint",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 7977
+        },
+        {
+          "prop": "lastSeenAt",
+          "name": "last_seen_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": true,
+          "pk": false,
+          "unique": false,
+          "y": 8007
+        },
+        {
+          "prop": "createdAt",
+          "name": "created_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 8037
+        },
+        {
+          "prop": "updatedAt",
+          "name": "updated_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 8067
+        }
+      ],
+      "uniques": []
+    },
+    {
+      "name": "device_values",
+      "fields": [
+        {
+          "prop": "deviceId",
+          "name": "device_id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": true,
+          "unique": false,
+          "fk": true,
+          "y": 7827
+        },
+        {
+          "prop": "key",
+          "name": "key",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": true,
+          "unique": false,
+          "y": 7857
+        },
+        {
+          "prop": "value",
+          "name": "value",
+          "type": "JSONB",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 7887
+        },
+        {
+          "prop": "source",
+          "name": "source",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 7917
+        },
+        {
+          "prop": "updatedAt",
+          "name": "updated_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 7947
+        }
+      ],
+      "uniques": []
+    },
+    {
+      "name": "telemetry_points",
+      "fields": [
+        {
+          "prop": "deviceId",
+          "name": "device_id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "fk": true,
+          "y": 7827
+        },
+        {
+          "prop": "key",
+          "name": "key",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 7857
+        },
+        {
+          "prop": "value",
+          "name": "value",
+          "type": "DOUBLE PRECISION",
+          "list": false,
+          "nullable": true,
+          "pk": false,
+          "unique": false,
+          "y": 7887
+        },
+        {
+          "prop": "text",
+          "name": "text",
+          "type": "TEXT",
+          "list": false,
+          "nullable": true,
+          "pk": false,
+          "unique": false,
+          "y": 7917
+        },
+        {
+          "prop": "recordedAt",
+          "name": "recorded_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 7947
+        }
+      ],
+      "uniques": []
+    },
+    {
+      "name": "ai_settings",
+      "fields": [
+        {
+          "prop": "id",
+          "name": "id",
+          "type": "SMALLINT",
+          "list": false,
+          "nullable": false,
+          "pk": true,
+          "unique": false,
+          "y": 8993
+        },
+        {
+          "prop": "primaryModel",
+          "name": "primary_model",
+          "type": "TEXT",
+          "list": false,
+          "nullable": true,
+          "pk": false,
+          "unique": false,
+          "y": 9023
+        },
+        {
+          "prop": "fallbackModels",
+          "name": "fallback_models",
+          "type": "TEXT[]",
+          "list": true,
+          "nullable": true,
+          "pk": false,
+          "unique": false,
+          "y": 9053
+        },
+        {
+          "prop": "dailyCredits",
+          "name": "daily_credits",
+          "type": "INTEGER",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 9083
+        },
+        {
+          "prop": "weeklyCredits",
+          "name": "weekly_credits",
+          "type": "INTEGER",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 9113
+        },
+        {
+          "prop": "monthlyCredits",
+          "name": "monthly_credits",
+          "type": "INTEGER",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 9143
+        },
+        {
+          "prop": "dailyResetMinute",
+          "name": "daily_reset_minute",
+          "type": "SMALLINT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 9173
+        },
+        {
+          "prop": "weeklyResetMinute",
+          "name": "weekly_reset_minute",
+          "type": "SMALLINT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 9203
+        },
+        {
+          "prop": "weeklyResetDay",
+          "name": "weekly_reset_day",
+          "type": "SMALLINT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 9233
+        },
+        {
+          "prop": "monthlyResetMinute",
+          "name": "monthly_reset_minute",
+          "type": "SMALLINT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 9263
+        },
+        {
+          "prop": "monthlyResetDay",
+          "name": "monthly_reset_day",
+          "type": "SMALLINT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 9293
+        },
+        {
+          "prop": "updatedAt",
+          "name": "updated_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 9323
+        },
+        {
+          "prop": "updatedBy",
+          "name": "updated_by",
+          "type": "UUID",
+          "list": false,
+          "nullable": true,
+          "pk": false,
+          "unique": false,
+          "y": 9353
+        }
+      ],
+      "uniques": []
+    },
+    {
+      "name": "ai_credit_overrides",
+      "fields": [
+        {
+          "prop": "userId",
+          "name": "user_id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": true,
+          "unique": false,
+          "fk": true,
+          "y": 8993
+        },
+        {
+          "prop": "dailyCredits",
+          "name": "daily_credits",
+          "type": "INTEGER",
+          "list": false,
+          "nullable": true,
+          "pk": false,
+          "unique": false,
+          "y": 9023
+        },
+        {
+          "prop": "weeklyCredits",
+          "name": "weekly_credits",
+          "type": "INTEGER",
+          "list": false,
+          "nullable": true,
+          "pk": false,
+          "unique": false,
+          "y": 9053
+        },
+        {
+          "prop": "monthlyCredits",
+          "name": "monthly_credits",
+          "type": "INTEGER",
+          "list": false,
+          "nullable": true,
+          "pk": false,
+          "unique": false,
+          "y": 9083
+        },
+        {
+          "prop": "note",
+          "name": "note",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 9113
+        },
+        {
+          "prop": "updatedAt",
+          "name": "updated_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 9143
+        }
+      ],
+      "uniques": []
+    },
+    {
+      "name": "ai_usage_events",
+      "fields": [
+        {
+          "prop": "userId",
+          "name": "user_id",
+          "type": "UUID",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "fk": true,
+          "y": 8993
+        },
+        {
+          "prop": "feature",
+          "name": "feature",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 9023
+        },
+        {
+          "prop": "model",
+          "name": "model",
+          "type": "TEXT",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 9053
+        },
+        {
+          "prop": "credits",
+          "name": "credits",
+          "type": "INTEGER",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 9083
+        },
+        {
+          "prop": "inputTokens",
+          "name": "input_tokens",
+          "type": "INTEGER",
+          "list": false,
+          "nullable": true,
+          "pk": false,
+          "unique": false,
+          "y": 9113
+        },
+        {
+          "prop": "outputTokens",
+          "name": "output_tokens",
+          "type": "INTEGER",
+          "list": false,
+          "nullable": true,
+          "pk": false,
+          "unique": false,
+          "y": 9143
+        },
+        {
+          "prop": "createdAt",
+          "name": "created_at",
+          "type": "TIMESTAMP(3)",
+          "list": false,
+          "nullable": false,
+          "pk": false,
+          "unique": false,
+          "y": 9173
+        }
+      ],
+      "uniques": []
+    },
+    {
+      "name": "auth.users",
+      "fields": [
+        {
+          "prop": "id",
+          "name": "id",
+          "type": "UUID",
+          "pk": true,
+          "y": 569
+        }
+      ],
+      "uniques": [],
+      "external": true
+    }
+  ],
+  "relations": [
+    {
+      "from": "users",
+      "field": "role_id",
+      "to": "roles",
+      "refProp": "id",
+      "optional": false,
+      "unique": false,
+      "ref": "id",
+      "description": "users.role_id → roles.id"
+    },
+    {
+      "from": "workspaces",
+      "field": "owner_id",
+      "to": "users",
+      "refProp": "id",
+      "optional": false,
+      "unique": false,
+      "ref": "id",
+      "description": "workspaces.owner_id → users.id"
+    },
+    {
+      "from": "workspace_members",
+      "field": "workspace_id",
+      "to": "workspaces",
+      "refProp": "id",
+      "optional": false,
+      "unique": false,
+      "ref": "id",
+      "description": "workspace_members.workspace_id → workspaces.id"
+    },
+    {
+      "from": "workspace_members",
+      "field": "user_id",
+      "to": "users",
+      "refProp": "id",
+      "optional": false,
+      "unique": false,
+      "ref": "id",
+      "description": "workspace_members.user_id → users.id"
+    },
+    {
+      "from": "projects",
+      "field": "workspace_id",
+      "to": "workspaces",
+      "refProp": "id",
+      "optional": false,
+      "unique": false,
+      "ref": "id",
+      "description": "projects.workspace_id → workspaces.id"
+    },
+    {
+      "from": "project_files",
+      "field": "project_id",
+      "to": "projects",
+      "refProp": "id",
+      "optional": false,
+      "unique": false,
+      "ref": "id",
+      "description": "project_files.project_id → projects.id"
+    },
+    {
+      "from": "plan_limits",
+      "field": "plan_id",
+      "to": "plans",
+      "refProp": "id",
+      "optional": false,
+      "unique": false,
+      "ref": "id",
+      "description": "plan_limits.plan_id → plans.id"
+    },
+    {
+      "from": "user_subscriptions",
+      "field": "user_id",
+      "to": "users",
+      "refProp": "id",
+      "optional": false,
+      "unique": true,
+      "ref": "id",
+      "description": "user_subscriptions.user_id → users.id"
+    },
+    {
+      "from": "user_subscriptions",
+      "field": "plan_id",
+      "to": "plans",
+      "refProp": "id",
+      "optional": false,
+      "unique": false,
+      "ref": "id",
+      "description": "user_subscriptions.plan_id → plans.id"
+    },
+    {
+      "from": "project_components",
+      "field": "project_id",
+      "to": "projects",
+      "refProp": "id",
+      "optional": false,
+      "unique": false,
+      "ref": "id",
+      "description": "project_components.project_id → projects.id"
+    },
+    {
+      "from": "project_connections",
+      "field": "project_id",
+      "to": "projects",
+      "refProp": "id",
+      "optional": false,
+      "unique": false,
+      "ref": "id",
+      "description": "project_connections.project_id → projects.id"
+    },
+    {
+      "from": "project_connections",
+      "field": "from_component_id",
+      "to": "project_components",
+      "refProp": "id",
+      "optional": false,
+      "unique": false,
+      "ref": "id",
+      "description": "project_connections.from_component_id → project_components.id"
+    },
+    {
+      "from": "project_connections",
+      "field": "to_component_id",
+      "to": "project_components",
+      "refProp": "id",
+      "optional": false,
+      "unique": false,
+      "ref": "id",
+      "description": "project_connections.to_component_id → project_components.id"
+    },
+    {
+      "from": "build_jobs",
+      "field": "project_id",
+      "to": "projects",
+      "refProp": "id",
+      "optional": false,
+      "unique": false,
+      "ref": "id",
+      "description": "build_jobs.project_id → projects.id"
+    },
+    {
+      "from": "build_jobs",
+      "field": "requested_by",
+      "to": "users",
+      "refProp": "id",
+      "optional": true,
+      "unique": false,
+      "ref": "id",
+      "description": "build_jobs.requested_by → users.id"
+    },
+    {
+      "from": "build_artifacts",
+      "field": "build_job_id",
+      "to": "build_jobs",
+      "refProp": "id",
+      "optional": false,
+      "unique": false,
+      "ref": "id",
+      "description": "build_artifacts.build_job_id → build_jobs.id"
+    },
+    {
+      "from": "community_posts",
+      "field": "author_id",
+      "to": "users",
+      "refProp": "id",
+      "optional": false,
+      "unique": false,
+      "ref": "id",
+      "description": "community_posts.author_id → users.id"
+    },
+    {
+      "from": "community_posts",
+      "field": "accepted_comment_id",
+      "to": "community_comments",
+      "refProp": "id",
+      "optional": true,
+      "unique": true,
+      "ref": "id",
+      "description": "community_posts.accepted_comment_id → community_comments.id"
+    },
+    {
+      "from": "community_comments",
+      "field": "post_id",
+      "to": "community_posts",
+      "refProp": "id",
+      "optional": false,
+      "unique": false,
+      "ref": "id",
+      "description": "community_comments.post_id → community_posts.id"
+    },
+    {
+      "from": "community_comments",
+      "field": "author_id",
+      "to": "users",
+      "refProp": "id",
+      "optional": false,
+      "unique": false,
+      "ref": "id",
+      "description": "community_comments.author_id → users.id"
+    },
+    {
+      "from": "community_comments",
+      "field": "parent_id",
+      "to": "community_comments",
+      "refProp": "id",
+      "optional": true,
+      "unique": false,
+      "ref": "id",
+      "description": "community_comments.parent_id → community_comments.id"
+    },
+    {
+      "from": "community_post_tags",
+      "field": "post_id",
+      "to": "community_posts",
+      "refProp": "id",
+      "optional": false,
+      "unique": true,
+      "ref": "id",
+      "description": "community_post_tags.post_id → community_posts.id"
+    },
+    {
+      "from": "community_post_tags",
+      "field": "tag_id",
+      "to": "community_tags",
+      "refProp": "id",
+      "optional": false,
+      "unique": true,
+      "ref": "id",
+      "description": "community_post_tags.tag_id → community_tags.id"
+    },
+    {
+      "from": "community_votes",
+      "field": "user_id",
+      "to": "users",
+      "refProp": "id",
+      "optional": false,
+      "unique": false,
+      "ref": "id",
+      "description": "community_votes.user_id → users.id"
+    },
+    {
+      "from": "community_votes",
+      "field": "post_id",
+      "to": "community_posts",
+      "refProp": "id",
+      "optional": true,
+      "unique": false,
+      "ref": "id",
+      "description": "community_votes.post_id → community_posts.id"
+    },
+    {
+      "from": "community_votes",
+      "field": "comment_id",
+      "to": "community_comments",
+      "refProp": "id",
+      "optional": true,
+      "unique": false,
+      "ref": "id",
+      "description": "community_votes.comment_id → community_comments.id"
+    },
+    {
+      "from": "login_events",
+      "field": "user_id",
+      "to": "users",
+      "refProp": "id",
+      "optional": false,
+      "unique": false,
+      "ref": "id",
+      "description": "login_events.user_id → users.id"
+    },
+    {
+      "from": "search_history",
+      "field": "user_id",
+      "to": "users",
+      "refProp": "id",
+      "optional": false,
+      "unique": false,
+      "ref": "id",
+      "description": "search_history.user_id → users.id"
+    },
+    {
+      "from": "project_datastreams",
+      "field": "project_id",
+      "to": "projects",
+      "refProp": "id",
+      "optional": false,
+      "unique": false,
+      "ref": "id",
+      "description": "project_datastreams.project_id → projects.id"
+    },
+    {
+      "from": "project_datastreams",
+      "field": "component_id",
+      "to": "project_components",
+      "refProp": "id",
+      "optional": true,
+      "unique": false,
+      "ref": "id",
+      "description": "project_datastreams.component_id → project_components.id"
+    },
+    {
+      "from": "project_dashboards",
+      "field": "project_id",
+      "to": "projects",
+      "refProp": "id",
+      "optional": false,
+      "unique": true,
+      "ref": "id",
+      "description": "project_dashboards.project_id → projects.id"
+    },
+    {
+      "from": "project_dashboards",
+      "field": "template_id",
+      "to": "dashboard_templates",
+      "refProp": "id",
+      "optional": true,
+      "unique": false,
+      "ref": "id",
+      "description": "project_dashboards.template_id → dashboard_templates.id"
+    },
+    {
+      "from": "dashboard_templates",
+      "field": "workspace_id",
+      "to": "workspaces",
+      "refProp": "id",
+      "optional": false,
+      "unique": false,
+      "ref": "id",
+      "description": "dashboard_templates.workspace_id → workspaces.id"
+    },
+    {
+      "from": "dashboard_templates",
+      "field": "created_by",
+      "to": "users",
+      "refProp": "id",
+      "optional": true,
+      "unique": false,
+      "ref": "id",
+      "description": "dashboard_templates.created_by → users.id"
+    },
+    {
+      "from": "dashboard_template_versions",
+      "field": "template_id",
+      "to": "dashboard_templates",
+      "refProp": "id",
+      "optional": false,
+      "unique": true,
+      "ref": "id",
+      "description": "dashboard_template_versions.template_id → dashboard_templates.id"
+    },
+    {
+      "from": "dashboard_template_versions",
+      "field": "created_by",
+      "to": "users",
+      "refProp": "id",
+      "optional": true,
+      "unique": false,
+      "ref": "id",
+      "description": "dashboard_template_versions.created_by → users.id"
+    },
+    {
+      "from": "ai_profiles",
+      "field": "owner_id",
+      "to": "users",
+      "refProp": "id",
+      "optional": true,
+      "unique": false,
+      "ref": "id",
+      "description": "ai_profiles.owner_id → users.id"
+    },
+    {
+      "from": "ai_conversations",
+      "field": "user_id",
+      "to": "users",
+      "refProp": "id",
+      "optional": false,
+      "unique": false,
+      "ref": "id",
+      "description": "ai_conversations.user_id → users.id"
+    },
+    {
+      "from": "ai_conversations",
+      "field": "project_id",
+      "to": "projects",
+      "refProp": "id",
+      "optional": false,
+      "unique": false,
+      "ref": "id",
+      "description": "ai_conversations.project_id → projects.id"
+    },
+    {
+      "from": "ai_conversations",
+      "field": "profile_id",
+      "to": "ai_profiles",
+      "refProp": "id",
+      "optional": true,
+      "unique": false,
+      "ref": "id",
+      "description": "ai_conversations.profile_id → ai_profiles.id"
+    },
+    {
+      "from": "ai_messages",
+      "field": "conversation_id",
+      "to": "ai_conversations",
+      "refProp": "id",
+      "optional": false,
+      "unique": false,
+      "ref": "id",
+      "description": "ai_messages.conversation_id → ai_conversations.id"
+    },
+    {
+      "from": "devices",
+      "field": "project_id",
+      "to": "projects",
+      "refProp": "id",
+      "optional": false,
+      "unique": false,
+      "ref": "id",
+      "description": "devices.project_id → projects.id"
+    },
+    {
+      "from": "devices",
+      "field": "created_by",
+      "to": "users",
+      "refProp": "id",
+      "optional": true,
+      "unique": false,
+      "ref": "id",
+      "description": "devices.created_by → users.id"
+    },
+    {
+      "from": "device_values",
+      "field": "device_id",
+      "to": "devices",
+      "refProp": "id",
+      "optional": false,
+      "unique": true,
+      "ref": "id",
+      "description": "device_values.device_id → devices.id"
+    },
+    {
+      "from": "telemetry_points",
+      "field": "device_id",
+      "to": "devices",
+      "refProp": "id",
+      "optional": false,
+      "unique": false,
+      "ref": "id",
+      "description": "telemetry_points.device_id → devices.id"
+    },
+    {
+      "from": "ai_credit_overrides",
+      "field": "user_id",
+      "to": "users",
+      "refProp": "id",
+      "optional": false,
+      "unique": true,
+      "ref": "id",
+      "description": "ai_credit_overrides.user_id → users.id"
+    },
+    {
+      "from": "ai_usage_events",
+      "field": "user_id",
+      "to": "users",
+      "refProp": "id",
+      "optional": false,
+      "unique": false,
+      "ref": "id",
+      "description": "ai_usage_events.user_id → users.id"
+    },
+    {
+      "from": "users",
+      "field": "id",
+      "to": "auth.users",
+      "refProp": "id",
+      "optional": false,
+      "unique": true,
+      "ref": "id",
+      "description": "users.id → auth.users.id"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+# Isolate smoke checks from Caddy and from real workspace files.
+services:
+  nestjs:
+    container_name: unity-hub-api-smoke
+    volumes: !override
+      - workspace-smoke:/app/.workspace-data
+  unity-hub-nginx:
+    container_name: unity-hub-web-smoke
+
+networks:
+  web:
+    name: unity-hub-smoke-edge
+    external: false
+
+volumes:
+  workspace-smoke:

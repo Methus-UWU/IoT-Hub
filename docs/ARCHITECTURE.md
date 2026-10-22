@@ -1,8 +1,143 @@
 # Architecture
 
-This document describes the **target** architecture. Sections 1 to 10 are the target. The sections from "Current State" onward record where the code actually is today and how it gets to the target.
+"System Overview" describes the system as built today. The sections from "Product Goal" to "Future Scalability" describe the **target** architecture. The sections from "Current State" onward record how the code moved from the legacy system towards that target.
 
 The evidence behind the current-state summary is in `docs/LEGACY_AUDIT.md`.
+
+# System Overview
+
+As built, 2026-10-18. Known gaps against the target: `docs/KNOWN_ISSUES.md`.
+
+## Diagram
+
+```mermaid
+flowchart LR
+  subgraph Browser
+    FE["Angular 22 SPA<br/>IDE · canvas · simulator · dashboards"]
+    WS["Web Serial<br/>flash + serial monitor"]
+  end
+  Board["ESP32 / Arduino board"]
+
+  subgraph Server["Docker host"]
+    NGINX["nginx<br/>static frontend + /api proxy"]
+    API["NestJS 11 API<br/>modular monolith"]
+    DISP["Build dispatcher<br/>(Node, Docker socket)"]
+    BUILDER["Builder container<br/>PlatformIO, no network"]
+  end
+
+  subgraph Supabase
+    AUTH["Supabase Auth"]
+    DB[("PostgreSQL<br/>RLS + Prisma migrations")]
+  end
+
+  AI["OpenRouter / Gemini"]
+
+  FE -- "sign-in, refresh (PKCE)" --> AUTH
+  FE -- "REST + Supabase JWT" --> NGINX --> API
+  API -- "verify JWT (JWKS)" --> AUTH
+  API -- "Prisma repositories" --> DB
+  API -- "AI calls, server-side keys" --> AI
+  DISP -- "claim job / post result<br/>BUILD_WORKER_TOKEN" --> API
+  DISP -- "docker run per build" --> BUILDER
+  FE --> WS -- "USB" --> Board
+  Board -- "telemetry, device token" --> API
+```
+
+A rendered copy is in `docs/diagrams/system-overview.png`.
+
+Request path, in order:
+
+1. The browser signs in with Supabase Auth and holds the Supabase session.
+2. Every API call carries the Supabase access token. `SupabaseAuthGuard` verifies it
+   against the project's JWKS and establishes identity only.
+3. `AuthorizationService` reads the platform role and workspace membership from the
+   database on every request, so a demotion takes effect immediately.
+4. The service applies business rules; a repository contract, implemented with
+   Prisma, reads or writes PostgreSQL.
+5. Errors are mapped centrally by `AllExceptionsFilter` to
+   `{ error: { code, message, requestId } }`.
+
+Firmware never compiles in the API. The API stores a build job; the dispatcher claims
+it and runs one locked-down container per build; the result and images return to the
+API, and the browser flashes the board.
+
+## Technology choices
+
+| Layer | Technology | Why it was chosen |
+| --- | --- | --- |
+| Frontend | Angular 22, standalone components, Signals | Framework-native routing, DI, forms, and lazy loading for a large app with many feature areas |
+| Styling | Tailwind CSS 4 | Utility classes keep feature styles local and consistent |
+| Code editor | Monaco | The VS Code editor engine: syntax highlighting, models with undo history |
+| Board flashing | esptool-js, STK500 over Web Serial | Flashing happens on the user's machine; the server never touches USB |
+| Backend | NestJS 11 | DI, guards, pipes, filters, and modules map directly onto the modular-monolith rules in `AGENTS.md` |
+| Database | Supabase PostgreSQL | Managed Postgres with RLS as defence in depth, alongside Auth and Storage in one platform |
+| Data access | Prisma 7 behind repository contracts | Typed queries and one migration history (ADR-001). Repositories keep ORM types out of services |
+| Authentication | Supabase Auth | The platform stores no passwords and issues no tokens. Email verification, reset, MFA, and OAuth come built in (ADR-003) |
+| Project files | PostgreSQL `TEXT` rows | Small autosaved sources; one atomic, versioned write per save (ADR-004) |
+| Build isolation | Docker container per build, PostgreSQL job table as queue | Untrusted code never runs next to platform secrets (ADR-002) |
+| AI | OpenRouter (plus Gemini for the advisor) | One API over many models with runtime ranking and fallback; keys stay on the server (ADR-007, ADR-009) |
+| Deployment | Docker Compose, nginx | One host, reproducible images pinned by digest |
+
+## Folder structure
+
+```
+iot-hub/
+├── backend/                      NestJS API
+│   ├── prisma/
+│   │   ├── schema.prisma            Single schema source of truth
+│   │   └── migrations/              Versioned SQL migrations (incl. RLS, triggers)
+│   └── src/
+│       ├── main.ts                  Bootstrap: /api prefix, Helmet, CORS, validation, filter
+│       ├── common/                  config/ (Supabase, security), filters/, http/ (request id)
+│       ├── prisma/                  PrismaService (primary + optional read replica)
+│       └── modules/                 One folder per domain
+│           ├── auth/                Supabase token guard, profile (/auth/me), sign-in history
+│           ├── authorization/       Platform role and workspace role checks
+│           ├── users/, workspaces/  Profiles, workspaces, membership
+│           ├── projects/            Projects, files, components, connections, board catalog,
+│           │                        pin-assignment engine
+│           ├── build/               Build queue and worker endpoints (never compiles)
+│           ├── libraries/           PlatformIO Registry library manager
+│           ├── devices/             Device tokens, telemetry ingestion, controls
+│           ├── dashboards/          Dashboards, datastreams, templates
+│           ├── ai/                  Admin assistant, project assistant, IoT advisor, providers
+│           ├── ai-credits/          AI model settings and credit limits
+│           ├── billing/             Plans and entitlements (quotas)
+│           ├── community/           Posts, comments, tags, votes
+│           ├── search-history/      Per-user recent searches
+│           ├── admin-users/, admin-database/, admin-monitoring/
+│           └── workspace/           Deprecated filesystem routes (to be removed)
+├── frontend/                      Angular SPA
+│   └── src/app/
+│       ├── core/                    guards/, interceptors/ (auth), services/ (API clients), models/
+│       ├── shared/                  Reusable UI components and pipes
+│       ├── layouts/                 Auth and main layouts
+│       └── features/
+│           ├── auth/                Login, signup, OAuth callback
+│           ├── main/                Home, community, public navigation
+│           ├── account/             Profile and settings (users and admins)
+│           ├── user/
+│           │   ├── projects/        Project list and creation
+│           │   ├── workspace/       IDE, AI chat, firmware/, library-manager/,
+│           │   │                    virtual-device/ (canvas, parts, simulation),
+│           │   │                    dashboard-builder/
+│           │   ├── documents/       Guides and device datasheets
+│           │   └── assistant/       IoT advisor chat
+│           └── admin/               Dashboard, users, database, logs, AI settings
+├── build-worker/
+│   ├── dispatcher/                  Claims jobs, runs one builder container each
+│   └── builder/                     PlatformIO image: build.py, targets, preinstalled libraries
+├── deploy/                          nginx config, gateway wrapper, smoke override
+├── scripts/                         Root build and production verification
+└── docs/                            Architecture, API, database, security, ADRs, diagrams
+```
+
+Dependency direction in the backend is always
+`Controller → Service → Repository contract → Prisma implementation`. Controllers
+handle HTTP only; authorization is resolved through `AuthorizationService` before a
+service runs.
+
+---
 
 ## Product Goal
 
@@ -241,7 +376,7 @@ Incremental strangler migration. The legacy system keeps serving traffic; each p
 
 No architectural change. Removes the blocking risks and makes the repository migratable.
 
-1. Rotate the AI API keys that are currently in `iot-hub-be/.env`; change the seeded `Nong4548!` password.
+1. Rotate the AI API keys that are currently in `backend/.env`; change the previously hardcoded seed password.
 2. Set `WORKSPACE_ALLOW_ANONYMOUS=false` and `NODE_ENV` explicitly in every environment. Remove the anonymous branch from `WorkspaceAccessGuard` entirely rather than relying on configuration.
 3. Disable or restrict `POST /workspace/build` until Phase 4 delivers an isolated worker.
 4. Sanitise the `markdown` pipe output.
@@ -348,7 +483,7 @@ Updated 2026-08-28.
 | 1 — Data access foundation | **Complete** |
 | 2 — Supabase foundation | **Complete** — Supabase Cloud; config boundary, schema, and RLS in place |
 | 3 — Authentication and authorization | **Complete** — Supabase Auth with email, Google, GitHub; database-resolved authorization |
-| 4 — Build isolation | **Blocked** — isolation mechanism undecided (ADR-002) |
+| 4 — Build isolation | **Complete** (2026-10-02) — see "Phase 4 — delivered" |
 | 5 — Project files and Storage | Not started; depends on Phase 2 |
 | 6 — Realtime | Not started; depends on Phase 2 |
 | 7 — Domain migration | Not started; depends on Phase 2 |
@@ -435,15 +570,45 @@ workspace produce the same 404, so ids cannot be enumerated.
 
 | Phase | Status |
 | --- | --- |
-| 4 — Build isolation | **Blocked** on the infrastructure choice in ADR-002 |
-| 5 — Project files and Storage | Backend complete; Angular IDE not yet switched over |
+| 4 — Build isolation | **Complete** — queued builds in isolated containers, Web Serial flashing |
+| 5 — Project files and Storage | **Complete** — `project_files` end to end; the IDE no longer uses the filesystem |
 | 6 — Realtime | Not started |
 | 7 — Domain migration | Projects, components, and connections done; other domains not started |
 
-Workspace files still live on the API filesystem, keyed by user id. That is the last
-piece of the old ownership model and is what Phase 5 replaces with `project_files`
-rows plus Supabase Storage objects, at which point the workspace routes switch from
-"scoped by user id" to a `requireWorkspaceRole` check.
+Project source no longer lives on the API filesystem. Files are `project_files` rows
+authorized by `requireWorkspaceRole`, and the client reads and writes them there. What
+remains keyed by user id on the host is the legacy `workspace/file` route set, which
+nothing calls any more.
+
+## Phase 4 — delivered
+
+ADR-002 is accepted: one Docker container per build, a PostgreSQL job table as the
+queue, and flashing over Web Serial in the browser.
+
+- `modules/build` queues a snapshot of the project's stored sources and returns 202.
+  It never compiles; `no-process-spawn.spec.ts` keeps every process API out of the
+  whole API source tree.
+- `build-worker/dispatcher` (Node, no dependencies) claims jobs through
+  `/api/internal/build-jobs` with `BUILD_WORKER_TOKEN` and runs
+  `build-worker/builder` (PlatformIO, everything preinstalled) with no network, no
+  mounts, no capabilities, a read-only root, and resource limits.
+- Images land in `build_artifacts`. The IDE downloads them and flashes the board with
+  esptool-js (ESP32) or STK500v1 (Uno/Nano), and reads the serial monitor over Web
+  Serial. The 650 ms serial polling loop and the host serial endpoints are gone; the
+  build status is still polled until Phase 6.
+
+The hardware Serial Monitor belongs to the signed-in user shell through
+`SerialSessionStore`; changing output tabs, collapsing the panel, or navigating
+between user pages leaves its read loop active. Opening the Serial Monitor tab
+connects the selected, browser-authorized port. Baud/port changes serialize close
+and reopen, and uploads take exclusive port access before restoring the monitor
+(also on a failed upload if it was already active). Successful uploads start the
+monitor automatically. Disconnect and selecting simulation stop monitoring;
+leaving the user shell releases the port. Read output is capped at 2,000 lines,
+and USB reconnect only resumes the selected port, never a different board.
+Unfinished `Serial.print()` output updates the same line immediately; newline and
+CRLF delimiters finish the line. UTF-8 decoding spans transport chunks, individual
+lines are split after 2,048 characters, and the view preserves output whitespace.
 
 ## Phase 5 — backend delivered
 
@@ -473,18 +638,49 @@ Verified end to end over HTTP against Supabase:
 | Stale write | 409 `FILE_VERSION_CONFLICT` |
 | Batch autosave | saved per file, conflicts reported separately |
 
-### What remains for Phase 5
+### Phase 5 — frontend delivered
 
-The Angular IDE still calls the deprecated `/api/projects/:projectId/workspace/*`
-endpoints, which read the API filesystem and scope by user id.
+The Angular IDE now reads, writes, and deletes source through `project_files`. What
+unblocked it was the projects domain landing first: route ids are real project UUIDs
+served by the API, not localStorage slugs, so the workspace-scoped endpoints could be
+called at all. `ProjectFilesClient` wraps `ProjectsApiService` and carries the row
+version, so the editor states the revision it read and a stale tab is refused rather
+than allowed to blind-write.
 
-Switching it over is entangled with the projects domain (Phase 7, first item): route
-ids are currently localStorage slugs such as `smart-greenhouse`, and they have to
-become real project UUIDs served by the API before the new endpoints can be called
-at all. `ProjectsApiService` is in place on the client and ready for that work.
+The trigger was the project assistant: it reads `project_files` to see what a project's
+source says, and it cannot see the API filesystem. An assistant that cannot read the
+current `main.ino` cannot patch it without destroying the user's work.
 
-The old filesystem endpoints stay until then, per the rule that legacy is removed
-only after its replacement is working — not before.
+Editor state outlives the IDE route. Dashboard, canvas, and IDE are sibling routes, so
+leaving the IDE destroys its page. The open text, the unsaved state, and the "already
+read" markers live in `WorkspaceFileBuffers` (root, keyed by project id), and Monaco
+models with their undo history and view state live in `MonacoModelCache`. Returning to
+the IDE paints from those without refetching; a pending autosave is flushed, not
+dropped, when the page goes. Switching project keeps only that project's buffers (plus
+any still-unsaved ones), and sign-out clears both. After an AI plan is applied, the
+chat store marks only the written files stale: the next read replaces a clean buffer in
+place and leaves one with unsaved edits alone, so the version check reports the conflict
+instead of either side being lost. The firmware step is labelled "Compile" in the UI;
+"Upload" compiles and then flashes.
+
+Multi-file sketches: the server compile (`build-plan.ts`) already takes every file in
+the Arduino or PlatformIO layout. The browser simulator and the assistant's client-side
+diagnostics now read the same files through `workspace/sketch-sources.ts`, which joins
+them in Arduino-builder order (main tab, other `.ino` tabs, other units, then the
+`lib/<Name>` libraries the sketch includes), pastes each project header once where it
+is first included, and maps every line back so a fault names `file:line`.
+
+Library Manager (ADR-006): `src/modules/libraries/` installs PlatformIO Registry
+libraries as project files under `lib/<Folder>/`, each with a `library-source.json`
+marker. The builder needs no network access and no image rebuild to compile them. The
+IDE keeps installed library files out of its tabs
+(`workspace/library-manager/library-files.ts`). The simulator ignores an installed
+copy of a library it emulates, so the emulation stays in charge.
+
+`/api/projects/:projectId/workspace/*` still serves the toolchain status, the serial
+monitor, and the attached-device list. Those are host concerns rather than project
+state, and they are what Phases 4 and 6 replace; the file routes on it are now unused
+by the client and can be deleted with them.
 
 ---
 
@@ -552,3 +748,279 @@ Beyond the simulation and wiring checks it already carried, it now asserts that
 every part declares `physicalSize`, has declarative artwork, agrees with its own
 aspect ratio to within 2 %, keeps its pins inside the drawn body plus bleed, and
 does not let neighbouring pin hit areas overlap.
+
+---
+
+# Project-aware AI Assistant
+
+The assistant in the IDE answers about **the project that is open**. The user never
+describes their hardware, because the platform already knows it: the board, the
+components, the wiring, and the source files are read server-side from the project
+the route names, and that reading is the assistant's only source of hardware truth.
+
+## The division of labour
+
+```
+LLM decides intent → application validates hardware → backend executes → database stores
+```
+
+Each arrow is a boundary something is not allowed to cross:
+
+- The model never names a GPIO it was not given. It asks to wire a pin; the
+  **assignment engine** answers with a concrete, legal pin, and that pin is what
+  the model writes into the code. A number it invented instead would be the exact
+  failure this feature exists to prevent — code that says GPIO 4 above a diagram
+  that says GPIO 5.
+- The model never writes. A turn produces a **plan**, not a change. The plan is
+  shown to the user and applied only if accepted.
+- The model never reaches outside the project. No tool takes a project or
+  workspace id, so there is no argument it could put another project's id into.
+
+## Faults are part of the context
+
+"Why does this read 0" is the commonest question asked of this assistant, and answering
+it needs the fault, not a guess. The context therefore ends with a problems block, and
+`get_project_problems` returns the same block on demand, refreshed against the draft so a
+wire the model has just staged counts as connected.
+
+It has two halves, kept apart because they are trusted differently:
+
+- **The server's audit** (`ai/project/project-problems.ts`) re-runs the wiring rules over
+  every wire already stored, which nothing else does — the rules otherwise run only when a
+  new wire is staged, so a circuit drawn by hand is never re-examined. It also reports a
+  part whose VCC or GND has nothing on it, the usual reason a correctly coded sensor
+  reads nothing.
+- **What the browser reported** (`workspace/project-diagnostics.service.ts`) is sent with
+  the message: a sketch that will not compile, the canvas checker's findings, the serial
+  tail, a failed firmware build. None of it can be computed server-side, because the
+  simulator runs in the client. It is size-capped by the DTO, quoted to the model as the
+  client's report rather than as fact, and can never introduce hardware — the component
+  list still comes from the database.
+
+Gathering it is best effort and never blocks a message: a project whose layout or files
+cannot be read simply produces fewer findings.
+
+## The pieces
+
+| Where | What it does |
+| --- | --- |
+| `frontend/scripts/export-device-catalog.ts` | Derives the API's copy of the device catalog from the Angular one |
+| `projects/catalog/device-catalog.generated.ts` | That copy: 72 parts, 2,038 pins, electrical facts only |
+| `frontend/scripts/export-device-datasheets.ts` | Derives the API's copy of the datasheets from the Markdown the documentation page renders |
+| `projects/catalog/device-datasheets.generated.ts` | That copy: 40 documents covering 72 ids, unmodified text |
+| `ai/project/plan-warnings.ts` | Decides which refusals are still true of the finished draft, and so worth showing |
+| `projects/pin-assignment.ts` | The hardware authority — validates a wire, assigns a pin |
+| `projects/project-circuit.service.ts` | Loads a project's circuit as one snapshot |
+| `ai/project/project-context.service.ts` | Builds the context block the model is given |
+| `ai/project/project-draft.ts` | A proposed change, held apart from the project |
+| `ai/project/project-problems.ts` | Audits the stored wiring and renders the problems block |
+| `workspace/project-diagnostics.service.ts` | Client-side: compiles the sketch, checks the circuit, collects serial and build output |
+| `ai/project/ai-tools.ts` | The tools offered, split into read and write |
+| `ai/project/ai-tool-executor.ts` | Runs one tool call against the draft |
+| `ai/project/project-ai.service.ts` | The bounded tool loop |
+| `ai/project/ai-plan-apply.service.ts` | Replays an accepted plan against live state |
+
+## Project AI model reliability
+
+Every project request uses at least the balanced profile, whatever the client asked
+for: a turn here is a tool loop of a dozen or more rounds, which the latency tier
+cannot serve — on the free catalog its winner spends up to two minutes on a single
+round. The IDE sends the balanced profile without a mode selector; the backend owns
+model selection. Saved IDE conversations no longer store a tier preference, and
+older conversations retain their messages when loaded. The admin assistant, which
+answers in one round, still offers tiers. API model overrides remain available.
+
+The model never sees a tool schema keyword a provider might reject. `uniqueItems` and
+an explicit `tool_choice` both fail the whole request on some OpenRouter endpoints —
+HTTP 400 and HTTP 404 respectively — so constraints that cannot be expressed portably
+are stated in a tool's description and enforced in `ai-tool-executor.ts` instead.
+
+The project assistant sends up to three ranked, policy-eligible tool models through
+OpenRouter's native `models` fallback routing. Paid models remain excluded unless
+enabled by the operator. After a fallback, subsequent tool rounds prefer the model
+that answered, provided its id is still in that approved candidate list. Tool
+history and the draft stay intact. Explicit model overrides do not switch models.
+Completion budgets respect every candidate's limit, and provider calls have a
+60-second timeout combined with the browser-disconnect signal.
+
+Project generation also has a five-minute wall-clock deadline, covering context,
+catalog loading and all model rounds together. Expiry cancels the active upstream
+request and returns `AI_GENERATION_TIMEOUT` without offering a partial draft.
+Context and model catalog load concurrently. The initial board pinout and active
+source are supplied as actual tool results before the first provider call.
+`add_device` returns the device pinout and optionally accepts `wirePins` from the
+catalog to add/reuse and wire a peripheral in one call, using the same assignment
+engine as individual `wire_to_board` calls. Each refused pin is reported alongside
+any successfully staged wires; no database writes occur. The IDE displays elapsed
+waiting time, not an estimated completion percentage.
+
+The adapter recognizes errors embedded in HTTP 200 responses and reports
+`AI_PROVIDER_ERROR` without forwarding raw upstream metadata. Tool requests require
+a provider that supports their parameters and prioritize low-latency endpoints
+within the approved model candidates (`provider.sort: 'latency'`). See
+[OpenRouter model fallbacks](https://openrouter.ai/docs/guides/routing/model-fallbacks)
+and [provider routing](https://openrouter.ai/docs/guides/routing/provider-selection).
+
+OpenRouter is no longer the only AI upstream (2026-10-01). The IoT advisor, which
+is plain conversation with no tools, answers through `GeminiProvider` when
+`GEMINI_API_KEY` is set and falls back to `AiService.complete` on any Gemini
+failure except a disconnected caller. The reason is quota: a free OpenRouter key
+allows 50 free-model requests a day, and one project generation spends several
+tool rounds of it, so advisor questions no longer draw on that budget. Project
+generation and the admin assistant stay on OpenRouter only; their tool calling and
+model ranking have not been tested against Gemini. On Google's free tier, prompts
+and answers may be used to improve Google's products, which matters because users
+paste sketches and logs that can contain Wi-Fi credentials or tokens.
+
+Verification on 2026-09-08 used a real AI-generated DHT22 proposal, applied through
+the production services to PostgreSQL: DATA, VCC, GND, and matching `main.ino` all
+survived independent reads, as did a component move. Browser verification replayed
+that generated proposal with in-memory API persistence to check accept, editor
+refresh, mouse dragging, and reload. This did not exercise a signed-in browser
+session or compile firmware. The temporary database project was deleted afterward.
+
+## Why the backend holds a copy of the catalog
+
+`board-catalog.ts` says pin geometry must not be duplicated on the API, and it is
+right: a hand-kept second copy drifts. But the API has to decide whether a wire is
+legal, and it cannot decide that from facts it does not hold.
+
+The way out is that the copy is **generated**, never authored. The exporter reads
+the Angular definitions — still the only place a part is written — and emits the
+electrical half: pin names, types, directions, voltages, fan-out, operating
+windows. No coordinates, no artwork, no simulation. Re-run it after changing any
+device:
+
+```bash
+cd frontend
+node_modules/@esbuild/win32-x64/esbuild.exe scripts/export-device-catalog.ts \
+  --bundle --platform=node --format=cjs --outfile=.tmp/export-catalog.cjs \
+  && node .tmp/export-catalog.cjs
+```
+
+## Why the backend also holds the datasheets
+
+The catalog carries what a validator needs; it says nothing about what a part needs
+to *work*. A DHT read through a bare sensor with no 4.7 kΩ pull-up on DATA returns
+nothing, most relay boards close on a LOW, and the third leg of a four-pin DHT is
+not connected to anything. None of that is derivable from a pin list, and a model
+asked to wire the part without it guesses — plausibly, and wrong.
+
+So the Markdown under `documents/device/`, which the documentation page renders for
+the user, is exported the same way the catalog is and served to the assistant by
+`read_device_datasheet`. The text crosses unmodified, so the assistant and the page
+cannot come to disagree about how a part should be wired. Re-run the exporter after
+editing a datasheet — the `.md` loader is required, because the mapping imports
+Markdown as text:
+
+```bash
+cd frontend
+node_modules/.bin/esbuild scripts/export-device-datasheets.ts \
+  --bundle --platform=node --format=cjs --loader:.md=text \
+  --outfile=.tmp/export-datasheets.cjs \
+  && node .tmp/export-datasheets.cjs
+```
+
+## Why a draft
+
+The assistant must know the pin a sensor will land on *before* it writes the code
+that reads it. It cannot be asked to remember a pin it chose, because it does not
+choose. So a request runs against a `ProjectDraft` — a copy of the project that
+accepts changes and answers questions about the result — and the assigned pin comes
+straight back as a tool result. `#define DHT_PIN 4` is then a fact the model read.
+
+The same class does duty at apply time: the plan is replayed against a draft built
+from live state, so a proposal that went stale is refused whole rather than applied
+half-way.
+
+## Wiring rules
+
+Refusals — the wire cannot exist: unknown pin, kind mismatch, supply shorted to
+ground, a pin past its fan-out, a not-internally-connected pin, a component outside
+the project.
+
+Warnings — a real bench would allow it: two outputs on one node, a rail above a
+part's rating. These follow `simulation/wire-validation.ts`, which is advisory for
+the same reason: a rule that blocked the user would be wrong more often than right.
+
+One warning is not about a wire at all. A series resistor whose two leads reach the
+same electrical node is shorted out and limits nothing, so whatever it protects is
+driven as though it were absent — and every wire that built it is individually legal,
+which is why the per-wire engine cannot see it. `bypassedCurrentLimiters` in
+`pin-assignment.ts` answers it from the circuit as a whole (union-find over the wires;
+nothing conducts through a component body), and `auditCircuit` reports it, so the
+assistant meets it through `get_project_problems` and the context block. An assistant
+built exactly this circuit before the check existed.
+
+Assignment order: an existing wire wins, then the caller's preference if it is legal
+and free, then the first compatible pin in the board's own header order — with an
+exact type ahead of a substitute, so an I2C display lands on the documented SDA/SCL
+pair. Rails are shared; signal pins are not.
+
+## Scope rules the prompt enforces
+
+The assistant is told, in the system prompt, that the context is authoritative: it
+must not write code for hardware the project lacks, must name a missing part rather
+than pretend it exists, must not ask which board the user has, and must read a file
+before changing it. The last one is also enforced in code — a write that would cut
+an existing file by more than half is refused before it reaches the plan.
+
+## Project files moved to the database
+
+The IDE previously read and wrote `.workspace-data/<userId>/<projectId>/` through
+the deprecated workspace routes, while the file *list* already came from
+`project_files`. The assistant cannot read the API filesystem, and an assistant that
+cannot read the current `main.ino` cannot patch it without destroying the user's
+work — so the editor now reads, writes, and deletes through `project_files`, with
+the row version carried in `ProjectFilesClient` so a stale tab cannot blind-write.
+That closes the frontend half of Phase 5. The legacy routes remain only for the
+toolchain, the serial monitor, and the attached-device list, which are host concerns.
+
+## The relay became a real part
+
+The relay module was the one catalog part with interactive state and no simulation
+behaviour, and the gap showed in two ways that only appear when you try to build
+something with it:
+
+- It **drew** NO/COM/NC screw terminals, and its own description named them, but it
+  declared no pins for them. Nothing could be wired to the switched side, so the part
+  could not actually switch anything.
+- Its channels toggled only by clicking the can. The `IN` pins were wireable but inert,
+  so a sketch driving them changed nothing on the canvas.
+
+Both are closed. The terminals are now pins — `passive`, because a dry contact has no
+polarity and no logic level and will join a supply, a ground, or a signal alike — named
+per channel (`COM1`, `NO2`, …) on multi-channel boards and unnumbered on the
+single-channel one, matching how the trigger pins were already named. `terminalBlock()`
+is the single source for both the artwork and the pin positions, so a pin cannot drift
+away from the screw it belongs to.
+
+The behaviour is a changeover contact: `COM` bonds to `NO` when the coil is energised
+and to `NC` when it is not. Two constraints shaped it. `bond` only has an effect during
+the `connect` pass, and that pass runs with reads disabled — so the contact position
+cannot be decided from the trigger pin in the same pass that acts on it. The coil state
+therefore lives on the behaviour instance: `update` reads the trigger, `connect` acts on
+what it found. The one-tick lag that falls out is not a workaround; it is what a relay
+does, which is why they are specified with a pull-in time.
+
+These modules are **active low**, as the pin description already said: `digitalWrite(pin,
+LOW)` closes the contact. When nothing is wired to a trigger the manual toggle takes
+over, so clicking the can still works exactly as before.
+
+`scripts/verify-relay-switching.ts` is the evidence, and it drives a full rig — two LEDs
+each in series with their own channel — rather than testing the coil in isolation.
+
+## What the bench rig exposed in the assignment engine
+
+Building that rig through the assistant's own path turned up two bugs that no unit test
+had reason to look for, both now fixed and covered:
+
+1. **A passive lead was auto-assignable.** Every board pin "satisfies" a passive pin, so
+   `wire_to_board` put an LED's anode *and* its cathode on `3V3`. Which leg faces the
+   supply and which faces ground is a circuit decision, not a pin-capability one, so it
+   is refused now and the caller wires both ends explicitly.
+2. **Supply rails were chosen by header order.** A 5 V relay module was assigned `3V3`
+   because that pin comes first on an ESP32 — a circuit that looks correct and never
+   works. Rails inside a part's declared window now come first, lowest first, so a part
+   sits at the board's logic level unless its own `min` rules that out. `validateConnection`
+   gained the matching `undervoltage` warning for the hand-wired case.

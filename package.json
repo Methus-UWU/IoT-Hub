@@ -1,0 +1,14 @@
+{
+  "name": "iot-hub",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Build entry point for the backend and frontend sub-projects.",
+  "scripts": {
+    "test": "npm run test --prefix backend -- --runInBand && npm run test:e2e --prefix backend -- --runInBand && npm run test --prefix frontend",
+    "build": "node scripts/build-all.mjs",
+    "build:clean": "node scripts/build-all.mjs --install",
+    "build:be": "node scripts/build-all.mjs --be",
+    "build:fe": "node scripts/build-all.mjs --fe",
+    "start:be": "npm run start:prod --prefix backend"
+  }
+}
