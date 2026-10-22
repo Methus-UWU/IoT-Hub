@@ -1,4 +1,10 @@
 import type { Page } from '@playwright/test';
+import { environment } from '../../src/environments/environment.development';
+
+/** Where supabase-js keeps the session: `sb-<project-ref>-auth-token`. */
+export const supabaseStorageKey = `sb-${
+  environment.supabaseUrl ? new URL(environment.supabaseUrl).hostname.split('.')[0] : 'unconfigured'
+}-auth-token`;
 
 export async function installAuthenticatedSession(
   page: Page,
@@ -17,7 +23,7 @@ export async function installAuthenticatedSession(
   await page.addInitScript(
     ({ storageKey, session }) => localStorage.setItem(storageKey, JSON.stringify(session)),
     {
-      storageKey: 'sb-your-project-ref-auth-token',
+      storageKey: supabaseStorageKey,
       session: {
         access_token: token,
         refresh_token: 'e2e-refresh-token',

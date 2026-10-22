@@ -142,7 +142,7 @@ cd frontend
 npm ci
 ```
 
-Point the app at your Supabase project. Edit both files and replace `supabaseUrl`
+Point the app at your Supabase project. Edit both files and fill in `supabaseUrl`
 and `supabasePublishableKey` with your values (publishable key only, never the
 secret key):
 

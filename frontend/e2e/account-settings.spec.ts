@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { installAuthenticatedSession } from './support/auth-session';
+import { installAuthenticatedSession, supabaseStorageKey } from './support/auth-session';
 
 const user = {
   id: '55555555-5555-4555-8555-555555555555',
@@ -248,8 +248,9 @@ test('password change rejects wrong current password before attempting an update
 }) => {
   await page.goto('/user/settings');
   await page.getByRole('button', { name: 'อีเมลและรหัสผ่าน', exact: true }).click();
-  const session = await page.evaluate(() =>
-    JSON.parse(localStorage.getItem('sb-your-project-ref-auth-token')!),
+  const session = await page.evaluate(
+    (storageKey) => JSON.parse(localStorage.getItem(storageKey)!),
+    supabaseStorageKey,
   );
   let rejected = true;
   let updates = 0;
