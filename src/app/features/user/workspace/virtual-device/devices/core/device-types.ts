@@ -35,15 +35,7 @@ export type PinType =
 export type PinDirection = 'input' | 'output' | 'bidirectional' | 'power' | 'passive';
 
 export type DeviceInterface =
-  | 'digital'
-  | 'analog'
-  | 'pwm'
-  | 'i2c'
-  | 'spi'
-  | 'uart'
-  | 'onewire'
-  | 'power'
-  | 'passive';
+  'digital' | 'analog' | 'pwm' | 'i2c' | 'spi' | 'uart' | 'onewire' | 'power' | 'passive';
 
 /**
  * Pin colour per type. Colour is only ever a *secondary* cue — every pin also

@@ -4,12 +4,7 @@ import { Observable } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
 
-export type WorkspaceRole =
-  | 'owner'
-  | 'admin'
-  | 'developer'
-  | 'editor'
-  | 'viewer';
+export type WorkspaceRole = 'owner' | 'admin' | 'developer' | 'editor' | 'viewer';
 
 export interface WorkspaceSummary {
   id: string;
@@ -23,6 +18,8 @@ export interface WorkspaceSummary {
 export interface BoardDefinition {
   id: string;
   name: string;
+  /** Frameworks the board supports, the default first. */
+  frameworks: string[];
   defaultFramework: string;
 }
 
@@ -129,19 +126,11 @@ export class ProjectsApiService {
   }
 
   /** Device and connection counts against the plan's per-project ceilings. */
-  projectUsage(
-    workspaceId: string,
-    projectId: string,
-  ): Observable<ProjectUsageReport> {
-    return this.http.get<ProjectUsageReport>(
-      `${this.projectUrl(workspaceId, projectId)}/usage`,
-    );
+  projectUsage(workspaceId: string, projectId: string): Observable<ProjectUsageReport> {
+    return this.http.get<ProjectUsageReport>(`${this.projectUrl(workspaceId, projectId)}/usage`);
   }
 
-  listComponents(
-    workspaceId: string,
-    projectId: string,
-  ): Observable<RemoteComponent[]> {
+  listComponents(workspaceId: string, projectId: string): Observable<RemoteComponent[]> {
     return this.http.get<RemoteComponent[]>(
       `${this.projectUrl(workspaceId, projectId)}/components`,
     );
@@ -171,6 +160,7 @@ export class ProjectsApiService {
     projectId: string,
     componentId: string,
     body: {
+      definitionId?: string;
       label?: string;
       x?: number;
       y?: number;
@@ -194,13 +184,8 @@ export class ProjectsApiService {
     );
   }
 
-  listConnections(
-    workspaceId: string,
-    projectId: string,
-  ): Observable<RemoteConnection[]> {
-    return this.http.get<RemoteConnection[]>(
-      this.connectionsUrl(workspaceId, projectId),
-    );
+  listConnections(workspaceId: string, projectId: string): Observable<RemoteConnection[]> {
+    return this.http.get<RemoteConnection[]>(this.connectionsUrl(workspaceId, projectId));
   }
 
   addConnection(
@@ -214,10 +199,7 @@ export class ProjectsApiService {
       waypoints?: { x: number; y: number }[];
     },
   ): Observable<RemoteConnection> {
-    return this.http.post<RemoteConnection>(
-      this.connectionsUrl(workspaceId, projectId),
-      body,
-    );
+    return this.http.post<RemoteConnection>(this.connectionsUrl(workspaceId, projectId), body);
   }
 
   /** Replaces every manual bend. An empty array resets to automatic routing. */
@@ -255,38 +237,27 @@ export class ProjectsApiService {
       /** Catalog id; the backend creates this board as the project's first component. */
       boardId: string;
       framework?: string;
+      deviceIds?: string[];
     },
-  ): Observable<RemoteProject> {
-    return this.http.post<RemoteProject>(this.projectsUrl(workspaceId), body);
-  }
-
-  deleteProject(
-    workspaceId: string,
-    projectId: string,
-  ): Observable<{ deleted: true }> {
-    return this.http.delete<{ deleted: true }>(
-      `${this.projectsUrl(workspaceId)}/${projectId}`,
+  ): Observable<RemoteProject & { components: RemoteComponent[] }> {
+    return this.http.post<RemoteProject & { components: RemoteComponent[] }>(
+      this.projectsUrl(workspaceId),
+      body,
     );
   }
 
-  listFiles(
-    workspaceId: string,
-    projectId: string,
-  ): Observable<ProjectFileSummary[]> {
-    return this.http.get<ProjectFileSummary[]>(
-      `${this.projectUrl(workspaceId, projectId)}/files`,
-    );
+  deleteProject(workspaceId: string, projectId: string): Observable<{ deleted: true }> {
+    return this.http.delete<{ deleted: true }>(`${this.projectsUrl(workspaceId)}/${projectId}`);
   }
 
-  readFile(
-    workspaceId: string,
-    projectId: string,
-    path: string,
-  ): Observable<ProjectFileContent> {
-    return this.http.get<ProjectFileContent>(
-      `${this.projectUrl(workspaceId, projectId)}/file`,
-      { params: new HttpParams().set('path', path) },
-    );
+  listFiles(workspaceId: string, projectId: string): Observable<ProjectFileSummary[]> {
+    return this.http.get<ProjectFileSummary[]>(`${this.projectUrl(workspaceId, projectId)}/files`);
+  }
+
+  readFile(workspaceId: string, projectId: string, path: string): Observable<ProjectFileContent> {
+    return this.http.get<ProjectFileContent>(`${this.projectUrl(workspaceId, projectId)}/file`, {
+      params: new HttpParams().set('path', path),
+    });
   }
 
   saveFile(
@@ -311,10 +282,9 @@ export class ProjectsApiService {
     projectId: string,
     files: SaveFileRequest[],
   ): Observable<BatchSaveResult> {
-    return this.http.put<BatchSaveResult>(
-      `${this.projectUrl(workspaceId, projectId)}/files`,
-      { files },
-    );
+    return this.http.put<BatchSaveResult>(`${this.projectUrl(workspaceId, projectId)}/files`, {
+      files,
+    });
   }
 
   deleteFile(
@@ -332,16 +302,8 @@ export class ProjectsApiService {
     return this.projectUrl(workspaceId, projectId) + '/connections';
   }
 
-  private connectionUrl(
-    workspaceId: string,
-    projectId: string,
-    connectionId: string,
-  ): string {
-    return (
-      this.connectionsUrl(workspaceId, projectId) +
-      '/' +
-      encodeURIComponent(connectionId)
-    );
+  private connectionUrl(workspaceId: string, projectId: string, connectionId: string): string {
+    return this.connectionsUrl(workspaceId, projectId) + '/' + encodeURIComponent(connectionId);
   }
 
   private projectsUrl(workspaceId: string): string {

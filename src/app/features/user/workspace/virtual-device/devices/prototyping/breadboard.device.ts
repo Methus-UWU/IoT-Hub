@@ -158,36 +158,41 @@ function createBreadboard(size: BreadboardSize): VirtualDevice {
         : []),
 
       // Holes.
-      ...repeat(columns, { x: HOLE }, (column, x) => [
-        ...repeat(5, { y: HOLE }, (_, __, y) => hole(x, y), {
-          x: 0,
-          y: upperStripY + HOLE / 2,
-        }),
-        ...repeat(5, { y: HOLE }, (_, __, y) => hole(x, y), {
-          x: 0,
-          y: lowerStripY + HOLE / 2,
-        }),
-        ...(powerRails
-          ? [
-              hole(x, topRailY + HOLE / 2),
-              hole(x, topRailY + HOLE * 1.5),
-              hole(x, bottomRailY + HOLE / 2),
-              hole(x, bottomRailY + HOLE * 1.5),
-            ]
-          : []),
-        // Column numbers every fifth column, as printed on a real board.
-        ...((column + 1) % 5 === 0
-          ? [
-              text(x, upperStripY - u(0.6), String(column + 1), {
-                size: u(1.2),
-                fill: '#9a9384',
-                anchor: 'middle',
-                mono: true,
-                detail: 'high',
-              }),
-            ]
-          : []),
-      ], { x: MARGIN + HOLE / 2, y: 0 }),
+      ...repeat(
+        columns,
+        { x: HOLE },
+        (column, x) => [
+          ...repeat(5, { y: HOLE }, (_, __, y) => hole(x, y), {
+            x: 0,
+            y: upperStripY + HOLE / 2,
+          }),
+          ...repeat(5, { y: HOLE }, (_, __, y) => hole(x, y), {
+            x: 0,
+            y: lowerStripY + HOLE / 2,
+          }),
+          ...(powerRails
+            ? [
+                hole(x, topRailY + HOLE / 2),
+                hole(x, topRailY + HOLE * 1.5),
+                hole(x, bottomRailY + HOLE / 2),
+                hole(x, bottomRailY + HOLE * 1.5),
+              ]
+            : []),
+          // Column numbers every fifth column, as printed on a real board.
+          ...((column + 1) % 5 === 0
+            ? [
+                text(x, upperStripY - u(0.6), String(column + 1), {
+                  size: u(1.2),
+                  fill: '#9a9384',
+                  anchor: 'middle',
+                  mono: true,
+                  detail: 'high',
+                }),
+              ]
+            : []),
+        ],
+        { x: MARGIN + HOLE / 2, y: 0 },
+      ),
 
       // Row letters down both edges.
       ...ROW_LETTERS.map((letter, row) => {

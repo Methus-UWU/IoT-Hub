@@ -1,6 +1,7 @@
 import { Component, forwardRef, input } from '@angular/core';
 
-import type { Shape } from '../devices/core/device-shape';
+import type { Paint, Shape } from '../devices/core/device-shape';
+import { paintRef } from '../devices/core/device-shape';
 
 /**
  * Draws a device's declarative shape list as SVG.
@@ -25,8 +26,8 @@ import type { Shape } from '../devices/core/device-shape';
             [attr.width]="shape.width"
             [attr.height]="shape.height"
             [attr.rx]="shape.rx ?? null"
-            [attr.fill]="shape.fill ?? 'none'"
-            [attr.stroke]="shape.stroke ?? null"
+            [attr.fill]="paint(shape.fill, 'none')"
+            [attr.stroke]="paint(shape.stroke, null)"
             [attr.stroke-width]="shape.strokeWidth ?? null"
             [attr.opacity]="shape.opacity ?? null"
           />
@@ -36,8 +37,8 @@ import type { Shape } from '../devices/core/device-shape';
             [attr.cx]="shape.cx"
             [attr.cy]="shape.cy"
             [attr.r]="shape.r"
-            [attr.fill]="shape.fill ?? 'none'"
-            [attr.stroke]="shape.stroke ?? null"
+            [attr.fill]="paint(shape.fill, 'none')"
+            [attr.stroke]="paint(shape.stroke, null)"
             [attr.stroke-width]="shape.strokeWidth ?? null"
             [attr.opacity]="shape.opacity ?? null"
           />
@@ -48,8 +49,8 @@ import type { Shape } from '../devices/core/device-shape';
             [attr.cy]="shape.cy"
             [attr.rx]="shape.rx"
             [attr.ry]="shape.ry"
-            [attr.fill]="shape.fill ?? 'none'"
-            [attr.stroke]="shape.stroke ?? null"
+            [attr.fill]="paint(shape.fill, 'none')"
+            [attr.stroke]="paint(shape.stroke, null)"
             [attr.stroke-width]="shape.strokeWidth ?? null"
             [attr.opacity]="shape.opacity ?? null"
           />
@@ -57,9 +58,10 @@ import type { Shape } from '../devices/core/device-shape';
         @case ('path') {
           <svg:path
             [attr.d]="shape.d"
-            [attr.fill]="shape.fill ?? 'none'"
-            [attr.stroke]="shape.stroke ?? null"
+            [attr.fill]="paint(shape.fill, 'none')"
+            [attr.stroke]="paint(shape.stroke, null)"
             [attr.stroke-width]="shape.strokeWidth ?? null"
+            [attr.fill-rule]="shape.fillRule ?? null"
             [attr.stroke-linecap]="shape.strokeLinecap ?? null"
             [attr.stroke-linejoin]="shape.strokeLinejoin ?? null"
             [attr.opacity]="shape.opacity ?? null"
@@ -71,7 +73,7 @@ import type { Shape } from '../devices/core/device-shape';
             [attr.y1]="shape.y1"
             [attr.x2]="shape.x2"
             [attr.y2]="shape.y2"
-            [attr.stroke]="shape.stroke ?? 'currentColor'"
+            [attr.stroke]="paint(shape.stroke, 'currentColor')"
             [attr.stroke-width]="shape.strokeWidth ?? 1"
             [attr.stroke-linecap]="shape.strokeLinecap ?? null"
             [attr.opacity]="shape.opacity ?? null"
@@ -82,7 +84,7 @@ import type { Shape } from '../devices/core/device-shape';
             [attr.x]="shape.x"
             [attr.y]="shape.y"
             [attr.font-size]="shape.size ?? 11"
-            [attr.fill]="shape.fill ?? 'currentColor'"
+            [attr.fill]="paint(shape.fill, 'currentColor')"
             [attr.text-anchor]="shape.anchor ?? 'start'"
             [attr.font-weight]="shape.weight ?? null"
             [attr.letter-spacing]="shape.letterSpacing ?? null"
@@ -105,9 +107,13 @@ import type { Shape } from '../devices/core/device-shape';
     }
   `,
   styles: `
-    :host {
-      display: contents;
-    }
+    /*
+      The host is always an <svg:g> — the canvas root and, when this component
+      recurses, the group element carrying a shape's own transform. It must NOT
+      be given "display: contents": that removes the element from SVG rendering,
+      children draw against the parent's coordinate system, and any transform on
+      the group is silently dropped.
+    */
 
     .shape-text {
       /* Artwork lettering must not inherit the page font, or a theme change
@@ -124,6 +130,14 @@ import type { Shape } from '../devices/core/device-shape';
 })
 export class DeviceShapes {
   readonly shapes = input.required<readonly Shape[]>({ alias: 'appDeviceShapes' });
+
+  /**
+   * Resolves a paint to an attribute value: a colour passes through, a gradient
+   * becomes the `url(#…)` of the definition `DeviceGradients` emitted for it.
+   */
+  protected paint(value: Paint | undefined, fallback: string | null): string | null {
+    return paintRef(value, fallback);
+  }
 
   protected textTransform(shape: Extract<Shape, { kind: 'text' }>): string | null {
     return shape.rotate ? `rotate(${shape.rotate} ${shape.x} ${shape.y})` : null;

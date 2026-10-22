@@ -1,42 +1,116 @@
 <div class="min-h-full bg-gray-50 px-4 py-6 sm:px-6 lg:px-8">
-  <header class="mb-6">
-    <h1 class="text-xl font-semibold text-gray-900">System Logs</h1>
-    <p class="text-sm text-gray-500">API requests and system events across the platform.</p>
-  </header>
-
-  <div class="mb-4 flex flex-wrap gap-2" role="group" aria-label="Filter logs by level">
-    @for (filter of filters; track filter.value) {
-      <button
-        type="button"
-        class="rounded-full px-3 py-1.5 text-xs font-medium transition-colors"
-        [class.bg-gray-900]="levelFilter() === filter.value"
-        [class.text-white]="levelFilter() === filter.value"
-        [class.bg-white]="levelFilter() !== filter.value"
-        [class.text-gray-600]="levelFilter() !== filter.value"
-        [class.border]="levelFilter() !== filter.value"
-        [class.border-gray-200]="levelFilter() !== filter.value"
-        [attr.aria-pressed]="levelFilter() === filter.value"
-        (click)="setLevelFilter(filter.value)"
-      >
-        {{ filter.label }}
-      </button>
-    }
-  </div>
-
-  <div class="rounded-xl border border-gray-200 bg-white shadow-sm">
-    <ul class="divide-y divide-gray-100">
-      @for (log of filteredLogs(); track log.id) {
-        <li class="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 text-sm">
-          <span class="w-20 shrink-0 font-mono text-xs text-gray-400">{{ log.timestamp | date: 'HH:mm:ss' }}</span>
-          <app-status-badge class="shrink-0" [label]="log.level" [tone]="logTones[log.level]" />
-          <span class="min-w-0 flex-1 truncate text-gray-700">{{ log.message }}</span>
-          <span class="shrink-0 font-mono text-xs text-gray-400">{{ log.method }} {{ log.endpoint }}</span>
-          <span class="w-10 shrink-0 text-right font-mono text-xs text-gray-400">{{ log.statusCode }}</span>
-          <span class="w-28 shrink-0 text-right font-mono text-xs text-gray-400">{{ log.ip }}</span>
-        </li>
-      } @empty {
-        <li class="px-4 py-10 text-center text-sm text-gray-400">No log entries match this filter yet.</li>
+  <div class="mx-auto max-w-[90rem]">
+    <header class="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+      <div>
+        <h1 class="text-2xl font-semibold tracking-tight text-gray-900">บันทึกคำขอ</h1>
+        <p class="mt-1 text-sm text-gray-500">คำขอ HTTP ล่าสุดที่ NestJS process นี้ประมวลผล</p>
+      </div>
+      @if (store.lastUpdated(); as updated) {
+        <p class="text-xs text-gray-500">อัปเดตล่าสุด {{ updated | date: 'HH:mm:ss' }} น.</p>
       }
-    </ul>
+    </header>
+
+    <div
+      class="mb-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-xs leading-5 text-blue-800"
+    >
+      ข้อมูลนี้เป็น operational log แบบจำกัด 200 รายการและจะเริ่มใหม่เมื่อ deploy โดยไม่เก็บ query
+      string, body, header, token หรือ IP address
+    </div>
+
+    @if (store.error(); as error) {
+      <div
+        role="alert"
+        class="mb-4 flex items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+      >
+        <span>{{ error }}</span>
+        <button
+          type="button"
+          class="rounded-lg px-3 py-1.5 font-semibold hover:bg-red-100"
+          (click)="store.retry()"
+        >
+          ลองใหม่
+        </button>
+      </div>
+    }
+
+    <div class="mb-4 flex flex-wrap gap-2" role="group" aria-label="กรอง log ตามระดับ">
+      @for (filter of filters; track filter.value) {
+        <button
+          type="button"
+          class="rounded-full px-3 py-1.5 text-xs font-medium transition-colors"
+          [class.bg-gray-900]="levelFilter() === filter.value"
+          [class.text-white]="levelFilter() === filter.value"
+          [class.bg-white]="levelFilter() !== filter.value"
+          [class.text-gray-600]="levelFilter() !== filter.value"
+          [class.border]="levelFilter() !== filter.value"
+          [class.border-gray-200]="levelFilter() !== filter.value"
+          [attr.aria-pressed]="levelFilter() === filter.value"
+          (click)="setLevelFilter(filter.value)"
+        >
+          {{ filter.label }}
+        </button>
+      }
+    </div>
+
+    <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+      @if (store.loading() && !store.snapshot()) {
+        <div class="space-y-3 p-4" aria-hidden="true">
+          @for (item of [1, 2, 3, 4]; track item) {
+            <div class="h-10 animate-pulse rounded-lg bg-gray-100"></div>
+          }
+        </div>
+      } @else {
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200 text-sm">
+            <thead
+              class="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500"
+            >
+              <tr>
+                <th class="px-4 py-3">เวลา</th>
+                <th class="px-4 py-3">ระดับ</th>
+                <th class="px-4 py-3">คำขอ</th>
+                <th class="px-4 py-3 text-right">สถานะ</th>
+                <th class="px-4 py-3 text-right">เวลา</th>
+                <th class="px-4 py-3">รหัสคำขอ</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+              @for (log of filteredLogs(); track log.id) {
+                <tr>
+                  <td class="whitespace-nowrap px-4 py-3 font-mono text-xs text-gray-500">
+                    {{ log.timestamp | date: 'HH:mm:ss' }}
+                  </td>
+                  <td class="px-4 py-3">
+                    <app-status-badge [label]="log.level" [tone]="logTones[log.level]" />
+                  </td>
+                  <td class="px-4 py-3">
+                    <span class="font-semibold text-gray-700">{{ log.method }}</span>
+                    <span class="font-mono text-xs text-gray-600">{{ log.endpoint }}</span>
+                  </td>
+                  <td class="px-4 py-3 text-right font-mono text-xs text-gray-600">
+                    {{ log.statusCode }}
+                  </td>
+                  <td class="px-4 py-3 text-right font-mono text-xs text-gray-600">
+                    {{ log.durationMs }} ms
+                  </td>
+                  <td
+                    class="max-w-40 truncate px-4 py-3 font-mono text-xs text-gray-400"
+                    [title]="log.requestId"
+                  >
+                    {{ log.requestId }}
+                  </td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="6" class="px-4 py-10 text-center text-sm text-gray-400">
+                    ยังไม่มี log ที่ตรงกับตัวกรองนี้
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
   </div>
 </div>

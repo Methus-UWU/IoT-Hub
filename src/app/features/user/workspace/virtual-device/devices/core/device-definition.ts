@@ -62,6 +62,22 @@ export interface DevicePropertyDefinition {
   readonly simulationOnly?: boolean;
 }
 
+/**
+ * One live value a running part publishes for the inspector to print.
+ *
+ * A part emits whatever it likes during a tick; declaring a reading is how it
+ * says which of those values are meant for a person, and what to call them. The
+ * inspector prints exactly the declared list, so a part gains a readout by
+ * describing it here rather than by the panel learning the part's internals.
+ */
+export interface DeviceReadingDefinition {
+  /** Key the behaviour passes to `emit`. */
+  readonly id: string;
+  readonly label: string;
+  readonly unit?: string;
+  readonly description?: string;
+}
+
 export interface DeviceOperatingVoltage {
   readonly min: number;
   readonly max: number;
@@ -78,11 +94,7 @@ export function defaultStateFor(
 }
 
 /** Reads a numeric property out of a draw context, falling back when unset. */
-export function numberState(
-  context: DeviceDrawContext,
-  id: string,
-  fallback: number,
-): number {
+export function numberState(context: DeviceDrawContext, id: string, fallback: number): number {
   const value = context.state[id];
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 }

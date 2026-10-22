@@ -1,0 +1,206 @@
+/*
+ * Feed card, laid out the way link aggregators have taught people to read one:
+ * a vote rail on the left, then community · author · time, title, preview, and
+ * a row of actions. The rail sits on its own tinted strip so the arrows read as
+ * belonging to the post rather than floating in the text column.
+ *
+ * Text colours stop at #767676 (4.5:1 on white). The genre's usual light grey
+ * meta line fails AA outright, so the structure is copied and the contrast is not.
+ */
+:host {
+  display: block;
+}
+.post-card {
+  display: grid;
+  grid-template-columns: 2.5rem minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid #dcdcdc;
+  border-radius: 0.5rem;
+  background: #fff;
+  transition: border-color 0.15s ease;
+}
+.post-card:hover {
+  border-color: #9c9c9c;
+}
+.post-card:focus-within {
+  border-color: #767676;
+}
+.vote-rail {
+  display: flex;
+  justify-content: center;
+  padding: 0.5rem 0;
+  background: #f8f9fa;
+}
+.post-main {
+  min-width: 0;
+  padding: 0.6rem 0.75rem 0.4rem;
+}
+.post-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+  color: #767676;
+  font-size: 0.75rem;
+}
+.community-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0;
+  border: 0;
+  color: #1c1c1c;
+  background: transparent;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.community-pill:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.community-pill:focus-visible {
+  outline: 2px solid #1c1c1c;
+  outline-offset: 2px;
+  border-radius: 0.2rem;
+}
+.community-mark {
+  color: #767676;
+  font-weight: 700;
+}
+.dot {
+  color: #a8a8a8;
+}
+.posted-by {
+  color: #767676;
+}
+.post-time {
+  color: #767676;
+}
+.post-solved {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  margin-left: auto;
+  padding: 0.12rem 0.45rem;
+  border-radius: 0.25rem;
+  color: #046c4e;
+  background: #e7f7ef;
+  font-size: 0.71rem;
+  font-weight: 700;
+}
+.post-solved svg {
+  width: 0.8rem;
+  height: 0.8rem;
+}
+.post-title {
+  margin: 0.3rem 0 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: -0.012em;
+  line-height: 1.45;
+}
+.post-title a {
+  color: #1c1c1c;
+  text-decoration: none;
+}
+.post-title a:hover {
+  color: #000;
+}
+.post-title a:focus-visible {
+  outline: 2px solid #1c1c1c;
+  outline-offset: 3px;
+  border-radius: 0.2rem;
+}
+.post-excerpt {
+  max-height: 10rem;
+  overflow: clip;
+  margin: 0.25rem 0 0;
+  color: #5c5c5c;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.post-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.55rem;
+}
+.post-excerpt-expanded {
+  max-height: none;
+  overflow: visible;
+}
+.post-expand {
+  margin-top: 0.25rem;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.post-expand:disabled {
+  cursor: progress;
+}
+.post-tag {
+  padding: 0.1rem 0.45rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 0.25rem;
+  color: #5c5c5c;
+  background: #f6f7f8;
+  font: inherit;
+  font-size: 0.73rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.post-tag:hover {
+  border-color: #c2c2c2;
+  color: #1c1c1c;
+}
+.post-tag:focus-visible {
+  outline: 2px solid #1c1c1c;
+  outline-offset: 2px;
+}
+.post-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.15rem;
+  margin-top: 0.4rem;
+}
+.post-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.5rem;
+  border: 0;
+  border-radius: 0.25rem;
+  color: #5c5c5c;
+  background: transparent;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    color 0.12s ease,
+    background 0.12s ease;
+}
+.post-action svg {
+  width: 1rem;
+  height: 1rem;
+}
+a.post-action:hover,
+button.post-action:hover {
+  color: #1c1c1c;
+  background: #f1f2f3;
+}
+a.post-action:focus-visible,
+button.post-action:focus-visible {
+  outline: 2px solid #1c1c1c;
+  outline-offset: 1px;
+}
+.post-action-quiet {
+  color: #767676;
+  cursor: default;
+}

@@ -1,6 +1,7 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { CanActivateFn, CanMatchFn, Router } from '@angular/router';
-import { catchError, map, of, switchMap } from 'rxjs';
+import { catchError, map, of, retry, switchMap, throwError, timer } from 'rxjs';
 
 import { AuthService } from '../services/auth.service';
 
@@ -65,6 +66,13 @@ function requireRole(expectAdmin: boolean) {
       if (!session) return of(router.createUrlTree(['/auth/login']));
 
       return auth.getCurrentUser().pipe(
+        // An API that is restarting or briefly unreachable is not a signed-out
+        // user. Retry a few times before deciding anything.
+        retry({
+          count: PROFILE_RETRIES,
+          delay: (error: unknown, attempt: number) =>
+            isSignedOut(error) ? throwError(() => error) : timer(attempt * 1000),
+        }),
         map((user) => {
           const isAdmin = user.role.name.toLowerCase() === 'admin';
           if (isAdmin === expectAdmin) return true;
@@ -72,9 +80,24 @@ function requireRole(expectAdmin: boolean) {
         }),
       );
     }),
-    catchError(() => {
-      auth.clearSession();
-      return of(router.createUrlTree(['/auth/login']));
+    catchError((error: unknown) => {
+      if (isSignedOut(error)) {
+        auth.clearSession();
+        return of(router.createUrlTree(['/auth/login']));
+      }
+      // The session is intact but the role could not be read. Guards are UX only
+      // and every call is authorized again by the API, so let a user through to
+      // pages that will show their own load errors rather than to the login
+      // screen. The admin console is not shown on a guess.
+      return of(expectAdmin ? router.createUrlTree(['/user/projects']) : true);
     }),
   );
+}
+
+/** Attempts after the first before the profile lookup is given up on. */
+const PROFILE_RETRIES = 3;
+
+/** Only the API saying the token is not accepted means the user is signed out. */
+function isSignedOut(error: unknown): boolean {
+  return error instanceof HttpErrorResponse && error.status === 401;
 }

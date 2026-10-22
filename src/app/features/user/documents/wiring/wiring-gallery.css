@@ -1,0 +1,151 @@
+:host {
+  display: block;
+  margin: 1.5rem 0;
+}
+h3,
+p {
+  margin: 0 0 0.8rem;
+}
+h3 {
+  color: var(--color-ink);
+  font-size: 1rem;
+}
+.example-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+}
+.example-picker button {
+  padding: 0.3rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.82rem;
+}
+.example-heading {
+  display: flex;
+  gap: 1rem;
+  align-items: baseline;
+  justify-content: space-between;
+}
+button {
+  cursor: pointer;
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  padding: 0.4rem 0.7rem;
+  color: var(--color-ink);
+  background: var(--color-surface);
+  font: inherit;
+}
+.example-heading button {
+  flex: none;
+  font-size: 0.85rem;
+}
+button:hover,
+button[aria-pressed='true'] {
+  background: var(--color-surface-muted);
+  border-color: var(--color-ink);
+}
+button:focus-visible,
+.diagram-scroll:focus-visible {
+  outline: 2px solid var(--color-ink);
+  outline-offset: 3px;
+}
+.diagram-scroll {
+  overflow: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 0.75rem;
+  margin-bottom: 0.8rem;
+  background: var(--color-surface-soft);
+}
+svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+svg.enlarged {
+  min-width: var(--diagram-width, 920px);
+}
+.part-label {
+  font-size: 18px;
+  font-weight: 600;
+  fill: var(--color-ink);
+}
+.wire,
+.wire-outline {
+  fill: none;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.wire {
+  stroke-width: 3;
+}
+.wire-outline {
+  stroke: var(--color-surface-soft);
+  stroke-width: 7;
+}
+.selected .wire {
+  stroke-width: 5;
+}
+.muted {
+  opacity: 0.18;
+}
+.wire-badge {
+  fill: var(--color-surface);
+  stroke: var(--color-ink);
+  stroke-width: 1.5;
+}
+.wire-number {
+  fill: var(--color-ink);
+  text-anchor: middle;
+  font-size: 15px;
+  font-weight: 700;
+}
+.diagram-note {
+  color: var(--color-ink-muted);
+  font-size: 0.82rem;
+}
+svg .diagram-note {
+  fill: var(--color-ink-muted);
+  font-size: 16px;
+}
+.connection-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+.connection-list button {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  text-align: left;
+  font-size: 0.85rem;
+}
+.connection-number {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  background: var(--color-surface-muted);
+  font-weight: 700;
+}
+.tips {
+  margin: 0;
+  padding-left: 1.2rem;
+  color: var(--color-ink);
+  font-size: 0.88rem;
+  line-height: 1.6;
+}
+.tips li + li {
+  margin-top: 0.35rem;
+}
+@media (max-width: 600px) {
+  .connection-list {
+    grid-template-columns: 1fr;
+  }
+  .example-heading {
+    align-items: flex-start;
+  }
+}

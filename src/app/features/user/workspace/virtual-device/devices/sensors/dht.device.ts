@@ -1,14 +1,12 @@
 import type { VirtualDevice } from '../../models/virtual-device.model';
-import {
-  numberState,
-  type DeviceDrawContext,
-  type DevicePropertyDefinition,
-} from '../core/device-definition';
+import { type DevicePropertyDefinition } from '../core/device-definition';
 import { bodyFromMm, HEADER_PITCH, u } from '../core/device-metrics';
 import { OUTLINE, PART, SILK } from '../core/device-palette';
 import { silkLabel } from '../core/device-parts';
 import { pin } from '../core/device-pin';
-import { line, rect, repeat, text, type Shape } from '../core/device-shape';
+import { line, rect, repeat, type Shape } from '../core/device-shape';
+import { requiresSupply } from '../core/device-simulation';
+import { readingPublisher } from '../core/bus-peripherals';
 
 /** How far the legs reach below the moulded shell. */
 const LEG_LENGTH = u(5);
@@ -68,19 +66,20 @@ function createDhtDevice(options: DhtOptions): VirtualDevice {
     },
   ];
 
-  function draw(context: DeviceDrawContext): readonly Shape[] {
-    const temperature = numberState(context, 'temperature', options.temperature.default);
-    const humidity = numberState(context, 'humidity', options.humidity.default);
-
+  function draw(): readonly Shape[] {
     return [
       // Four legs.
-      ...repeat(4, { x: HEADER_PITCH }, (_, x) =>
-        line(x, BODY_HEIGHT - u(0.6), x, PIN_Y, {
-          stroke: PART.metal,
-          strokeWidth: u(0.45),
-          strokeLinecap: 'round',
-        }),
-      { x: PIN_START_X, y: 0 }),
+      ...repeat(
+        4,
+        { x: HEADER_PITCH },
+        (_, x) =>
+          line(x, BODY_HEIGHT - u(0.6), x, PIN_Y, {
+            stroke: PART.metal,
+            strokeWidth: u(0.45),
+            strokeLinecap: 'round',
+          }),
+        { x: PIN_START_X, y: 0 },
+      ),
 
       // Moulded shell.
       rect(0, 0, WIDTH, BODY_HEIGHT, {
@@ -118,20 +117,10 @@ function createDhtDevice(options: DhtOptions): VirtualDevice {
         { y: u(2) },
       ),
 
-      silkLabel(WIDTH / 2, BODY_HEIGHT - u(2.6), options.model, {
+      silkLabel(WIDTH / 2, BODY_HEIGHT - u(1.6), options.model, {
         size: u(1.6),
         fill: pale ? '#4a5058' : SILK.white,
         weight: 700,
-      }),
-
-      // Live reading, so the part is readable without opening the inspector.
-      text(WIDTH / 2, BODY_HEIGHT - u(0.9), `${temperature.toFixed(1)}°C ${humidity.toFixed(0)}%`, {
-        size: u(1.1),
-        fill: pale ? '#6b7280' : SILK.soft,
-        anchor: 'middle',
-        weight: 600,
-        mono: true,
-        detail: 'normal',
       }),
     ];
   }
@@ -146,6 +135,8 @@ function createDhtDevice(options: DhtOptions): VirtualDevice {
     ...BODY,
     initiallyVisible: false,
     operatingVoltage: { min: 3, max: 5.5, recommended: 5 },
+    logicVoltage: 3.3,
+    supplyCurrentMa: 2.5,
     interfaces: ['onewire', 'digital'],
     pins: [
       pin('VCC', PIN_START_X, PIN_Y, 'vcc', {
@@ -155,6 +146,7 @@ function createDhtDevice(options: DhtOptions): VirtualDevice {
       }),
       pin('DATA', PIN_START_X + HEADER_PITCH, PIN_Y, 'digital', {
         side: 'bottom',
+        requiresBias: 'up',
         description: 'Single-wire bus, needs a 4.7 kΩ pull-up',
       }),
       pin('NC', PIN_START_X + HEADER_PITCH * 2, PIN_Y, 'nc', {
@@ -168,10 +160,20 @@ function createDhtDevice(options: DhtOptions): VirtualDevice {
     ],
     properties,
     render: { draw },
+    // Answers the DHT library with the inspector's temperature and humidity.
+    simulation: requiresSupply(
+      readingPublisher('DATA', 'dht', ['temperature', 'humidity'], { model: options.id }),
+      { minimumVolts: 3 },
+    ),
     catalog: {
       categoryId: 'sensors',
       category: 'Sensors',
-      aliases: [options.model.toLowerCase(), 'temperature sensor', 'humidity sensor', 'เซนเซอร์อุณหภูมิ'],
+      aliases: [
+        options.model.toLowerCase(),
+        'temperature sensor',
+        'humidity sensor',
+        'เซนเซอร์อุณหภูมิ',
+      ],
       tags: [
         options.model.toLowerCase(),
         'dht',

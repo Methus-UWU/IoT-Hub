@@ -914,3 +914,63 @@ select:focus-visible,
 label:has(input:focus-visible) {
   outline-color: #545454;
 }
+
+.field-hint {
+  margin: 0.4rem 0 0;
+  color: #6b7280;
+  font-size: 0.68rem;
+  line-height: 1.5;
+}
+
+.stream-add {
+  margin-top: 0.6rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px dashed #c9ced6;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: #374151;
+  font: inherit;
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+
+.stream-form {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.6rem;
+}
+
+.stream-form .field-label + .field-label {
+  margin-top: 0;
+}
+
+.stream-form-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.4rem;
+}
+
+.stream-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.4rem;
+}
+
+.stream-form-actions button {
+  padding: 0.35rem 0.7rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.45rem;
+  background: #fff;
+  font: inherit;
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+
+.stream-form-actions .primary {
+  border-color: #2b2b2b;
+  background: #2b2b2b;
+  color: #fff;
+}

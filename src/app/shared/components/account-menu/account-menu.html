@@ -1,0 +1,59 @@
+@if (open()) {
+  <div class="account-popover" role="menu" aria-label="เมนูบัญชีผู้ใช้">
+    <div class="account-popover-header">
+      <p class="account-popover-name">{{ name() }}</p>
+      @if (detail()) {
+        <p class="account-popover-detail">{{ detail() }}</p>
+      }
+    </div>
+
+    <div class="account-popover-items">
+      <a [routerLink]="profileLink()" class="account-menu-item" role="menuitem" (click)="followLink()">
+        <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+          <circle cx="10" cy="6.5" r="2.5" stroke="currentColor" stroke-width="1.4" />
+          <path
+            d="M4.5 16c0-3.04 2.46-5.5 5.5-5.5s5.5 2.46 5.5 5.5"
+            stroke="currentColor"
+            stroke-width="1.4"
+            stroke-linecap="round"
+          />
+        </svg>
+        <span>แก้ไขโปรไฟล์</span>
+      </a>
+      <button
+        type="button"
+        class="account-menu-item account-menu-item-danger"
+        role="menuitem"
+        [disabled]="loggingOut()"
+        (click)="logout.emit()"
+      >
+        <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+          <path
+            d="M8 4H4.5v12H8M12.5 6.5 16 10l-3.5 3.5M7 10h9"
+            stroke="currentColor"
+            stroke-width="1.4"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
+        <span>{{ loggingOut() ? 'กำลังออกจากระบบ…' : 'ออกจากระบบ' }}</span>
+      </button>
+    </div>
+  </div>
+}
+
+<button
+  #trigger
+  type="button"
+  class="account-menu-trigger"
+  [attr.aria-expanded]="open()"
+  aria-haspopup="menu"
+  aria-label="เปิดเมนูบัญชีผู้ใช้"
+  (click)="toggle()"
+>
+  <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+    <circle cx="4" cy="10" r="1.25" />
+    <circle cx="10" cy="10" r="1.25" />
+    <circle cx="16" cy="10" r="1.25" />
+  </svg>
+</button>

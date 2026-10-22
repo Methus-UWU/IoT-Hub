@@ -1,0 +1,445 @@
+/*
+ * Composer dialog.
+ *
+ * Same surface language as the thread page it posts into: #dcdcdc borders,
+ * 0.5rem card corners, #f8f9fa strips, pill actions, and no grey text lighter
+ * than #767676 (4.5:1 on white). Literal values rather than the global theme
+ * tokens, because the community pages carry their own darker ink than the rest
+ * of the app and mixing the two is what made this dialog look borrowed.
+ *
+ * Every input sits in its own bordered card. The textarea cannot be dragged
+ * bigger — the dialog already scrolls, and a resize handle lets the field grow
+ * past the footer that holds the post button.
+ */
+:host {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  display: block;
+}
+
+.post-dialog[open] {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  place-items: center;
+  margin: 0;
+  padding: 1rem;
+  border: 0;
+  color: #1c1c1c;
+  background: rgb(20 20 20 / 0.45);
+  backdrop-filter: blur(4px);
+  animation: backdrop-in 150ms ease-out;
+}
+
+.composer {
+  display: flex;
+  width: min(100%, 39rem);
+  max-height: min(50rem, calc(100dvh - 2rem));
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid #dcdcdc;
+  border-radius: 0.5rem;
+  background: #fff;
+  box-shadow: 0 18px 60px rgb(20 20 20 / 0.22);
+  animation: composer-in 180ms ease-out;
+}
+
+.composer-header {
+  position: relative;
+  display: flex;
+  min-height: 3.5rem;
+  flex: none;
+  align-items: center;
+  padding: 0.75rem 3.5rem 0.75rem 1.1rem;
+  border-bottom: 1px solid #e4e4e4;
+  background: #f8f9fa;
+}
+
+.composer-header h1 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.close-button {
+  position: absolute;
+  top: 50%;
+  right: 0.75rem;
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  transform: translateY(-50%);
+  border: 1px solid transparent;
+  border-radius: 0.3rem;
+  color: #5c5c5c;
+  background: transparent;
+}
+
+.close-button:hover:not(:disabled) {
+  color: #1c1c1c;
+  border-color: #dcdcdc;
+  background: #f1f2f3;
+}
+
+.close-button svg {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+.composer-form {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.composer-body {
+  min-height: 0;
+  padding: 1rem 1.1rem 1.25rem;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.author-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.composer-intro {
+  margin: 0;
+  color: #5c5c5c;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.kind-group {
+  margin: 1rem 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.kind-group legend {
+  padding: 0;
+  margin-bottom: 0.45rem;
+  color: #454545;
+  font-size: 0.83rem;
+  font-weight: 700;
+}
+
+.kind-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+/* Chips, matching the tag pills a post carries on the thread page. */
+.kind-option,
+.tag-chip {
+  padding: 0.3rem 0.7rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 999px;
+  color: #5c5c5c;
+  background: #f6f7f8;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.kind-option:hover,
+.tag-chip:hover {
+  border-color: #c2c2c2;
+  color: #1c1c1c;
+}
+
+.kind-option-active,
+.kind-option-active:hover,
+.tag-chip-active,
+.tag-chip-active:hover {
+  border-color: #1c1c1c;
+  color: #fff;
+  background: #1c1c1c;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  margin-top: 1rem;
+}
+
+.field-label-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+  color: #454545;
+  font-size: 0.83rem;
+  font-weight: 700;
+}
+
+.field-counter {
+  color: #767676;
+  font-size: 0.74rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.preview-toggle {
+  margin-left: auto;
+  padding: 0.25rem 0.5rem;
+  border: 0;
+  border-radius: 0.25rem;
+  color: #5c5c5c;
+  background: transparent;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.preview-toggle:hover {
+  color: #1c1c1c;
+  background: #f1f2f3;
+}
+
+/* The card around each input: the border is the field, not an underline. */
+.field-input {
+  width: 100%;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid #dedede;
+  border-radius: 0.35rem;
+  color: #1c1c1c;
+  background: #fff;
+  font: inherit;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.field-textarea {
+  min-height: 10rem;
+  font-family: ui-monospace, 'SFMono-Regular', 'Menlo', monospace;
+  font-size: 0.87rem;
+  line-height: 1.7;
+  /* No drag handle: the dialog scrolls already, and a dragged field grows past
+     the footer the post button sits in. */
+  resize: none;
+}
+
+.field-input::placeholder {
+  color: #8a8a8a;
+}
+
+.field-input:focus {
+  border-color: #b5b5b5;
+  outline: none;
+  box-shadow: 0 0 0 3px rgb(28 28 28 / 0.06);
+}
+
+.markdown-preview {
+  min-height: 10rem;
+  padding: 0.75rem 0.85rem;
+  border: 1px dashed #dcdcdc;
+  border-radius: 0.35rem;
+  color: #333;
+  background: #fbfbfb;
+  font-size: 0.875rem;
+  line-height: 1.75;
+  overflow-wrap: anywhere;
+}
+
+.post-extras {
+  margin-top: 1rem;
+  padding: 0.85rem 0.9rem;
+  border: 1px solid #dcdcdc;
+  border-radius: 0.5rem;
+  background: #f8f9fa;
+}
+
+.extras-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.extras-heading strong {
+  color: #454545;
+  font-size: 0.83rem;
+  font-weight: 700;
+}
+
+.extras-heading small,
+.tag-count {
+  color: #767676;
+  font-size: 0.74rem;
+}
+
+.tag-count {
+  margin-left: auto;
+  flex: none;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.tag-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.7rem;
+}
+
+/* White on the tinted card, so a chip still reads as a control. */
+.tag-chip {
+  background: #fff;
+}
+
+.tags-status,
+.tags-error {
+  margin: 0.7rem 0 0;
+  color: #5c5c5c;
+  font-size: 0.8rem;
+}
+
+.tags-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  color: #b42318;
+}
+
+.tags-error button {
+  border: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 0.2rem;
+}
+
+.submit-error {
+  display: block;
+  margin-top: 0.75rem;
+}
+
+.composer-footer {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding: 0.75rem 1.1rem;
+  border-top: 1px solid #e4e4e4;
+  background: #f8f9fa;
+}
+
+.post-button,
+.cancel-button {
+  padding: 0.5rem 1.3rem;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 0.87rem;
+  font-weight: 700;
+}
+
+.post-button {
+  border: 0;
+  color: #fff;
+  background: #1c1c1c;
+}
+
+.post-button:hover:not(:disabled) {
+  background: #000;
+}
+
+.cancel-button {
+  border: 1px solid #dcdcdc;
+  color: #1c1c1c;
+  background: #fff;
+}
+
+.cancel-button:hover:not(:disabled) {
+  border-color: #b5b5b5;
+  background: #f1f2f3;
+}
+
+button {
+  cursor: pointer;
+  transition:
+    color 150ms ease,
+    border-color 150ms ease,
+    background 150ms ease;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid #1c1c1c;
+  outline-offset: 2px;
+}
+
+@keyframes backdrop-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes composer-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem) scale(0.98);
+  }
+}
+
+@media (max-width: 40rem) {
+  .post-dialog[open] {
+    padding: 0;
+  }
+
+  .composer {
+    width: 100%;
+    max-height: 100dvh;
+    min-height: 100dvh;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .composer-body {
+    padding-inline: 0.9rem;
+  }
+
+  .field-textarea,
+  .markdown-preview {
+    min-height: 8rem;
+  }
+
+  .composer-footer {
+    padding-inline: 0.9rem;
+  }
+
+  .post-button,
+  .cancel-button {
+    flex: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

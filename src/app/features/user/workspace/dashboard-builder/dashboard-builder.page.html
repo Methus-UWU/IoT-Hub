@@ -202,6 +202,22 @@
                   ><strong>Compact layout</strong><small>Remove unused vertical space</small></span
                 >
               </button>
+              <button type="button" (click)="openDevices()">
+                <app-dashboard-icon name="data" /><span
+                  ><strong>Devices</strong><small>Boards, tokens, and live data</small></span
+                >
+              </button>
+              <button type="button" (click)="openTemplates()">
+                <app-dashboard-icon name="grid" /><span
+                  ><strong>Templates</strong><small>Save, reuse, and share dashboards</small></span
+                >
+              </button>
+              <button type="button" (click)="reloadDashboard(); closeToolbarMenu(true)">
+                <app-dashboard-icon name="redo" /><span
+                  ><strong>Reload</strong
+                  ><small>Discard unsaved edits and load the saved dashboard</small></span
+                >
+              </button>
               <button type="button" (click)="exportDashboard()">
                 <app-dashboard-icon name="publish" /><span
                   ><strong>Export JSON</strong><small>Download this dashboard</small></span
@@ -245,21 +261,41 @@
       <app-widget-library (widgetAdded)="addWidget($event)" (closeRequested)="closeLibrary()" />
     </div>
 
-    <app-dashboard-canvas
-      [attr.inert]="overlayPanelOpen() ? '' : null"
-      [widgets]="widgets()"
-      [dashboardName]="dashboardName()"
-      [breakpoint]="activeBreakpoint()"
-      [editMode]="editMode()"
-      [layoutLocked]="layoutLocked()"
-      [selectedIds]="selectedIds()"
-      (selectionChanged)="updateSelection($event)"
-      (widgetDropped)="addWidget($event)"
-      (layoutsCommitted)="commitLayouts($event)"
-      (widgetActionRequested)="handleWidgetAction($event)"
-      (widgetSettingChanged)="handleWidgetSetting($event)"
-      (interactionMessage)="relayMessage($event)"
-    />
+    @if (loadingDashboard()) {
+      <div class="canvas-skeleton" role="status" aria-live="polite">
+        <span class="sr-only">Loading the dashboard…</span>
+        @for (tile of [3, 3, 6, 4, 4, 4]; track $index) {
+          <span
+            class="canvas-skeleton-tile"
+            [style.grid-column]="'span ' + tile"
+            aria-hidden="true"
+          ></span>
+        }
+      </div>
+    } @else if (loadFailed()) {
+      <div class="canvas-load-error" role="alert">
+        <p>The dashboard could not be loaded.</p>
+        <button type="button" (click)="reloadDashboard()">Retry</button>
+      </div>
+    } @else {
+      <app-dashboard-canvas
+        [attr.inert]="overlayPanelOpen() ? '' : null"
+        [widgets]="canvasWidgets()"
+        [series]="chartSeries()"
+        [liveMode]="liveActive()"
+        [dashboardName]="dashboardName()"
+        [breakpoint]="activeBreakpoint()"
+        [editMode]="editMode()"
+        [layoutLocked]="layoutLocked()"
+        [selectedIds]="selectedIds()"
+        (selectionChanged)="updateSelection($event)"
+        (widgetDropped)="addWidget($event)"
+        (layoutsCommitted)="commitLayouts($event)"
+        (widgetActionRequested)="handleWidgetAction($event)"
+        (widgetSettingChanged)="handleWidgetSetting($event)"
+        (interactionMessage)="relayMessage($event)"
+      />
+    }
 
     <div
       #inspectorPanel
@@ -278,7 +314,11 @@
         [breakpoint]="activeBreakpoint()"
         [layoutLocked]="layoutLocked()"
         [deviceScope]="deviceScope()"
+        [devices]="live.devices()"
         [dateRange]="dateRange()"
+        [datastreams]="datastreams()"
+        [components]="components()"
+        (datastreamCreated)="createDatastream($event)"
         (widgetPatched)="patchWidget($event)"
         (layoutChanged)="updateWidgetLayout($event)"
         (actionRequested)="handleWidgetAction($event)"
@@ -287,6 +327,64 @@
         (closeRequested)="closeInspector()"
       />
     </div>
+
+    @if (!editMode()) {
+      <p class="live-banner" role="status">
+        @if (selectedDevice(); as device) {
+          <span class="live-dot" [class.online]="device.online" aria-hidden="true"></span>
+          {{ device.name }} · {{ device.online ? 'Online' : 'Offline' }}
+          @if (live.failed()) {
+            · reading values failed, retrying
+          }
+        } @else {
+          Preview without a device. Choose one under Devices to see live values.
+        }
+      </p>
+    }
+
+    @if (devicesOpen()) {
+      <div
+        class="templates-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="devices-panel-title"
+      >
+        <app-devices-panel
+          [projectId]="projectId()"
+          [datastreams]="datastreams()"
+          [selectedDeviceId]="selectedDevice()?.id ?? ''"
+          (deviceSelected)="selectDevice($event)"
+          (closed)="devicesOpen.set(false)"
+        />
+      </div>
+      <button
+        type="button"
+        class="panel-backdrop"
+        aria-label="Close devices"
+        (click)="devicesOpen.set(false)"
+      ></button>
+    }
+
+    @if (templatesOpen()) {
+      <div class="templates-panel" role="dialog" aria-modal="true" aria-label="Dashboard templates">
+        <app-dashboard-templates
+          [projectId]="projectId()"
+          [open]="templatesOpen()"
+          [hasWidgets]="widgets().length > 0"
+          [replacesWidgets]="widgets().length > 0"
+          [dashboardVersion]="dashboardVersion()"
+          (applied)="applyTemplate($event)"
+          (message)="showPanelMessage($event)"
+          (closed)="templatesOpen.set(false)"
+        />
+      </div>
+      <button
+        type="button"
+        class="panel-backdrop"
+        aria-label="Close templates"
+        (click)="templatesOpen.set(false)"
+      ></button>
+    }
 
     @if (libraryOpen() || inspectorOpen()) {
       <button

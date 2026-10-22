@@ -1,0 +1,50 @@
+<div class="min-h-full bg-gray-50 px-4 py-6 sm:px-6 lg:px-8">
+  <div class="mx-auto max-w-5xl pb-6">
+    <header class="mb-6">
+      <div>
+        <h1 class="text-xl font-medium tracking-tight text-gray-900">จัดการ AI</h1>
+        <p class="mt-1 text-xs text-gray-500">ตั้งค่าโมเดล AI เครดิตการใช้งาน และรอบรีเซ็ตโควตา</p>
+      </div>
+    </header>
+
+    <div class="pointer-events-none fixed right-4 top-4 z-[100] grid justify-items-end gap-2">
+      @for (toast of toasts(); track toast.id) {
+        <app-toast
+          class="pointer-events-auto"
+          [message]="toast.text"
+          [tone]="toast.tone"
+          (dismissed)="dismissToast(toast.id)"
+        />
+      }
+    </div>
+
+    <div class="mb-8 grid gap-6" [attr.aria-busy]="aiLoading()">
+      @if (aiError(); as error) {
+        <div
+          role="alert"
+          class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700"
+        >
+          {{ error }}
+          <button type="button" class="ml-2 underline" (click)="loadAiSettings()">
+            ลองอีกครั้ง
+          </button>
+        </div>
+      } @else if (aiSettings(); as settings) {
+        <app-ai-models-panel
+          [settings]="settings"
+          (saved)="onSaved($event)"
+          (failed)="notify($event, 'error')"
+        />
+        <app-ai-credits-panel
+          [defaults]="settings.defaults"
+          [resets]="settings.resets"
+          (message)="onSaved($event)"
+          (failed)="notify($event, 'error')"
+        />
+      } @else {
+        <p role="status" class="sr-only">กำลังโหลดการตั้งค่า AI</p>
+        <app-integrations-skeleton section="settings" />
+      }
+    </div>
+  </div>
+</div>

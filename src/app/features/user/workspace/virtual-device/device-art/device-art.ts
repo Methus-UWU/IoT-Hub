@@ -4,6 +4,7 @@ import { defaultStateFor } from '../devices/core/device-definition';
 import type { DetailLevel } from '../devices/core/device-shape';
 import { shapesForDetail } from '../devices/core/device-shape';
 import type { VirtualDevice } from '../models/virtual-device.model';
+import { DeviceGradients } from './device-gradients';
 import { DeviceShapes } from './device-shapes';
 
 /**
@@ -22,7 +23,7 @@ import { DeviceShapes } from './device-shapes';
  */
 @Component({
   selector: '[appDeviceArt]',
-  imports: [DeviceShapes],
+  imports: [DeviceGradients, DeviceShapes],
   templateUrl: './device-art.html',
   styleUrl: './device-art.css',
   host: { class: 'virtual-component' },

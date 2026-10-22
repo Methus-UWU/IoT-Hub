@@ -1,0 +1,38 @@
+<form [formGroup]="emailForm" (ngSubmit)="save()" novalidate aria-labelledby="email-settings-title">
+  <header class="section-heading">
+    <h2 id="email-settings-title">อีเมลบัญชี</h2>
+    <p class="settings-help email-current">อีเมลปัจจุบัน: {{ currentEmail() }}</p>
+    <p id="email-help" class="settings-help">
+      ยืนยันผ่านลิงก์ในอีเมลเดิมและอีเมลใหม่ ก่อนใช้อีเมลใหม่เข้าสู่ระบบ
+    </p>
+  </header>
+  @if (pendingEmail()) {
+    <p class="email-pending" role="status">รอการยืนยัน: {{ pendingEmail() }}</p>
+  }
+  <label for="account-new-email">อีเมลใหม่</label>
+  <input
+    id="account-new-email"
+    type="email"
+    autocomplete="email"
+    formControlName="email"
+    class="profile-input"
+    aria-describedby="email-help email-validation"
+    [attr.aria-invalid]="emailForm.controls.email.touched && emailForm.controls.email.invalid"
+  />
+  <div id="email-validation">
+    @if (emailForm.controls.email.touched && emailForm.controls.email.invalid) {
+      <app-field-error message="กรุณากรอกอีเมลที่ถูกต้องและไม่เกิน 254 ตัวอักษร" />
+    }
+  </div>
+  @if (error()) {
+    <p class="settings-error" role="alert">{{ error() }}</p>
+  }
+  @if (success()) {
+    <p class="settings-help" role="status">{{ success() }}</p>
+  }
+  <footer class="settings-footer">
+    <button type="submit" class="settings-button" [disabled]="saving() || emailForm.invalid">
+      {{ saving() ? 'กำลังส่งคำขอ…' : 'ยืนยันเปลี่ยนอีเมล' }}
+    </button>
+  </footer>
+</form>

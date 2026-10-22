@@ -134,6 +134,9 @@ export class DashboardCanvas {
   readonly dashboardName = input.required<string>();
   readonly breakpoint = input.required<DashboardBreakpoint>();
   readonly editMode = input(true);
+  /** Chart history per datastream key, while the dashboard is live. */
+  readonly series = input<Readonly<Record<string, number[]>>>({});
+  readonly liveMode = input(false);
   readonly layoutLocked = input(false);
   readonly selectedIds = input<readonly string[]>([]);
 

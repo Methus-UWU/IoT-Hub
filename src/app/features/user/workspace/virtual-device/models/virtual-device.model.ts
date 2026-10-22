@@ -2,8 +2,10 @@ import type { DeviceCategoryId, DeviceKind } from '../device-library.models';
 import type {
   DeviceOperatingVoltage,
   DevicePropertyDefinition,
+  DeviceReadingDefinition,
   DeviceRenderDefinition,
 } from '../devices/core/device-definition';
+import type { DeviceHotspot } from '../devices/core/device-hotspots';
 import type { PhysicalSize } from '../devices/core/device-metrics';
 import type { DeviceBehaviorFactory } from '../devices/core/device-simulation';
 import type { DeviceInterface, PinDirection, PinType } from '../devices/core/device-types';
@@ -32,6 +34,12 @@ export interface DevicePin extends Point {
   aliases?: readonly string[];
   /** Nominal voltage this pin sources or expects, used by wiring checks. */
   voltage?: number;
+  /** Highest signal voltage this input can safely receive. */
+  maxInputVoltage?: number;
+  /** Maximum current this supply pin can provide, in milliamps. */
+  maxCurrentMa?: number;
+  /** External bias required when the controller does not enable an internal pull resistor. */
+  requiresBias?: 'up' | 'down';
   /** Defaults to true — most pins are shared electrical nodes. */
   multipleConnections?: boolean;
 }
@@ -52,6 +60,15 @@ export interface DeviceCatalogInfo {
   tags: readonly string[];
   interfaceLabel: string;
   typicalUsage: string;
+}
+
+export interface OnboardLed {
+  /** Catalog pin name of the GPIO that drives it, e.g. `GPIO2` or `13`. */
+  readonly pin: string;
+  /** Lit when the pin is LOW, as on boards that sink the LED's current. */
+  readonly activeLow?: boolean;
+  /** As printed beside it on the board, e.g. `LED` or `L`. */
+  readonly label: string;
 }
 
 export interface VirtualDevice {
@@ -94,15 +111,91 @@ export interface VirtualDevice {
   render?: DeviceRenderDefinition;
   /** Inspector knobs. Their defaults seed the device's runtime state. */
   properties?: readonly DevicePropertyDefinition[];
+  /**
+   * Live values this part publishes while the simulation runs, printed in the
+   * inspector. Read-only: a reading is what the circuit did, not a knob.
+   */
+  readings?: readonly DeviceReadingDefinition[];
+  /**
+   * Regions of the artwork the user can operate directly — a button cap, a
+   * relay channel. Declared here so the canvas never has to know which part it
+   * is drawing in order to make it clickable.
+   */
+  hotspots?: readonly DeviceHotspot[];
   interfaces?: readonly DeviceInterface[];
+  /** I2C address metadata used by wiring diagnostics and bus emulation. */
+  i2cAddress?: {
+    /** Inspector property that overrides the fixed/default address. */
+    readonly property?: string;
+    readonly fallback: string;
+  };
   operatingVoltage?: DeviceOperatingVoltage;
+  /** Voltage driven by this part's digital outputs. */
+  logicVoltage?: number;
+  /** Default absolute maximum for signal inputs on this part. */
+  maxLogicInputVoltage?: number;
+  /** Typical supply current used for rail-budget diagnostics. */
+  supplyCurrentMa?: number;
   /**
    * Creates this part's simulation behaviour. A factory rather than a shared
    * object because each placed instance needs its own internal state.
    */
   simulation?: DeviceBehaviorFactory;
+  /**
+   * The user LED soldered to a board, and the GPIO that drives it. A sketch that
+   * blinks "the LED" uses it with no extra part and no wire; it is what
+   * `LED_BUILTIN` names on this board, and what the board's artwork lights.
+   */
+  onboardLed?: OnboardLed;
+  /** Arduino core's default hardware SPI bus, expressed in catalog pin names. */
+  defaultSpi?: {
+    readonly mosi: string;
+    readonly miso: string;
+    readonly clock: string;
+    readonly select?: string;
+  };
   /** Blocks the rotate handle for parts that only make sense upright. */
   rotatable?: boolean;
+  /**
+   * This part *sources* power rather than consuming it: a development board, a
+   * battery holder, a regulator module.
+   *
+   * The simulator drives supply rails only from parts marked here. Inferring it
+   * from the pins cannot work, because a peripheral's `VCC` pin also declares
+   * the voltage it expects — 5 V on an HC-SR04 means "feed me 5 V", not
+   * "I produce 5 V", and treating the two alike energises a circuit nobody
+   * wired to a supply.
+   *
+   * A supply's `gnd` pins become the ground reference for the same reason: a
+   * peripheral's ground is only 0 V once it is wired back to something that
+   * defines 0 V.
+   */
+  powerSource?: boolean;
+  /**
+   * Power sources that count as one supply. A part's VCC and GND have to reach
+   * the same supply before it works, as current has to return to where it came
+   * from. Unset, each placed source is its own supply; the schematic VCC and GND
+   * symbols share a group so any of them close a loop with each other.
+   */
+  supplyGroup?: string;
+  /**
+   * Other catalog parts this one switches into from the inspector without being
+   * re-placed — the two polarities of an RGB LED. Every variant lists the same
+   * options. Wires carry across by pin name, or by pin position where the
+   * variants name a pin differently.
+   */
+  variants?: {
+    readonly label: string;
+    readonly options: readonly { readonly deviceId: string; readonly label: string }[];
+  };
+  /**
+   * The supply range of one placed instance, for a part whose rating is a
+   * property — a motor bought as 3 V, 5 V or 12 V. The wiring check prefers it
+   * over `operatingVoltage`.
+   */
+  operatingVoltageFor?: (
+    properties: Readonly<Record<string, string | number | boolean>>,
+  ) => NonNullable<VirtualDevice['operatingVoltage']>;
   /**
    * Parts that draw destructive current unless something limits it — LEDs,
    * mostly. Declared rather than inferred so the wiring check never has to
@@ -122,6 +215,13 @@ export interface VirtualDevice {
    * Declared per-device so the canvas never hard-codes a list of ids.
    */
   printsOwnPinLabels?: boolean;
+  /**
+   * Parts whose pin names carry no information worth printing on the canvas —
+   * an unpolarised two-lead passive, where "1" and "2" are only an ordering.
+   * The name still reaches the user through the pin's tooltip and the
+   * inspector; this suppresses the drawn label alone.
+   */
+  hidesPinLabels?: boolean;
   /** Optional radius override for headers tighter than the non-overlapping 9.5-unit default. */
   pinHitRadius?: number;
 }
@@ -131,18 +231,29 @@ export interface DevicePlacement extends Point {
   visible: boolean;
 }
 
-/** A header pin on the development board the peripherals wire back to. */
-export interface BoardPin extends Point {
-  id: string;
-  label: string;
-  detail: string;
-  kind: ConnectionKind;
-  side: 'left' | 'right';
+/** A catalog part placed on the canvas; `instanceId` is the server's component id. */
+export interface DeviceInstance extends VirtualDevice {
+  readonly instanceId: string;
 }
 
-/** Either end of a wire can belong to the ESP32 or to any placed device. */
+/** A placed part's property values, keyed by property name. */
+export type DeviceState = Readonly<Record<string, string | number | boolean>>;
+
+/** A wire branch point on the canvas, shared by the wires that meet there. */
+export interface WireJunction extends Point {
+  readonly id: string;
+  readonly kind: ConnectionKind;
+}
+
+/**
+ * Either end of a wire.
+ *
+ * A development board is an ordinary placed device, so there is exactly one
+ * kind of pin endpoint. The retired `board` variant existed for a single ESP32
+ * drawn straight into the canvas template; every branch that special-cased it
+ * was a place the board and the catalog could disagree.
+ */
 export type WireEndpoint =
-  | { readonly type: 'board'; readonly pinId: string }
   | { readonly type: 'device'; readonly deviceId: string; readonly pinId: string }
   | { readonly type: 'junction'; readonly junctionId: string };
 

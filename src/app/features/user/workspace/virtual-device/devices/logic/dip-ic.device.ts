@@ -64,20 +64,28 @@ function createDipIc(options: DipOptions): VirtualDevice {
   function draw(_context: DeviceDrawContext): readonly Shape[] {
     return [
       // Gold legs, drawn first so the body covers where they enter it.
-      ...repeat(options.left.length, { y: HEADER_PITCH }, (_, __, y) =>
-        rect(leftX - u(0.4), y - u(0.35), u(2.2), u(0.7), {
-          rx: u(0.1),
-          fill: PART.headerGold,
-          detail: 'normal',
-        }),
-      { x: 0, y: MARGIN_Y }),
-      ...repeat(options.right.length, { y: HEADER_PITCH }, (_, __, y) =>
-        rect(rightX - u(1.8), y - u(0.35), u(2.2), u(0.7), {
-          rx: u(0.1),
-          fill: PART.headerGold,
-          detail: 'normal',
-        }),
-      { x: 0, y: MARGIN_Y }),
+      ...repeat(
+        options.left.length,
+        { y: HEADER_PITCH },
+        (_, __, y) =>
+          rect(leftX - u(0.4), y - u(0.35), u(2.2), u(0.7), {
+            rx: u(0.1),
+            fill: PART.headerGold,
+            detail: 'normal',
+          }),
+        { x: 0, y: MARGIN_Y },
+      ),
+      ...repeat(
+        options.right.length,
+        { y: HEADER_PITCH },
+        (_, __, y) =>
+          rect(rightX - u(1.8), y - u(0.35), u(2.2), u(0.7), {
+            rx: u(0.1),
+            fill: PART.headerGold,
+            detail: 'normal',
+          }),
+        { x: 0, y: MARGIN_Y },
+      ),
 
       rect(bodyX, u(0.6), u(6.35), height - u(1.2), {
         rx: u(0.4),
@@ -113,12 +121,13 @@ function createDipIc(options: DipOptions): VirtualDevice {
         }),
       ),
       ...options.right.map((spec, index) =>
-        text(
-          bodyX + u(6.35) - u(0.4),
-          MARGIN_Y + index * HEADER_PITCH + u(0.3),
-          spec[0],
-          { size: u(0.85), fill: SILK.dim, anchor: 'end', mono: true, detail: 'high' },
-        ),
+        text(bodyX + u(6.35) - u(0.4), MARGIN_Y + index * HEADER_PITCH + u(0.3), spec[0], {
+          size: u(0.85),
+          fill: SILK.dim,
+          anchor: 'end',
+          mono: true,
+          detail: 'high',
+        }),
       ),
     ];
   }

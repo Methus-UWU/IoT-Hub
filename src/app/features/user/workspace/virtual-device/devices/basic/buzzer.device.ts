@@ -9,13 +9,18 @@ import { bodyFromMm, u } from '../core/device-metrics';
 import { OUTLINE, PART, SILK } from '../core/device-palette';
 import { pin } from '../core/device-pin';
 import { circle, line, path, repeat, text, type Shape } from '../core/device-shape';
-import { isLogicHigh, type DeviceBehavior } from '../core/device-simulation';
+import {
+  isLogicHigh,
+  propertyNumber,
+  supplyVolts,
+  type DeviceBehavior,
+} from '../core/device-simulation';
 
 /**
  * A 12 mm buzzer can on 7.62 mm lead spacing — three header pitches, which is
  * what lets one straddle the ravine of a breadboard.
  */
-const BODY = bodyFromMm({ widthMm: 13, heightMm: 19 });
+const BODY = bodyFromMm({ widthMm: 13, heightMm: 16 });
 const WIDTH = BODY.width;
 const HEIGHT = BODY.height;
 const CENTER_X = WIDTH / 2;
@@ -23,10 +28,14 @@ const CAN_CY = u(6.5);
 const CAN_R = u(6);
 const LEAD_PITCH = u(7.62);
 const PIN_START_X = CENTER_X - LEAD_PITCH / 2;
+const LEAD_ATTACH_Y = CAN_CY + Math.sqrt(CAN_R ** 2 - (LEAD_PITCH / 2) ** 2) - u(0.45);
 /** The negative lead is cut short, as it is on the real part. */
 const SHORT_LEAD_Y = HEIGHT - u(1.2);
 
 type BuzzerKind = 'active' | 'passive';
+
+/** Where the resonator inside a 12 mm active can actually sits. */
+const ACTIVE_BUZZER_HZ = 2400;
 
 /**
  * An active buzzer contains its own oscillator, so it only needs a level; a
@@ -74,22 +83,21 @@ function createBuzzer(kind: BuzzerKind): VirtualDevice {
 
   function draw(context: DeviceDrawContext): readonly Shape[] {
     const sounding = booleanState(context, 'sounding') && context.running;
-    const frequency = numberState(context, 'frequency', 2000);
+    // The pitch actually sounding: a sketch's tone(), else the configured frequency.
+    const frequency = numberState(context, 'toneHz', numberState(context, 'frequency', 2000));
 
     return [
-      // Leads. The longer one is positive on an active buzzer.
-      line(PIN_START_X, CAN_CY + CAN_R - u(0.4), PIN_START_X, HEIGHT, {
+      // Short leads start beneath the can so they remain visually attached.
+      line(PIN_START_X, LEAD_ATTACH_Y, PIN_START_X, HEIGHT, {
         stroke: PART.metal,
         strokeWidth: u(0.45),
         strokeLinecap: 'round',
       }),
-      line(
-        PIN_START_X + LEAD_PITCH,
-        CAN_CY + CAN_R - u(0.4),
-        PIN_START_X + LEAD_PITCH,
-        SHORT_LEAD_Y,
-        { stroke: PART.metal, strokeWidth: u(0.45), strokeLinecap: 'round' },
-      ),
+      line(PIN_START_X + LEAD_PITCH, LEAD_ATTACH_Y, PIN_START_X + LEAD_PITCH, SHORT_LEAD_Y, {
+        stroke: PART.metal,
+        strokeWidth: u(0.45),
+        strokeLinecap: 'round',
+      }),
 
       // Black plastic can.
       circle(CENTER_X, CAN_CY, CAN_R, {
@@ -105,7 +113,11 @@ function createBuzzer(kind: BuzzerKind): VirtualDevice {
       }),
 
       // Sound port.
-      circle(CENTER_X, CAN_CY, u(1), { fill: '#0a0c0f', stroke: '#3a3f46', strokeWidth: u(0.1) }),
+      circle(CENTER_X, CAN_CY, u(1), {
+        fill: '#0a0c0f',
+        stroke: '#3a3f46',
+        strokeWidth: u(0.1),
+      }),
 
       // Emission arcs, drawn only while it is actually sounding.
       ...(sounding
@@ -171,7 +183,9 @@ function createBuzzer(kind: BuzzerKind): VirtualDevice {
       pin('+', PIN_START_X, HEIGHT, active ? 'digital' : 'pwm', {
         side: 'bottom',
         direction: 'input',
-        description: active ? 'Drive high to sound' : 'Drive with a square wave at the tone frequency',
+        description: active
+          ? 'Drive high to sound'
+          : 'Drive with a square wave at the tone frequency',
       }),
       pin('−', PIN_START_X + LEAD_PITCH, SHORT_LEAD_Y, 'gnd', {
         side: 'bottom',
@@ -204,15 +218,33 @@ export const BUZZER_PASSIVE = createBuzzer('passive');
 function createBuzzerBehavior(): DeviceBehavior {
   return {
     update(context) {
-      const drive = context.readNode('+');
-      const ground = context.readNode('−');
-      const powered =
-        !drive.floating && !ground.floating && isLogicHigh({
-          voltage: drive.voltage - ground.voltage,
-          floating: false,
-          conflict: false,
-        });
+      // A sketch's tone() puts its pitch on the drive leg. The buzzer sounds it
+      // whenever its other leg returns to ground, whatever the square wave averages to.
+      const tone = (context.readNode('+').messages ?? []).find(
+        (message) => message.protocol === 'tone',
+      );
+      const hz = tone?.data['hz'];
+      if (typeof hz === 'number' && hz > 0) {
+        const ground = context.readNode('−');
+        const grounded = !ground.floating && ground.voltage < 0.5;
+        context.emit('sounding', grounded);
+        context.emit('toneHz', Math.round(hz));
+        return;
+      }
+
+      // supplyVolts is 0 when a leg floats or the legs reach different supplies.
+      const powered = isLogicHigh({
+        voltage: supplyVolts(context, '+', '−'),
+        floating: false,
+        conflict: false,
+      });
       context.emit('sounding', powered);
+      // The pitch the canvas should play it at. A passive buzzer is a bare
+      // transducer, so its tone is whatever the sketch drives it with — which
+      // the workspace cannot see, so the configured frequency stands in. An
+      // active one has no such property and falls back to the tone its own
+      // internal oscillator runs at.
+      context.emit('toneHz', Math.round(propertyNumber(context, 'frequency', ACTIVE_BUZZER_HZ)));
     },
   };
 }

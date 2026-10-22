@@ -5,45 +5,58 @@ import {
   type DevicePropertyDefinition,
 } from '../core/device-definition';
 import { bodyFromMm, HEADER_PITCH, u } from '../core/device-metrics';
-import { OUTLINE, PART } from '../core/device-palette';
-import { silkLabel } from '../core/device-parts';
+import { rotaryHotspot } from '../core/device-hotspots';
+import { PART, WOKWI } from '../core/device-palette';
 import { pin } from '../core/device-pin';
 import { circle, group, line, path, rect, text, type Shape } from '../core/device-shape';
-import {
-  propertyNumber,
-  propertyString,
-  type DeviceBehavior,
-} from '../core/device-simulation';
+import { propertyNumber, propertyString, type DeviceBehavior } from '../core/device-simulation';
 
 /**
- * RV09-style 9 mm vertical pot: a 9.5 mm phenolic case on three lugs at 0.1 in
- * pitch. The case is only twice the width of its own lug spacing, which is why
- * a real one looks so much smaller in a circuit than the knob it usually wears.
+ * Wokwi-style potentiometer module: a square blue breakout with a large grey
+ * rotary knob, four plated mounting holes, and a three-pin header.
+ *
+ * Sized as the breakout it draws rather than as the bare 13 mm pot it carries:
+ * the artwork has mounting holes and a 0.1 in header, which only exist on the
+ * module, and at the board's real 24 mm the knob is finally large enough to
+ * grab with a pointer.
  */
-const BODY = bodyFromMm({ widthMm: 11, heightMm: 15 });
+const BODY = bodyFromMm({ widthMm: 24, heightMm: 26 });
 const WIDTH = BODY.width;
 const HEIGHT = BODY.height;
-const BODY_R = u(4.75);
 const CENTER_X = WIDTH / 2;
-const CENTER_Y = u(5.5);
-const PIN_Y = HEIGHT;
-const PIN_START_X = CENTER_X - HEADER_PITCH;
+const CENTER_Y = u(11);
+const KNOB_R = u(8);
+const PIN_SPACING = HEADER_PITCH;
+const PIN_START_X = CENTER_X - PIN_SPACING;
+/** Where each pin ends: clear of the 26 mm board, so the tip is solderable metal. */
+const PIN_TIP_Y = u(28.4);
+const PIN_RADIUS = u(0.28);
+/** The moulded shroud the pins leave through, hugging the bottom edge. */
+const HEADER_TOP = u(22.6);
+const HEADER_HEIGHT = u(2.5);
+const PIN_XS: readonly number[] = [0, 1, 2].map((index) => PIN_START_X + index * PIN_SPACING);
 
 /** Rotation limits of a standard single-turn pot, in degrees from vertical. */
 const SWEEP = 135;
 
+/** ESP32 ADC full scale: 12 bits across the 3.3 V rail. */
+const ADC_FULL_SCALE = 4095;
+/** A pot is shipped and placed turned right down, so a fresh part reads zero. */
+const ADC_REST = 0;
+const ADC_REFERENCE_VOLTS = 3.3;
+
 const PROPERTIES: readonly DevicePropertyDefinition[] = [
   {
-    id: 'position',
-    label: 'Wiper position',
+    id: 'wiper',
+    label: 'Wiper',
     kind: 'number',
-    defaultValue: 50,
+    defaultValue: ADC_REST,
     min: 0,
-    max: 100,
+    max: ADC_FULL_SCALE,
     step: 1,
-    unit: '%',
+    unit: 'counts',
     group: 'simulation',
-    description: 'Where the wiper sits between the two end terminals.',
+    description: 'Shaft travel, counted the way analogRead reports it: 0 - 4095.',
   },
   {
     id: 'resistance',
@@ -64,61 +77,120 @@ const PROPERTIES: readonly DevicePropertyDefinition[] = [
     group: 'electrical',
     options: [
       { value: 'linear', label: 'Linear (B)' },
-      { value: 'log', label: 'Logarithmic (A)' },
+      { value: 'log', label: 'Log (A)' },
     ],
   },
 ];
 
-/** Wiper resistance for a given travel, honouring the taper curve. */
-export function wiperResistance(total: number, positionPercent: number, taper: string): number {
-  const travel = Math.min(Math.max(positionPercent, 0), 100) / 100;
+/**
+ * What `analogRead` would return for a wiper sitting at this voltage.
+ *
+ * Derived from the voltage rather than from the knob angle, so an unpowered or
+ * half-wired divider reads what it really produces — turning the shaft on a pot
+ * whose VCC is not connected moves nothing, exactly as on the bench.
+ */
+export function adcCounts(volts: number): number {
+  const ratio = Math.min(Math.max(volts / ADC_REFERENCE_VOLTS, 0), 1);
+  return Math.round(ratio * ADC_FULL_SCALE);
+}
+
+/** Shaft travel as a 0-1 fraction, from the ADC count the wiper is set to. */
+export function wiperTravel(counts: number): number {
+  return Math.min(Math.max(counts, 0), ADC_FULL_SCALE) / ADC_FULL_SCALE;
+}
+
+/** Wiper resistance for a given setting, honouring the taper curve. */
+export function wiperResistance(total: number, counts: number, taper: string): number {
+  const travel = wiperTravel(counts);
   const curve = taper === 'log' ? travel ** 2.5 : travel;
   return total * curve;
 }
 
+/** Mounting-hole geometry: the drilled bore, and the pad ring around it. */
+const HOLE_BORE = u(0.74);
+const HOLE_PAD = u(0.56);
+const HOLE_CENTRES: readonly (readonly [number, number])[] = [
+  [u(2.4), u(2.4)],
+  [WIDTH - u(2.4), u(2.4)],
+  [u(2.4), HEIGHT - u(2.4)],
+  [WIDTH - u(2.4), HEIGHT - u(2.4)],
+];
+
+/** A rounded rectangle as path data, so holes can be cut out of it. */
+function roundedRectPath(x: number, y: number, width: number, height: number, r: number): string {
+  const right = x + width;
+  const bottom = y + height;
+  return [
+    `M ${x + r} ${y}`,
+    `H ${right - r}`,
+    `A ${r} ${r} 0 0 1 ${right} ${y + r}`,
+    `V ${bottom - r}`,
+    `A ${r} ${r} 0 0 1 ${right - r} ${bottom}`,
+    `H ${x + r}`,
+    `A ${r} ${r} 0 0 1 ${x} ${bottom - r}`,
+    `V ${y + r}`,
+    `A ${r} ${r} 0 0 1 ${x + r} ${y}`,
+    'Z',
+  ].join(' ');
+}
+
+/** A full circle as one subpath, for use as an `evenodd` cut-out. */
+function circlePath(cx: number, cy: number, r: number): string {
+  return `M ${cx - r} ${cy} A ${r} ${r} 0 1 0 ${cx + r} ${cy} A ${r} ${r} 0 1 0 ${cx - r} ${cy} Z`;
+}
+
 function draw(context: DeviceDrawContext): readonly Shape[] {
-  const position = numberState(context, 'position', 50);
-  const total = numberState(context, 'resistance', 10_000);
-  const angle = -SWEEP + (position / 100) * SWEEP * 2;
-  const wiper = wiperResistance(total, position, String(context.state['taper'] ?? 'linear'));
+  const angle = -SWEEP + wiperTravel(numberState(context, 'wiper', ADC_REST)) * SWEEP * 2;
 
   return [
-    // Solder lugs.
-    ...[0, 1, 2].map((index) =>
-      line(
-        PIN_START_X + index * HEADER_PITCH,
-        CENTER_Y + BODY_R - u(0.8),
-        PIN_START_X + index * HEADER_PITCH,
-        PIN_Y,
-        { stroke: PART.metal, strokeWidth: u(0.45), strokeLinecap: 'round' },
-      ),
+    // The board is drawn as one path with the mounting holes as counter-wound
+    // subpaths, so `evenodd` leaves them genuinely unpainted. Nothing else
+    // punches a hole through a filled shape: a disc of canvas colour sitting on
+    // top would hide the ESP32 the moment this part was dragged over it.
+    path(
+      [
+        roundedRectPath(0, 0, WIDTH, HEIGHT, u(0.65)),
+        ...HOLE_CENTRES.map(([cx, cy]) => circlePath(cx, cy, HOLE_BORE)),
+      ].join(' '),
+      { fill: WOKWI.board, fillRule: 'evenodd' },
     ),
-
-    // Blue phenolic case with the metal shaft collar.
-    circle(CENTER_X, CENTER_Y, BODY_R, {
-      fill: '#2f6fbf',
-      stroke: OUTLINE,
-      strokeWidth: u(0.15),
+    // The outline is a separate shape: stroking the path above would paint the
+    // board edge around the inside of every bore as well.
+    rect(0, 0, WIDTH, HEIGHT, {
+      rx: u(0.65),
+      fill: 'none',
+      stroke: WOKWI.boardEdge,
+      strokeWidth: u(0.4),
     }),
-    circle(CENTER_X, CENTER_Y, BODY_R - u(0.9), {
-      fill: '#2a63ab',
-      stroke: '#20508d',
-      strokeWidth: u(0.1),
+    rect(u(0.5), u(0.5), WIDTH - u(1), HEIGHT - u(1), {
+      rx: u(0.4),
+      fill: 'none',
+      stroke: WOKWI.boardTrace,
+      strokeWidth: u(0.18),
       detail: 'normal',
     }),
-    // 6 mm shaft collar.
-    circle(CENTER_X, CENTER_Y, u(3), {
-      fill: PART.metalLight,
-      stroke: PART.metalDark,
-      strokeWidth: u(0.15),
-    }),
+    // The pad ring around each bore, covering the raw cut edge. Bare metal, not
+    // silkscreen white: it is the plating a mounting screw bears against.
+    ...HOLE_CENTRES.map(([cx, cy]) =>
+      circle(cx, cy, HOLE_BORE + HOLE_PAD / 2, {
+        fill: 'none',
+        stroke: PART.metal,
+        strokeWidth: HOLE_PAD,
+      }),
+    ),
 
-    // Knob indicator — rotates with the wiper so the position is readable
-    // straight off the canvas.
+    circle(CENTER_X, CENTER_Y, KNOB_R, {
+      fill: WOKWI.knob,
+      stroke: WOKWI.knobEdge,
+      strokeWidth: u(0.75),
+    }),
+    // The pointer is drawn up the -y axis, so mid travel reads as "straight up"
+    // the way a real single-turn shaft does, and `angle` is then simply degrees
+    // clockwise from that rest position.
     group(
       [
-        line(0, 0, 0, -u(2.4), {
-          stroke: '#1f2937',
+        line(0, -u(1.2), 0, -u(6.6), {
+          stroke: WOKWI.indicator,
           strokeWidth: u(0.5),
           strokeLinecap: 'round',
         }),
@@ -126,36 +198,48 @@ function draw(context: DeviceDrawContext): readonly Shape[] {
       { transform: `translate(${CENTER_X} ${CENTER_Y}) rotate(${angle})` },
     ),
 
-    // Travel arc.
-    path(
-      `M ${CENTER_X - u(2.7)} ${CENTER_Y + u(2.1)} A ${u(3.4)} ${u(3.4)} 0 0 1 ${
-        CENTER_X + u(2.7)
-      } ${CENTER_Y + u(2.1)}`,
-      { fill: 'none', stroke: '#93c5fd', strokeWidth: u(0.2), opacity: 0.7, detail: 'high' },
+    ...['GND', 'SIG', 'VCC'].map((label, index) =>
+      text(PIN_XS[index], HEADER_TOP - u(0.7), label, {
+        size: u(1.15),
+        fill: WOKWI.label,
+        anchor: 'middle',
+        weight: 700,
+        mono: true,
+        detail: 'normal',
+      }),
     ),
-
-    silkLabel(CENTER_X, CENTER_Y + BODY_R - u(0.9), `${Math.round(position)}%`, {
-      size: u(1.1),
-      fill: '#e6f0ff',
-      weight: 700,
-      detail: 'normal',
+    // A moulded 0.1 in header, drawn the way the comparator modules draw theirs:
+    // a black shroud, a gold pad per way, and a tinned lead standing out past
+    // the board edge. The lead is what a wire lands on, so the connection point
+    // is metal a person can see rather than a circle painted on the board.
+    rect(PIN_XS[0] - u(1.25), HEADER_TOP, PIN_SPACING * 2 + u(2.5), HEADER_HEIGHT, {
+      rx: u(0.2),
+      fill: PART.headerPlastic,
+      stroke: '#0b0d10',
+      strokeWidth: u(0.1),
     }),
-
-    text(CENTER_X, HEIGHT - u(0.3), `${formatOhms(wiper)}/${formatOhms(total)}`, {
-      size: u(0.95),
-      fill: '#6b7280',
-      anchor: 'middle',
-      weight: 600,
-      mono: true,
-      detail: 'high',
-    }),
+    ...PIN_XS.flatMap((pinX) => [
+      rect(pinX - u(0.45), HEADER_TOP + HEADER_HEIGHT / 2 - u(0.45), u(0.9), u(0.9), {
+        rx: u(0.08),
+        fill: PART.headerGold,
+        stroke: PART.headerGoldDark,
+        strokeWidth: u(0.08),
+        detail: 'normal',
+      }),
+      rect(
+        pinX - PIN_RADIUS,
+        HEADER_TOP + HEADER_HEIGHT,
+        PIN_RADIUS * 2,
+        PIN_TIP_Y - HEADER_TOP - HEADER_HEIGHT,
+        {
+          rx: u(0.18),
+          fill: PART.metal,
+          stroke: PART.metalDark,
+          strokeWidth: u(0.06),
+        },
+      ),
+    ]),
   ];
-}
-
-function formatOhms(ohms: number): string {
-  if (ohms >= 1_000_000) return `${(ohms / 1_000_000).toFixed(1)}M`;
-  if (ohms >= 1_000) return `${(ohms / 1_000).toFixed(1)}k`;
-  return `${Math.round(ohms)}`;
 }
 
 /** Single-turn rotary potentiometer wired as a three-terminal divider. */
@@ -168,24 +252,43 @@ export const POTENTIOMETER: VirtualDevice = {
   y: 640,
   ...BODY,
   initiallyVisible: false,
+  rotatable: true,
+  printsOwnPinLabels: true,
   interfaces: ['analog', 'passive'],
   pins: [
-    pin('1', PIN_START_X, PIN_Y, 'passive', {
+    pin('1', PIN_XS[0], PIN_TIP_Y, 'passive', {
       side: 'bottom',
       description: 'End terminal, commonly tied to GND',
     }),
-    pin('WIPER', PIN_START_X + HEADER_PITCH, PIN_Y, 'analog', {
+    pin('WIPER', PIN_XS[1], PIN_TIP_Y, 'analog', {
       side: 'bottom',
       direction: 'output',
       description: 'Wiper output, feed this to an ADC pin',
     }),
-    pin('3', PIN_START_X + HEADER_PITCH * 2, PIN_Y, 'passive', {
+    pin('3', PIN_XS[2], PIN_TIP_Y, 'passive', {
       side: 'bottom',
       description: 'End terminal, commonly tied to VCC',
     }),
   ],
   properties: PROPERTIES,
-  render: { draw },
+  readings: [
+    {
+      id: 'adc',
+      label: 'ADC reading',
+      unit: 'counts',
+      description: '12-bit ESP32 scale: 0 – 4095 across 3.3 V.',
+    },
+    { id: 'wiperVolts', label: 'Wiper voltage', unit: 'V' },
+  ],
+  // The knob cap is the grip: dragging it turns the shaft, exactly as the
+  // Wiper field in the inspector does.
+  hotspots: [
+    rotaryHotspot('shaft', 'Turn the potentiometer', 'wiper', CENTER_X, CENTER_Y, KNOB_R, {
+      sweep: SWEEP,
+      range: { min: 0, max: ADC_FULL_SCALE },
+    }),
+  ],
+  render: { draw, bleed: { bottom: PIN_TIP_Y - HEIGHT + u(0.4) } },
   catalog: {
     categoryId: 'input-devices',
     category: 'Input Devices',
@@ -211,7 +314,7 @@ function createPotentiometerBehavior(): DeviceBehavior {
       const high = context.readNode('3');
       if (low.floating && high.floating) return;
 
-      const travel = Math.min(Math.max(propertyNumber(context, 'position', 50), 0), 100) / 100;
+      const travel = wiperTravel(propertyNumber(context, 'wiper', ADC_REST));
       const taper = propertyString(context, 'taper', 'linear');
       const curve = taper === 'log' ? travel ** 2.5 : travel;
       const lowVolts = low.floating ? 0 : low.voltage;
@@ -221,7 +324,9 @@ function createPotentiometerBehavior(): DeviceBehavior {
     },
     update(context) {
       const wiper = context.readNode('WIPER');
-      context.emit('wiperVolts', wiper.floating ? 0 : Math.round(wiper.voltage * 100) / 100);
+      const volts = wiper.floating ? 0 : wiper.voltage;
+      context.emit('wiperVolts', Math.round(volts * 100) / 100);
+      context.emit('adc', adcCounts(volts));
     },
   };
 }

@@ -112,6 +112,13 @@ const POPULAR_ORDER: readonly DeviceKind[] = [
   'pir-hc-sr501',
   'oled-096-i2c',
   'buzzer-active',
+  'ir-obstacle',
+  'tm1637-display',
+  'max7219-matrix',
+  'rtc-ds1307',
+  'rfid-rc522',
+  'tft-ili9341-touch',
+  'bme280',
 ];
 
 export function devicePopularity(id: DeviceKind): number {

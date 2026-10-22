@@ -29,7 +29,8 @@
   border-bottom: 1px solid #454545;
   background: #202020;
   box-shadow: 0 2px 10px rgb(0 0 0 / 0.22);
-}.topbar-tools {
+}
+.topbar-tools {
   display: flex;
   align-items: center;
 }
@@ -142,6 +143,7 @@
   fill: none;
   stroke-linecap: round;
   stroke-linejoin: round;
+  shape-rendering: geometricPrecision;
   vector-effect: non-scaling-stroke;
 }
 
@@ -166,9 +168,21 @@
   cursor: crosshair;
 }
 
+/* The visible strokes live in their own layer painted after the hardware, so
+   they read as wires lying on top of the parts — and so a click on the wire
+   over a part still reaches the wire. Only the drawn stroke is a target: at
+   2.5 px it is the wire itself, not a corridor around it, which is what keeps
+   pins and part bodies clickable where a wire runs across them. The wide
+   transparent hit strokes stay below the parts for grabbing a wire in open
+   space. */
+.wire-ink-layer {
+  pointer-events: none;
+}
+
 .wire {
   stroke-width: 2.5;
-  pointer-events: none;
+  cursor: pointer;
+  pointer-events: stroke;
   transition:
     filter 120ms ease,
     stroke-width 120ms ease;
@@ -176,6 +190,7 @@
 
 path.wire-preview {
   opacity: 0.78;
+  cursor: crosshair;
   pointer-events: none;
 }
 
@@ -250,6 +265,14 @@ path.wire-preview {
 .hardware:active {
   cursor: grabbing;
 }
+/*
+ * A running board is not editable, so the grab cursor would be a lie. The part
+ * still selects on click, which is why this is not `not-allowed`.
+ */
+.hardware-locked,
+.hardware-locked:active {
+  cursor: default;
+}
 .selection-box {
   fill: transparent;
   stroke: transparent;
@@ -280,25 +303,6 @@ path.wire-preview {
 #lcd-character-pixels rect {
   fill: #315500;
   opacity: 0.7;
-}
-
-.lcd-parallel-pin text,
-.lcd-i2c-pin text {
-  fill: #fff;
-  opacity: 1;
-  stroke: #087545;
-  stroke-width: 2px;
-}
-
-.lcd-parallel-pin text {
-  font-size: 6px;
-}
-
-.relay-input-pin text {
-  fill: #fff;
-  opacity: 1;
-  stroke: #202427;
-  stroke-width: 2px;
 }
 
 .wiring-notice {
@@ -354,6 +358,12 @@ path.wire-preview {
   color: #fff;
   background: #494949;
 }
+/* Muted is a state the user has to be able to see without hovering: a circuit
+   that has gone quiet because it was silenced looks the same as one that is not
+   running. */
+.zoom-controls button[aria-pressed='true'] {
+  color: #ff8f6b;
+}
 .zoom-controls span {
   min-width: 2.8rem;
   color: #b3b3b3;
@@ -399,8 +409,7 @@ path.wire-preview {
   color: #f5f5f5;
   font-size: 0.69rem;
 }
-.property-heading button,
-.serial-monitor header button {
+.property-heading button {
   display: grid;
   width: 1.8rem;
   height: 1.8rem;
@@ -410,105 +419,25 @@ path.wire-preview {
   font-size: 1rem;
 }
 
-.property-heading button svg,
-.serial-monitor header button svg {
+.property-heading button svg {
   width: 1rem;
   height: 1rem;
 }
-.property-heading button:hover,
-.serial-monitor header button:hover {
+.property-heading button:hover {
   color: #fff;
   background: #414141;
 }
 
-.part-property,
 .wire-property,
 .property-section {
   padding: 0.85rem;
   border-bottom: 1px solid #414141;
-}
-.part-property > span {
-  color: #969696;
-  font-size: 0.53rem;
-}
-.part-property > strong {
-  display: block;
-  margin-top: 0.25rem;
-  color: #fff;
-  font-size: 1.15rem;
-}
-.part-property p {
-  margin: 0.4rem 0 0;
-  color: #aaa;
-  font-size: 0.56rem;
-  line-height: 1.55;
 }
 .property-section h3 {
   margin: 0 0 0.65rem;
   color: #e5e5e5;
   font-size: 0.59rem;
 }
-.section-title {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.section-title h3 {
-  margin: 0;
-}
-.section-title span {
-  color: #8a8a8a;
-  font-size: 0.51rem;
-}
-
-.pin-map {
-  display: grid;
-  gap: 0.32rem;
-  margin-top: 0.6rem;
-}
-.pin-map button {
-  display: grid;
-  width: 100%;
-  min-height: 2.5rem;
-  grid-template-columns: 0.25rem 1fr;
-  align-items: center;
-  gap: 0.55rem;
-  padding: 0.4rem 0.5rem;
-  border: 1px solid #444;
-  border-radius: 0.45rem;
-  color: #d4d4d4;
-  background: #303030;
-  text-align: left;
-}
-.pin-map button:hover {
-  border-color: #666;
-  background: #383838;
-}
-.pin-map i {
-  width: 0.25rem;
-  height: 1.4rem;
-  border-radius: 99px;
-}
-.pin-map small,
-.pin-map strong {
-  display: block;
-}
-.pin-map small {
-  color: #aaa;
-  font-size: 0.49rem;
-}
-.pin-map strong {
-  margin-top: 0.08rem;
-  font-size: 0.56rem;
-}
-
-.part-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.4rem;
-  padding: 0.85rem;
-}
-.part-actions button,
 .danger-button {
   min-height: 2.2rem;
   border: 1px solid #4b4b4b;
@@ -517,10 +446,6 @@ path.wire-preview {
   background: #333;
   font-size: 0.56rem;
 }
-.part-actions button:hover {
-  background: #414141;
-}
-.part-actions .danger-text,
 .danger-button {
   color: #fca5a5;
   border-color: #713737;
@@ -597,66 +522,6 @@ path.wire-preview {
   margin: 0.3rem 0 0;
   font-size: 0.54rem;
   line-height: 1.55;
-}
-
-.serial-monitor {
-  position: absolute;
-  z-index: 14;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  height: 13rem;
-  border-top: 1px solid #505050;
-  background: #171717;
-  box-shadow: 0 -8px 24px rgb(0 0 0 / 0.24);
-}
-
-.serial-monitor header {
-  display: flex;
-  height: 2.6rem;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 0.65rem;
-  border-bottom: 1px solid #383838;
-}
-.serial-monitor header > span {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-}
-.serial-monitor header i {
-  width: 0.42rem;
-  height: 0.42rem;
-  border-radius: 50%;
-  background: #22c55e;
-}
-.serial-monitor header strong {
-  font-size: 0.58rem;
-}
-.serial-monitor header small {
-  color: #777;
-  font-size: 0.49rem;
-}
-.serial-output {
-  height: calc(100% - 2.6rem);
-  overflow: auto;
-  padding: 0.6rem 0.75rem;
-  color: #d4d4d4;
-  font-family: Consolas, monospace;
-  font-size: 0.56rem;
-  line-height: 1.65;
-}
-.serial-output p {
-  margin: 0;
-}
-.serial-output span {
-  color: #737373;
-}
-.serial-output .serial-success {
-  color: #86efac;
-}
-.serial-output .serial-muted {
-  color: #888;
 }
 
 button:focus-visible,
@@ -999,22 +864,30 @@ input:focus-visible {
   stroke-dasharray: none;
 }
 
-.selection-label {
-  fill: #1d4ed8;
-  stroke: #f5f5f5;
-  paint-order: stroke fill;
-  stroke-width: 3px;
-  font-size: 12px;
-  font-weight: 700;
-  pointer-events: none;
-  vector-effect: non-scaling-stroke;
-}
-
 /* Interactive overlays sit on top of the artwork without altering it. */
 .part-hitbox {
   fill: transparent;
   cursor: pointer;
   outline: none;
+}
+
+/*
+ * Stopped simulation: the operable regions stop intercepting the pointer
+ * entirely, so a press on a button cap or a relay block reaches the part and
+ * drags it. Hiding them behind `pointer-events` rather than removing them from
+ * the DOM keeps the markup stable across start/stop.
+ */
+.component-hitboxes-idle {
+  pointer-events: none;
+}
+
+/* A shaft is dragged round, not clicked — say so before the user tries. */
+.part-hitbox-rotary {
+  cursor: grab;
+}
+
+.part-hitbox-rotary:active {
+  cursor: grabbing;
 }
 
 .part-hitbox:hover {
@@ -1054,15 +927,12 @@ input:focus-visible {
   filter: none;
 }
 
-.wire-editing .wire {
-  pointer-events: stroke;
-}
-
 .wire-halo {
   fill: none;
   stroke: rgb(37 99 235 / 0.28);
   stroke-width: 7;
   stroke-linecap: round;
+  shape-rendering: geometricPrecision;
   pointer-events: none;
   vector-effect: non-scaling-stroke;
 }
@@ -1161,22 +1031,16 @@ input:focus-visible {
 }
 
 .property-heading,
-.part-property,
 .wire-property,
 .property-section {
   border-color: #ededed;
 }
 
-.property-heading small,
-.part-property > span,
-.part-property p,
-.section-title span,
-.pin-map small {
+.property-heading small {
   color: #808080;
 }
 
 .property-heading strong,
-.part-property > strong,
 .property-section h3 {
   color: #2b2b2b;
 }
@@ -1188,23 +1052,6 @@ input:focus-visible {
 .property-heading button:hover {
   color: #2b2b2b;
   background: #ededed;
-}
-
-.pin-map button {
-  color: #545454;
-  border-color: #e1e1e1;
-  background: #fafafa;
-}
-
-.pin-map button:hover {
-  border-color: #afafaf;
-  background: #f1f1f1;
-}.part-actions button {
-  color: #2b2b2b;
-  border-color: #d8d8d8;
-  background: #f1f1f1;
-}.part-actions button:hover {
-  background: #e1e1e1;
 }
 
 .wire-property p {
@@ -1316,9 +1163,9 @@ input:focus-visible {
   gap: 0.36rem;
   padding: 0 0.65rem;
   color: #fff;
-  background: #2b2b2b;
-  font-size: 0.55rem;
-  font-weight: 650;
+  background: #2f2f2f;
+  font-size: 0.68rem;
+  font-weight: 600;
 }
 
 .topbar-tools .nav-action:hover {
@@ -1335,8 +1182,8 @@ input:focus-visible {
   padding: 0 0.8rem;
   color: #fff;
   background: #16a34a;
-  font-size: 0.58rem;
-  font-weight: 700;
+  font-size: 0.7rem;
+  font-weight: 650;
 }
 
 .topbar-tools .nav-start:hover {
@@ -1354,17 +1201,18 @@ input:focus-visible {
 
 .nav-divider {
   width: 1px;
-  height: 1.6rem;
+  height: 1.4rem;
   flex: none;
-  margin: 0 0.15rem;
-  background: #e1e1e1;
+  margin: 0 0.3rem;
+  background: #3d3d3d;
 }
 
 .nav-zoom {
-  min-width: 2.7rem;
+  min-width: 3rem;
   flex: none;
-  color: #6b6b6b;
-  font-size: 0.52rem;
+  color: #b3b3b3;
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
   text-align: center;
 }
 
@@ -1438,7 +1286,6 @@ input:focus-visible {
   margin: 0;
   overflow: visible;
   transform-origin: 0 0;
-  will-change: transform;
 }
 
 .board,
@@ -1530,36 +1377,21 @@ input:focus-visible {
 /* Placeholder while a project's saved layout is being fetched. */
 .canvas-loading {
   position: absolute;
+  z-index: 20;
   inset: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 10px;
-  pointer-events: none;
+  pointer-events: auto;
   color: #71717a;
+  background: #f5f5f5;
   font-size: 13px;
 }
 
-.canvas-spinner {
-  width: 22px;
-  height: 22px;
-  border: 2.5px solid #e4e4e7;
-  border-top-color: #2563eb;
-  border-radius: 50%;
-  animation: canvas-spin 0.8s linear infinite;
-}
-
-@keyframes canvas-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .canvas-spinner {
-    animation-duration: 2.4s;
-  }
+.canvas-loading p {
+  margin: 0;
 }
 
 /* Undo/redo controls in the status strip. */
@@ -1733,4 +1565,32 @@ input:focus-visible {
   margin: 0;
   font-size: 12px;
   color: #a1a1aa;
+}
+
+.firmware-status {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 0.35rem;
+  margin: 0 0 0 0.6rem;
+  padding: 0.2rem 0.5rem;
+  overflow: hidden;
+  border-radius: 0.4rem;
+  background: #f1f1f1;
+  color: #545454;
+  font-size: 0.55rem;
+  line-height: 1.4;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.firmware-status strong {
+  font-weight: 650;
+}
+.firmware-status-live {
+  color: #2f6d3f;
+  background: #eaf5ec;
+}
+.firmware-status-error {
+  color: #8a3232;
+  background: #fbeeee;
 }

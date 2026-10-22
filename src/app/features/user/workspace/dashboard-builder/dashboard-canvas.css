@@ -411,7 +411,6 @@ kbd {
   background: #fff;
 }
 
-
 /* Shown when a project has no dashboard widgets yet. */
 .dashboard-empty {
   grid-column: 1 / -1;

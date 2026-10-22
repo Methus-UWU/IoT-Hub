@@ -1,0 +1,45 @@
+<div class="vote-control" [class.vote-control-horizontal]="orientation() === 'horizontal'">
+  <button
+    type="button"
+    class="vote-button"
+    [class.vote-button-active]="upActive()"
+    [attr.aria-pressed]="upActive()"
+    [attr.aria-label]="label() + ' เห็นด้วย'"
+    [disabled]="busy()"
+    (click)="press(1)"
+  >
+    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+      <path
+        d="M10 4.5 16 12H4l6-7.5Z"
+        stroke="currentColor"
+        stroke-width="1.5"
+        stroke-linejoin="round"
+        [attr.fill]="upActive() ? 'currentColor' : 'none'"
+      />
+    </svg>
+  </button>
+
+  <span class="vote-score" [class.vote-score-positive]="score() > 0" [class.vote-score-negative]="score() < 0">
+    {{ score() }}
+  </span>
+
+  <button
+    type="button"
+    class="vote-button"
+    [class.vote-button-active-down]="downActive()"
+    [attr.aria-pressed]="downActive()"
+    [attr.aria-label]="label() + ' ไม่เห็นด้วย'"
+    [disabled]="busy()"
+    (click)="press(-1)"
+  >
+    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+      <path
+        d="M10 15.5 4 8h12l-6 7.5Z"
+        stroke="currentColor"
+        stroke-width="1.5"
+        stroke-linejoin="round"
+        [attr.fill]="downActive() ? 'currentColor' : 'none'"
+      />
+    </svg>
+  </button>
+</div>

@@ -1402,3 +1402,13 @@ input:focus-visible {
     margin: 0.32rem 0 0;
   }
 }
+
+.chart-empty {
+  display: grid;
+  height: 100%;
+  min-height: 6rem;
+  margin: 0;
+  place-items: center;
+  color: #6b7280;
+  font-size: 0.75rem;
+}

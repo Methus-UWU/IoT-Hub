@@ -1,0 +1,583 @@
+/* Settings panel for one part. Flat and quiet: sections are separated by a
+   hairline and a small heading, and the only filled surfaces are the controls
+   themselves. */
+:host {
+  display: block;
+  color: #0f172a;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.head {
+  position: sticky;
+  z-index: 2;
+  top: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.8rem 0.65rem 0.7rem 0.95rem;
+  border-bottom: 1px solid #eef0f3;
+  background: #fff;
+}
+
+.head-title {
+  min-width: 0;
+}
+
+.head-title h2 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 0.78rem;
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.head-title p {
+  margin: 0.15rem 0 0;
+  overflow: hidden;
+  color: #64748b;
+  font-size: 0.56rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.head-actions {
+  display: flex;
+  flex: none;
+  gap: 0.1rem;
+}
+
+.icon-button {
+  display: grid;
+  width: 1.7rem;
+  height: 1.7rem;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 0.45rem;
+  color: #64748b;
+  background: transparent;
+  cursor: pointer;
+}
+
+.icon-button svg {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+.icon-button:hover:not(:disabled) {
+  color: #0f172a;
+  background: #f1f5f9;
+}
+
+.icon-button.is-danger:hover {
+  color: #b91c1c;
+  background: #fef2f2;
+}
+
+.icon-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.block {
+  display: grid;
+  gap: 0.85rem;
+  padding: 0.9rem 0.95rem;
+  border-bottom: 1px solid #eef0f3;
+}
+
+.block:last-child {
+  border-bottom: 0;
+}
+
+.block-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.block-title {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.56rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+}
+
+.block-note {
+  color: #64748b;
+  font-size: 0.54rem;
+}
+
+.text-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #2563eb;
+  font: inherit;
+  font-size: 0.56rem;
+  cursor: pointer;
+}
+
+.text-button:hover {
+  text-decoration: underline;
+}
+
+/* One setting: label, control, and an optional short explanation. */
+.field {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.field-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.4rem;
+  padding: 0;
+  color: #334155;
+  font-size: 0.62rem;
+  font-weight: 550;
+}
+
+legend.field-label {
+  width: 100%;
+  margin-bottom: 0.35rem;
+}
+
+.field-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.field-value {
+  color: #0f172a;
+  font-size: 0.62rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.field-unit {
+  color: #64748b;
+  font-weight: 400;
+}
+
+.hint {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: #64748b;
+  font-size: 0.54rem;
+  line-height: 1.5;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+/* A row of equal buttons; the chosen one is lifted onto white. The radios stay
+   real inputs, so arrow keys move the choice as they do in any radio group. */
+.segmented {
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  gap: 0.15rem;
+  padding: 0.18rem;
+  border-radius: 0.55rem;
+  background: #f1f5f9;
+}
+
+.segment,
+.swatch {
+  position: relative;
+  min-width: 0;
+}
+
+.segment input,
+.swatch input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.segment span {
+  display: block;
+  overflow: hidden;
+  padding: 0.38rem 0.3rem;
+  border-radius: 0.42rem;
+  color: #475569;
+  font-size: 0.6rem;
+  font-weight: 550;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition:
+    background 120ms ease,
+    color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.segment:hover span {
+  color: #0f172a;
+}
+
+.segment input:checked + span {
+  background: #fff;
+  color: #0f172a;
+  font-weight: 650;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.14);
+}
+
+.segment input:focus-visible + span,
+.swatch input:focus-visible + .swatch-dot {
+  outline: 2px solid #2563eb;
+  outline-offset: 1px;
+}
+
+.field:disabled .segmented,
+.field:disabled .swatches {
+  opacity: 0.5;
+}
+
+.field:disabled input {
+  cursor: not-allowed;
+}
+
+.swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.swatch-dot {
+  display: block;
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 1px solid rgb(15 23 42 / 0.2);
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 2px #fff;
+}
+
+.swatch input:checked + .swatch-dot {
+  box-shadow:
+    inset 0 0 0 2px #fff,
+    0 0 0 2px #0f172a;
+}
+
+.number,
+.text {
+  min-width: 0;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  background: #fff;
+  color: #0f172a;
+  font: inherit;
+  font-size: 0.62rem;
+}
+
+.number {
+  width: 5rem;
+  text-align: right;
+}
+
+.slider-editor {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.slider-number {
+  width: 6.75rem;
+  min-width: 0;
+  padding: 0.32rem 0.45rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.45rem;
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font: inherit;
+  font-size: 0.62rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  text-align: right;
+  appearance: textfield;
+}
+
+.slider-number::-webkit-inner-spin-button,
+.slider-number::-webkit-outer-spin-button {
+  margin: 0;
+  appearance: none;
+}
+
+.slider-unit {
+  min-width: 1rem;
+  color: var(--color-ink-muted);
+  font-size: 0.58rem;
+}
+
+.slider-number:disabled {
+  background: var(--color-surface-muted);
+  color: var(--color-ink-muted);
+}
+
+.number:disabled,
+.text:disabled {
+  background: #f8fafc;
+  color: #94a3b8;
+}
+
+.switch {
+  position: relative;
+  flex: none;
+  width: 1.9rem;
+  height: 1.1rem;
+  margin: 0;
+  border-radius: 999px;
+  background: #cbd5e1;
+  appearance: none;
+  cursor: pointer;
+  transition: background 140ms ease;
+}
+
+.switch::before {
+  position: absolute;
+  top: 0.15rem;
+  left: 0.15rem;
+  width: 0.8rem;
+  height: 0.8rem;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.25);
+  content: '';
+  transition: transform 140ms ease;
+}
+
+.switch:checked {
+  background: #2563eb;
+}
+
+.switch:checked::before {
+  transform: translateX(0.8rem);
+}
+
+.switch:disabled,
+.range:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.range {
+  --range-progress: 0%;
+
+  height: 1.25rem;
+  width: 100%;
+  margin: 0;
+  background: transparent;
+  appearance: none;
+  cursor: pointer;
+}
+
+.range::-webkit-slider-runnable-track {
+  height: 0.25rem;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    var(--color-primary-dark) 0 var(--range-progress),
+    var(--color-border) var(--range-progress) 100%
+  );
+}
+
+.range::-webkit-slider-thumb {
+  width: 1rem;
+  height: 1rem;
+  margin-top: -0.375rem;
+  border: 3px solid var(--color-surface);
+  border-radius: 50%;
+  background: var(--color-primary-dark);
+  box-shadow: 0 0 0 1px var(--color-primary-dark);
+  appearance: none;
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.range::-moz-range-track {
+  height: 0.25rem;
+  border-radius: 999px;
+  background: var(--color-border);
+}
+
+.range::-moz-range-progress {
+  height: 0.25rem;
+  border-radius: 999px;
+  background: var(--color-primary-dark);
+}
+
+.range::-moz-range-thumb {
+  width: 0.625rem;
+  height: 0.625rem;
+  border: 3px solid var(--color-surface);
+  border-radius: 50%;
+  background: var(--color-primary-dark);
+  box-shadow: 0 0 0 1px var(--color-primary-dark);
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.range:hover:not(:disabled)::-webkit-slider-thumb,
+.range:hover:not(:disabled)::-moz-range-thumb {
+  transform: scale(1.08);
+}
+
+.range:focus-visible {
+  outline: none;
+}
+
+.range:focus-visible::-webkit-slider-thumb,
+.range:focus-visible::-moz-range-thumb {
+  box-shadow:
+    0 0 0 1px var(--color-primary-dark),
+    0 0 0 4px color-mix(in srgb, var(--color-primary-dark) 18%, transparent);
+}
+
+.number:focus-visible,
+.text:focus-visible,
+.switch:focus-visible,
+.text-button:focus-visible,
+.icon-button:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+.slider-number:focus-visible {
+  outline: 2px solid var(--color-primary-dark);
+  outline-offset: 2px;
+}
+
+/* Live values: printed, never edited, so they read as values rather than as
+   fields waiting to be filled in. */
+.readings {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.4rem;
+  margin: 0;
+}
+
+.reading {
+  min-width: 0;
+  padding: 0.45rem 0.55rem;
+  border-radius: 0.5rem;
+  background: #f8fafc;
+}
+
+.reading dt {
+  overflow: hidden;
+  color: #64748b;
+  font-size: 0.52rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reading dd {
+  margin: 0.1rem 0 0;
+  color: #0f172a;
+  font-family: 'JetBrains Mono', 'SFMono-Regular', Consolas, monospace;
+  font-size: 0.66rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Wiring findings. Severity is spelled out in words, so the accent colour is
+   reinforcement rather than the only signal. */
+.issues {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.issue {
+  padding: 0.5rem 0.6rem;
+  border-left: 3px solid #94a3b8;
+  border-radius: 0.5rem;
+  background: #f8fafc;
+}
+
+.issue[data-severity='error'] {
+  border-left-color: #dc2626;
+  background: #fef2f2;
+}
+
+.issue[data-severity='warning'] {
+  border-left-color: #d97706;
+  background: #fffbeb;
+}
+
+.issue-title {
+  margin: 0;
+  color: #1f2937;
+  font-size: 0.58rem;
+  font-weight: 600;
+}
+
+.issue-badge {
+  margin-right: 0.3rem;
+  padding: 0.02rem 0.3rem;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #334155;
+  font-size: 0.48rem;
+  font-weight: 700;
+}
+
+.issue[data-severity='error'] .issue-badge {
+  background: #fecaca;
+  color: #991b1b;
+}
+
+.issue[data-severity='warning'] .issue-badge {
+  background: #fde68a;
+  color: #92400e;
+}
+
+.issue-detail {
+  margin: 0.25rem 0 0;
+  color: #475569;
+  font-size: 0.54rem;
+  line-height: 1.55;
+}
+
+.issue-actions {
+  display: flex;
+  gap: 0.7rem;
+  margin-top: 0.3rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .segment span,
+  .range::-webkit-slider-thumb,
+  .range::-moz-range-thumb,
+  .switch,
+  .switch::before {
+    transition: none;
+  }
+}

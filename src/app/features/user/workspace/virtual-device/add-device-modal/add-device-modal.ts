@@ -12,10 +12,6 @@ import {
   viewChild,
 } from '@angular/core';
 
-import {
-  CustomSelect,
-  CustomSelectOption,
-} from '../../../../../shared/components/custom-select/custom-select';
 import { DeviceThumbnail } from '../device-thumbnail';
 import {
   DEVICE_CATEGORY_OPTIONS,
@@ -30,6 +26,12 @@ type CategoryFilterId = 'all' | DeviceCategoryId;
 interface LibraryFilterOption {
   id: QuickFilterId;
   label: string;
+}
+
+interface CategoryFilterOption {
+  id: CategoryFilterId;
+  label: string;
+  count: number;
 }
 
 const QUICK_FILTERS: readonly LibraryFilterOption[] = [
@@ -73,12 +75,13 @@ function deviceMatchesSearch(device: DeviceLibraryItem, query: string): boolean 
 }
 
 /**
- * Centred "Add Device" modal: search, category dropdown, favourites, recently used,
- * and a thumbnail grid that previews the exact artwork placed on the canvas.
+ * Centred device picker. A card click immediately hands one exact catalog part
+ * back to the canvas for placement; the modal never keeps a second selection
+ * state that can drift from what the user is about to place.
  */
 @Component({
   selector: 'app-add-device-modal',
-  imports: [CustomSelect, DeviceThumbnail],
+  imports: [DeviceThumbnail],
   templateUrl: './add-device-modal.html',
   styleUrl: './add-device-modal.css',
 })
@@ -103,16 +106,7 @@ export class AddDeviceModal {
   protected readonly activeFilter = signal<QuickFilterId>('all');
   protected readonly activeCategory = signal<CategoryFilterId>('all');
   protected readonly focusedId = signal<DeviceKind | null>(null);
-  protected readonly selectedCounts = signal<ReadonlyMap<DeviceKind, number>>(new Map());
   protected readonly quickFilters = QUICK_FILTERS;
-
-  protected readonly categoryOptions = computed<readonly CustomSelectOption[]>(() => [
-    { value: 'all', label: 'ทุกหมวดหมู่' },
-    ...DEVICE_CATEGORY_OPTIONS.map((category) => ({
-      value: category.id,
-      label: category.label,
-    })),
-  ]);
 
   private readonly searchMatches = computed(() => {
     const query = this.query();
@@ -152,14 +146,6 @@ export class AddDeviceModal {
     return devices.find((device) => device.id === this.focusedId()) ?? devices[0] ?? null;
   });
 
-  protected readonly selectedDevices = computed(() =>
-    this.devices().filter((device) => (this.selectedCounts().get(device.id) ?? 0) > 0),
-  );
-
-  protected readonly selectedTotal = computed(() =>
-    [...this.selectedCounts().values()].reduce((total, quantity) => total + quantity, 0),
-  );
-
   protected readonly resultAnnouncement = computed(() => {
     const count = this.visibleDevices().length;
     const query = this.query().trim();
@@ -185,6 +171,31 @@ export class AddDeviceModal {
     }
 
     return counts;
+  });
+
+  protected readonly categoryFilters = computed<readonly CategoryFilterOption[]>(() => {
+    const filter = this.activeFilter();
+    const favorites = this.favoriteIdSet();
+    const recents = this.recentIdSet();
+    const matches = this.searchMatches().filter(
+      (device) =>
+        filter === 'all' ||
+        (filter === 'popular' && device.popularity > 0) ||
+        (filter === 'favorites' && favorites.has(device.id)) ||
+        (filter === 'recently-used' && recents.has(device.id)),
+    );
+    const counts = new Map<DeviceCategoryId, number>();
+    for (const device of matches) {
+      counts.set(device.categoryId, (counts.get(device.categoryId) ?? 0) + 1);
+    }
+
+    return [
+      { id: 'all', label: 'ทุกประเภท', count: matches.length },
+      ...DEVICE_CATEGORY_OPTIONS.flatMap((category) => {
+        const count = counts.get(category.id) ?? 0;
+        return count ? [{ id: category.id, label: category.label, count }] : [];
+      }),
+    ];
   });
 
   protected readonly emptyMessage = computed(() => {
@@ -223,47 +234,17 @@ export class AddDeviceModal {
     this.activeFilter.set(filter);
   }
 
-  protected updateCategory(value: string): void {
-    this.activeCategory.set(value as CategoryFilterId);
+  protected selectCategory(category: CategoryFilterId): void {
+    this.activeCategory.set(category);
   }
 
   protected focusDevice(id: DeviceKind): void {
     this.focusedId.set(id);
   }
 
-  protected toggleDeviceSelection(id: DeviceKind): void {
-    this.focusDevice(id);
-    this.selectedCounts.update((counts) => {
-      const next = new Map(counts);
-      if (next.has(id)) next.delete(id);
-      else next.set(id, 1);
-      return next;
-    });
-  }
-
-  protected incrementDevice(event: Event, id: DeviceKind): void {
-    event.stopPropagation();
-    this.focusDevice(id);
-    this.selectedCounts.update((counts) => {
-      const next = new Map(counts);
-      next.set(id, Math.min((next.get(id) ?? 0) + 1, 99));
-      return next;
-    });
-  }
-
-  protected decrementDevice(event: Event, id: DeviceKind): void {
-    event.stopPropagation();
-    this.selectedCounts.update((counts) => {
-      const next = new Map(counts);
-      const quantity = (next.get(id) ?? 0) - 1;
-      if (quantity > 0) next.set(id, quantity);
-      else next.delete(id);
-      return next;
-    });
-  }
-
-  protected selectedQuantity(id: DeviceKind): number {
-    return this.selectedCounts().get(id) ?? 0;
+  protected chooseDevice(id: DeviceKind): void {
+    if (!this.devices().some((candidate) => candidate.id === id)) return;
+    this.devicesAdded.emit([id]);
   }
 
   protected isFavorite(id: DeviceKind): boolean {
@@ -290,13 +271,6 @@ export class AddDeviceModal {
     }
   }
 
-  protected addSelectedDevices(): void {
-    const selections = [...this.selectedCounts()].flatMap(([id, quantity]) =>
-      Array.from({ length: quantity }, () => id),
-    );
-    if (selections.length) this.devicesAdded.emit(selections);
-  }
-
   protected closeDialog(): void {
     this.closed.emit();
     queueMicrotask(() => {
@@ -308,30 +282,34 @@ export class AddDeviceModal {
     if (event.target === event.currentTarget) this.closeDialog();
   }
 
-  protected onGridKeydown(event: KeyboardEvent, index: number, id: DeviceKind): void {
+  protected onGridKeydown(event: KeyboardEvent, id: DeviceKind): void {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       event.stopPropagation();
-      this.toggleDeviceSelection(id);
+      this.chooseDevice(id);
       return;
     }
 
     const cardButtons = this.gridCardButtons();
     if (!cardButtons.length) return;
 
-    let nextIndex = index;
+    const currentIndex = Math.max(
+      0,
+      cardButtons.findIndex((button) => button.dataset['deviceCard'] === id),
+    );
+    let nextIndex = currentIndex;
     switch (event.key) {
       case 'ArrowRight':
-        nextIndex = Math.min(index + 1, cardButtons.length - 1);
+        nextIndex = Math.min(currentIndex + 1, cardButtons.length - 1);
         break;
       case 'ArrowLeft':
-        nextIndex = Math.max(index - 1, 0);
+        nextIndex = Math.max(currentIndex - 1, 0);
         break;
       case 'ArrowDown':
-        nextIndex = this.findVerticalGridTarget(cardButtons, index, 1);
+        nextIndex = this.findVerticalGridTarget(cardButtons, currentIndex, 1);
         break;
       case 'ArrowUp':
-        nextIndex = this.findVerticalGridTarget(cardButtons, index, -1);
+        nextIndex = this.findVerticalGridTarget(cardButtons, currentIndex, -1);
         break;
       case 'Home':
         nextIndex = 0;
@@ -345,9 +323,10 @@ export class AddDeviceModal {
 
     event.preventDefault();
     event.stopPropagation();
-    const nextDevice = this.visibleDevices()[nextIndex];
-    if (nextDevice) this.focusDevice(nextDevice.id);
-    cardButtons[nextIndex]?.focus();
+    const nextButton = cardButtons[nextIndex];
+    const nextId = nextButton?.dataset['deviceCard'];
+    if (nextId) this.focusDevice(nextId);
+    nextButton?.focus();
   }
 
   protected onDialogKeydown(event: KeyboardEvent): void {
@@ -368,7 +347,7 @@ export class AddDeviceModal {
       const focused = this.focusedDevice();
       if (focused) {
         event.preventDefault();
-        this.toggleDeviceSelection(focused.id);
+        this.chooseDevice(focused.id);
       }
     }
   }
@@ -376,7 +355,7 @@ export class AddDeviceModal {
   private gridCardButtons(): HTMLButtonElement[] {
     return Array.from(
       this.dialog()?.nativeElement.querySelectorAll<HTMLButtonElement>('[data-device-card]') ?? [],
-    );
+    ).filter((button) => !button.disabled);
   }
 
   private findVerticalGridTarget(

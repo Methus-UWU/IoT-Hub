@@ -17,6 +17,15 @@ import { ProjectStore } from '../../projects/project.store';
 import { DashboardCanvas } from './dashboard-canvas';
 import { DashboardIcon } from './dashboard-icon';
 import { DashboardMenuState } from './dashboard-menu.state';
+import { apiErrorMessage } from '../../../../core/models/api-error';
+import { DashboardSync, DashboardContent, SaveOutcome } from './dashboard-sync';
+import { DashboardApiClient, DatastreamInput } from './dashboard-api.client';
+import { DashboardTemplates, TemplateApplied } from './dashboard-templates';
+import { DashboardLive } from './dashboard-live';
+import { DashboardViewCache } from './dashboard-view.cache';
+import { DevicesPanel } from './devices-panel';
+import type { TelemetryRange } from './devices-api.client';
+import { CONTROL_WIDGETS, applyLive, controlValue, seriesKeys } from './live-overlay';
 import {
   BREAKPOINT_CONFIG,
   DashboardBreakpoint,
@@ -30,7 +39,6 @@ import {
   WidgetSettingChange,
   WidgetSettings,
   WidgetType,
-  WIDGET_DEFINITIONS,
   cloneWidget,
   cloneWidgets,
   widgetDefinition,
@@ -56,12 +64,7 @@ import {
 type SaveState = 'saved' | 'saving' | 'unsaved';
 type ToastKind = 'success' | 'info' | 'warning';
 
-interface DashboardSnapshot {
-  name: string;
-  deviceScope: string;
-  dateRange: string;
-  widgets: DashboardWidget[];
-}
+type DashboardSnapshot = DashboardContent;
 
 interface ToastMessage {
   text: string;
@@ -69,13 +72,22 @@ interface ToastMessage {
 }
 
 const HISTORY_LIMIT = 50;
-const STORAGE_VERSION = 1;
 
 @Component({
   selector: 'app-dashboard-builder-page',
-  imports: [DashboardCanvas, DashboardIcon, RouterLink, WidgetInspector, WidgetLibrary],
+  imports: [
+    DashboardCanvas,
+    DashboardIcon,
+    DashboardTemplates,
+    DevicesPanel,
+    RouterLink,
+    WidgetInspector,
+    WidgetLibrary,
+  ],
   templateUrl: './dashboard-builder.page.html',
   styleUrl: './dashboard-builder.page.css',
+  // The dashboard is saved to the project on the server; the sync tracks its version.
+  providers: [DashboardSync, DashboardLive],
   host: {
     '(document:keydown)': 'handleKeyboardShortcut($event)',
     '(document:click)': 'closeOpenMenu()',
@@ -87,6 +99,8 @@ export class DashboardBuilderPage {
   private readonly destroyRef = inject(DestroyRef);
   private readonly projectStore = inject(ProjectStore);
   private readonly menuState = inject(DashboardMenuState);
+  protected readonly sync = inject(DashboardSync);
+  private readonly api = inject(DashboardApiClient);
   private readonly libraryTrigger = viewChild<ElementRef<HTMLButtonElement>>('libraryTrigger');
   private readonly toolbarMenuTrigger =
     viewChild<ElementRef<HTMLButtonElement>>('toolbarMenuTrigger');
@@ -126,6 +140,29 @@ export class DashboardBuilderPage {
   protected readonly published = signal(false);
   protected readonly toast = signal<ToastMessage | null>(null);
   protected readonly announcement = signal('Dashboard builder ready.');
+  /** The first load of this project's dashboard; the canvas shows a skeleton meanwhile. */
+  protected readonly loadingDashboard = signal(true);
+  protected readonly loadFailed = signal(false);
+  protected readonly datastreams = this.sync.datastreams;
+  /** The project's parts, for naming what a datastream reads. */
+  protected readonly components = signal<{ id: string; label: string }[]>([]);
+  protected readonly templatesOpen = signal(false);
+  protected readonly devicesOpen = signal(false);
+  protected readonly live = inject(DashboardLive);
+  private readonly viewCache = inject(DashboardViewCache);
+  /** The device the dashboard shows, from the document's device scope. */
+  protected readonly selectedDevice = computed(
+    () => this.live.devices().find((device) => device.id === this.deviceScope()) ?? null,
+  );
+  /** Preview with a device selected: widgets show and send its real values. */
+  protected readonly liveActive = computed(
+    () => !this.editMode() && this.selectedDevice() !== null,
+  );
+  protected readonly canvasWidgets = computed(() =>
+    this.liveActive() ? applyLive(this.widgets(), this.live.snapshot()) : this.widgets(),
+  );
+  protected readonly chartSeries = computed(() => (this.liveActive() ? this.live.series() : {}));
+  protected readonly dashboardVersion = signal(0);
 
   protected readonly breakpointOptions = (
     Object.keys(BREAKPOINT_CONFIG) as DashboardBreakpoint[]
@@ -149,28 +186,43 @@ export class DashboardBuilderPage {
     return 'All changes saved';
   });
 
+  /** Polls the selected device while the dashboard is live; stops otherwise. */
+  private readonly followLive = effect(() => {
+    const device = this.selectedDevice();
+    if (!this.liveActive() || !device) {
+      this.live.stop();
+      return;
+    }
+    this.live.watch({
+      projectId: this.projectId(),
+      deviceId: device.id,
+      keys: seriesKeys(this.widgets()),
+      range: (['1h', '24h', '7d', '30d'].includes(this.dateRange())
+        ? this.dateRange()
+        : '24h') as TelemetryRange,
+    });
+  });
+
   private readonly hydrateProject = effect(() => {
     const projectId = this.projectId();
     if (this.loadedProjectId === projectId) return;
     this.loadedProjectId = projectId;
-    this.hydrated.set(false);
-    this.restoreDashboard(projectId);
-    this.undoStack.set([]);
-    this.redoStack.set([]);
-    this.selectedIds.set([]);
-    this.hydrated.set(true);
+    void this.loadDashboard(projectId);
   });
 
   private readonly autoSaveDashboard = effect(() => {
     const snapshot = this.currentSnapshot();
-    const projectId = this.projectId();
     if (!this.hydrated()) return;
-    this.saveState.set('unsaved');
     if (this.autoSaveTimer) clearTimeout(this.autoSaveTimer);
+    // Loading the dashboard is not an edit: nothing to save until it differs.
+    if (this.sync.isSaved(snapshot)) {
+      if (this.saveState() !== 'saving') this.saveState.set('saved');
+      return;
+    }
+    this.saveState.set('unsaved');
     this.autoSaveTimer = setTimeout(() => {
-      const saved = this.persistSnapshot(projectId, snapshot);
-      this.saveState.set(saved ? 'saved' : 'unsaved');
       this.autoSaveTimer = null;
+      void this.persist(snapshot, false);
     }, 900);
   });
 
@@ -183,7 +235,8 @@ export class DashboardBuilderPage {
       if (this.autoSaveTimer) {
         clearTimeout(this.autoSaveTimer);
         this.autoSaveTimer = null;
-        this.persistSnapshot(this.projectId(), this.currentSnapshot(), false);
+        // Leaving the page must not drop the last edit; the save outlives the page.
+        void this.sync.save(this.currentSnapshot());
       }
       if (this.toastTimer) clearTimeout(this.toastTimer);
       this.menuState.close();
@@ -348,8 +401,9 @@ export class DashboardBuilderPage {
       type: request.type,
       title: definition.title,
       subtitle: this.defaultSubtitle(request.type),
-      deviceId: 'greenhouse-01',
-      datasource: this.defaultDatasource(request.type),
+      // Unbound until the user picks one of the project's datastreams in the inspector.
+      deviceId: '',
+      datasource: '',
       state: 'online',
       layouts,
       settings: this.defaultSettings(request.type),
@@ -385,6 +439,20 @@ export class DashboardBuilderPage {
   }
 
   protected handleWidgetSetting(change: WidgetSettingChange): void {
+    const widget = this.widgets().find((entry) => entry.id === change.widgetId);
+    if (this.liveActive() && widget?.datasource && CONTROL_WIDGETS.has(widget.type)) {
+      // A live control talks to the device; the saved dashboard does not change.
+      const stream = this.datastreams().find((entry) => entry.key === widget.datasource);
+      this.live
+        .setControl(widget.datasource, controlValue(stream?.dataType, change.controlValue))
+        .catch((error: unknown) =>
+          this.showToast(
+            apiErrorMessage(error) ?? 'The device did not accept the value.',
+            'warning',
+          ),
+        );
+      return;
+    }
     this.widgets.update((widgets) =>
       widgets.map((widget) =>
         widget.id === change.widgetId
@@ -586,23 +654,26 @@ export class DashboardBuilderPage {
     this.announce('Dashboard change restored.');
   }
 
-  protected saveDashboard(): boolean {
+  protected async saveDashboard(): Promise<boolean> {
     if (this.autoSaveTimer) {
       clearTimeout(this.autoSaveTimer);
       this.autoSaveTimer = null;
     }
-    this.saveState.set('saving');
-    const saved = this.persistSnapshot(this.projectId(), this.currentSnapshot());
-    this.saveState.set(saved ? 'saved' : 'unsaved');
-    if (saved) {
-      this.showToast('Dashboard saved', 'success');
-    }
+    const saved = await this.persist(this.currentSnapshot(), true);
+    if (saved) this.showToast('Dashboard saved', 'success');
     return saved;
   }
 
-  protected publishDashboard(): void {
+  /** Reloads the server's dashboard, discarding unsaved edits. Used after a conflict. */
+  protected async reloadDashboard(): Promise<void> {
+    if (this.autoSaveTimer) clearTimeout(this.autoSaveTimer);
+    this.autoSaveTimer = null;
+    await this.loadDashboard(this.projectId(), true);
+  }
+
+  protected async publishDashboard(): Promise<void> {
     if (this.publishing()) return;
-    if (!this.saveDashboard()) return;
+    if (!(await this.saveDashboard())) return;
     this.publishing.set(true);
     setTimeout(() => {
       this.publishing.set(false);
@@ -638,7 +709,8 @@ export class DashboardBuilderPage {
       return;
     }
     this.pushHistory();
-    this.widgets.set(cloneWidgets(STARTER_WIDGETS));
+    // The starter is an example: bindings to datastreams this project lacks are cleared.
+    this.widgets.set(this.sync.unbindUnknown(STARTER_WIDGETS));
     this.selectedIds.set(['temperature']);
     this.redoStack.set([]);
     this.showToast('Starter layout restored', 'info');
@@ -874,122 +946,149 @@ export class DashboardBuilderPage {
     );
   }
 
-  private restoreDashboard(projectId: string): void {
-    const stored = this.documentRef.defaultView?.localStorage.getItem(this.storageKey(projectId));
-    if (!stored) {
-      this.dashboardName.set(
-        this.projectName().toLowerCase().includes('greenhouse')
-          ? 'Greenhouse operations'
-          : `${this.projectName()} dashboard`,
+  private async loadDashboard(projectId: string, reload = false): Promise<void> {
+    this.hydrated.set(false);
+    this.loadFailed.set(false);
+    void this.live.loadDevices(projectId);
+    // A return visit draws the last known dashboard at once and checks the server behind it.
+    const cached = reload ? undefined : this.sync.cachedView(projectId);
+    if (cached) {
+      this.showContent(
+        this.sync.adopt(projectId, cached),
+        this.viewCache.components(projectId) ?? [],
       );
-      this.deviceScope.set('All devices');
-      this.dateRange.set('24h');
-      // No saved dashboard means the user has not built one. Seeding sample
-      // widgets here made a brand-new project look like it already had a
-      // dashboard, and counted charts the user never created. The starter
-      // layout is still available from the toolbar, on request.
-      this.widgets.set([]);
-      return;
+    } else if (!reload) {
+      this.loadingDashboard.set(true);
     }
-
     try {
-      const parsed: unknown = JSON.parse(stored);
-      if (!this.isStoredDashboard(parsed)) throw new Error('Invalid dashboard document');
-      this.dashboardName.set(parsed.name);
-      this.deviceScope.set(parsed.deviceScope);
-      this.dateRange.set(parsed.dateRange);
-      this.widgets.set(cloneWidgets(parsed.widgets));
-    } catch {
-      // Discarding the unreadable draft is right; replacing it with sample
-      // widgets would silently invent content the user never made.
-      this.widgets.set([]);
-      this.showToast('The saved dashboard could not be read, so it was cleared.', 'warning');
-    }
-  }
-
-  private persistSnapshot(
-    projectId: string,
-    snapshot: DashboardSnapshot,
-    showFailure = true,
-  ): boolean {
-    const dashboard: DashboardDocument = {
-      schemaVersion: STORAGE_VERSION,
-      dashboardId: `dashboard-${projectId}`,
-      ...snapshot,
-    };
-    try {
-      this.documentRef.defaultView?.localStorage.setItem(
-        this.storageKey(projectId),
-        JSON.stringify(dashboard),
-      );
-      return true;
-    } catch {
-      this.saveState.set('unsaved');
-      if (showFailure) {
-        this.showToast('Dashboard could not be saved in this browser.', 'warning');
+      if (cached) {
+        const [fresh, components] = await Promise.all([
+          this.sync.fetchLatest(projectId),
+          this.api.listComponents(projectId).catch(() => this.components()),
+        ]);
+        if (projectId !== this.projectId()) return;
+        this.components.set(components);
+        this.viewCache.setComponents(projectId, components);
+        this.sync.datastreams.set(fresh.datastreams);
+        // Someone else saved meanwhile: take it, unless the user has already edited.
+        if (
+          fresh.version !== this.sync.currentVersion &&
+          this.sync.isSaved(this.currentSnapshot())
+        ) {
+          this.showContent(this.sync.accept(fresh), components);
+        }
+        return;
       }
-      return false;
+      const [content, components] = await Promise.all([
+        this.sync.load(projectId),
+        this.api.listComponents(projectId).catch(() => []),
+      ]);
+      if (projectId !== this.projectId()) return;
+      this.viewCache.setComponents(projectId, components);
+      this.showContent(content, components);
+    } catch {
+      if (projectId !== this.projectId() || cached) return;
+      this.loadFailed.set(true);
+      this.showToast(
+        'The dashboard could not be loaded. Check the connection and retry.',
+        'warning',
+      );
+    } finally {
+      if (projectId === this.projectId()) this.loadingDashboard.set(false);
     }
   }
 
-  private isStoredDashboard(value: unknown): value is DashboardDocument {
-    if (!value || typeof value !== 'object') return false;
-    const candidate = value as Partial<DashboardDocument>;
-    return (
-      candidate.schemaVersion === STORAGE_VERSION &&
-      typeof candidate.name === 'string' &&
-      typeof candidate.deviceScope === 'string' &&
-      typeof candidate.dateRange === 'string' &&
-      Array.isArray(candidate.widgets) &&
-      candidate.widgets.every((widget) => this.isStoredWidget(widget))
+  private showContent(
+    content: DashboardContent,
+    components: { id: string; label: string }[],
+  ): void {
+    this.hydrated.set(false);
+    this.components.set(components);
+    this.dashboardVersion.set(this.sync.currentVersion);
+    this.dashboardName.set(content.name);
+    this.deviceScope.set(content.deviceScope);
+    this.dateRange.set(content.dateRange);
+    this.widgets.set(content.widgets);
+    this.undoStack.set([]);
+    this.redoStack.set([]);
+    this.selectedIds.set([]);
+    this.saveState.set('saved');
+    this.hydrated.set(true);
+  }
+
+  /** Saves through the sync and turns its outcome into the page's state and messages. */
+  private async persist(snapshot: DashboardSnapshot, explicit: boolean): Promise<boolean> {
+    this.saveState.set('saving');
+    const outcome: SaveOutcome = await this.sync.save(snapshot);
+    const saved = outcome === 'saved' || outcome === 'unchanged';
+    this.dashboardVersion.set(this.sync.currentVersion);
+    this.saveState.set(saved && this.sync.isSaved(this.currentSnapshot()) ? 'saved' : 'unsaved');
+    if (outcome === 'conflict') {
+      this.showToast(
+        'This dashboard was changed elsewhere (another tab or an AI proposal). Reload it before saving.',
+        'warning',
+      );
+    } else if (outcome === 'rejected') {
+      this.showToast(this.sync.lastProblem() || 'The server refused this dashboard.', 'warning');
+    } else if (outcome === 'offline' && explicit) {
+      this.showToast('Dashboard could not be saved. Check the connection.', 'warning');
+    }
+    return saved;
+  }
+
+  protected openDevices(): void {
+    this.closeToolbarMenu(true);
+    this.devicesOpen.set(true);
+  }
+
+  /** Shows a device on the dashboard; stored with the dashboard as its device scope. */
+  protected selectDevice(deviceId: string): void {
+    this.updateDashboardSettings({ field: 'deviceScope', value: deviceId });
+  }
+
+  protected openTemplates(): void {
+    this.closeToolbarMenu(true);
+    this.templatesOpen.set(true);
+  }
+
+  /** A template replaced the dashboard on the server; show what it wrote. */
+  protected applyTemplate(event: TemplateApplied): void {
+    const content = this.sync.accept(event.view);
+    this.pushHistory();
+    this.hydrated.set(false);
+    this.dashboardName.set(content.name);
+    this.deviceScope.set(content.deviceScope);
+    this.dateRange.set(content.dateRange);
+    this.widgets.set(content.widgets);
+    this.selectedIds.set([]);
+    this.dashboardVersion.set(this.sync.currentVersion);
+    this.hydrated.set(true);
+    this.showToast(
+      event.warnings[0] ?? 'Template applied. Rearrange it freely; the template stays as it was.',
+      event.warnings.length ? 'warning' : 'success',
     );
   }
 
-  private isStoredWidget(value: unknown): value is DashboardWidget {
-    if (!value || typeof value !== 'object') return false;
-    const candidate = value as Partial<DashboardWidget>;
-    const settings = candidate.settings as Partial<WidgetSettings> | undefined;
-    return (
-      typeof candidate.id === 'string' &&
-      WIDGET_DEFINITIONS.some((definition) => definition.type === candidate.type) &&
-      typeof candidate.title === 'string' &&
-      typeof candidate.subtitle === 'string' &&
-      typeof candidate.deviceId === 'string' &&
-      typeof candidate.datasource === 'string' &&
-      ['online', 'offline', 'loading', 'stale', 'error', 'pending'].includes(
-        candidate.state ?? '',
-      ) &&
-      Boolean(settings) &&
-      typeof settings?.accent === 'string' &&
-      ['white', 'soft', 'dark'].includes(settings.background ?? '') &&
-      typeof settings.showHeader === 'boolean' &&
-      typeof settings.unit === 'string' &&
-      Number.isInteger(settings.decimals) &&
-      (settings.decimals ?? -1) >= 0 &&
-      (settings.decimals ?? 5) <= 4 &&
-      typeof settings.controlValue === 'number' &&
-      Number.isFinite(settings.controlValue) &&
-      typeof settings.locked === 'boolean' &&
-      this.isStoredLayout(candidate.layouts?.desktop, BREAKPOINT_CONFIG.desktop.columns) &&
-      this.isStoredLayout(candidate.layouts?.tablet, BREAKPOINT_CONFIG.tablet.columns) &&
-      this.isStoredLayout(candidate.layouts?.mobile, BREAKPOINT_CONFIG.mobile.columns)
-    );
+  protected showPanelMessage(message: { text: string; kind: 'success' | 'warning' }): void {
+    this.showToast(message.text, message.kind);
   }
 
-  private isStoredLayout(value: unknown, columns: number): value is WidgetLayout {
-    if (!value || typeof value !== 'object') return false;
-    const layout = value as Partial<WidgetLayout>;
-    return (
-      Number.isInteger(layout.x) &&
-      (layout.x ?? -1) >= 0 &&
-      Number.isInteger(layout.y) &&
-      (layout.y ?? -1) >= 0 &&
-      Number.isInteger(layout.cols) &&
-      (layout.cols ?? 0) >= 1 &&
-      (layout.x ?? columns) + (layout.cols ?? 1) <= columns &&
-      Number.isInteger(layout.rows) &&
-      (layout.rows ?? 0) >= 1
-    );
+  /** Creates a datastream and binds the selected widget to it. */
+  protected async createDatastream(input: DatastreamInput): Promise<void> {
+    try {
+      const stream = await this.api.createDatastream(this.projectId(), input);
+      this.datastreams.update((streams) => [...streams, stream]);
+      const widget = this.primarySelectedWidget();
+      if (widget) {
+        this.patchWidget({
+          widgetId: widget.id,
+          patch: { datasource: stream.key, deviceId: stream.componentId ?? '' },
+        });
+      }
+      this.showToast(`Datastream "${stream.key}" added`, 'success');
+    } catch (error: unknown) {
+      this.showToast(apiErrorMessage(error) ?? 'The datastream could not be added.', 'warning');
+    }
   }
 
   private defaultSettings(type: WidgetType): WidgetSettings {
@@ -1016,18 +1115,10 @@ export class DashboardBuilderPage {
     return 'Greenhouse sensor';
   }
 
-  private defaultDatasource(type: WidgetType): string {
-    return type.replaceAll('-', '_');
-  }
-
   private createWidgetId(type: WidgetType): string {
     const suffix =
       this.documentRef.defaultView?.crypto.randomUUID().slice(0, 8) ?? Date.now().toString(36);
     return `${type}-${suffix}`;
-  }
-
-  private storageKey(projectId: string): string {
-    return `iot-hub:dashboard-builder:${projectId}:v${STORAGE_VERSION}`;
   }
 
   private slugify(value: string): string {

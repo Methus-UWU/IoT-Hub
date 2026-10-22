@@ -1,0 +1,424 @@
+<section class="documents-page" aria-labelledby="documents-heading">
+  <div class="documents-container">
+    <header class="documents-hero">
+      <span class="eyebrow">คลังความรู้</span>
+      <h1 id="documents-heading">สร้างงานได้อย่างมั่นใจ</h1>
+      <p>คู่มือ ข้อมูลอุปกรณ์ และแนวทางปฏิบัติสำหรับงานอุปกรณ์เชื่อมต่อเครือข่าย</p>
+      <label class="document-search">
+        <span class="sr-only">ค้นหาในคลังความรู้</span>
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <circle cx="10.5" cy="10.5" r="6.5" stroke="currentColor" stroke-width="1.6" />
+          <path
+            d="m15.5 15.5 4.5 4.5"
+            stroke="currentColor"
+            stroke-width="1.6"
+            stroke-linecap="round"
+          />
+        </svg>
+        <input
+          type="search"
+          [placeholder]="
+            tab() === 'guides' ? 'ค้นหาคู่มือ…' : 'ค้นหาอุปกรณ์ เช่น DHT22 รีเลย์ เซนเซอร์…'
+          "
+          [value]="query()"
+          (input)="updateQuery($event)"
+        />
+      </label>
+      @if (!query()) {
+        <app-recent-searches scope="documents" (picked)="pickRecentSearch($event)" />
+      }
+    </header>
+
+    <div class="tab-bar" role="tablist" aria-label="ประเภทเอกสาร">
+      <button
+        type="button"
+        role="tab"
+        [attr.aria-selected]="tab() === 'guides'"
+        [class.tab-active]="tab() === 'guides'"
+        (click)="setTab('guides')"
+      >
+        คู่มือ
+      </button>
+      <button
+        type="button"
+        role="tab"
+        [attr.aria-selected]="tab() === 'devices'"
+        [class.tab-active]="tab() === 'devices'"
+        (click)="setTab('devices')"
+      >
+        ข้อมูลอุปกรณ์
+      </button>
+    </div>
+
+    <div class="documents-layout">
+      <aside class="category-panel" aria-label="หมวดหมู่">
+        <p>เลือกดู</p>
+        @if (tab() === 'guides') {
+          @for (item of categories; track item.value) {
+            <button
+              type="button"
+              [class.category-active]="category() === item.value"
+              [attr.aria-pressed]="category() === item.value"
+              (click)="setCategory(item.value)"
+            >
+              <span>{{ item.label }}</span>
+              <small>{{ item.count }}</small>
+            </button>
+          }
+        } @else {
+          @for (item of deviceCategories; track item.id) {
+            <button
+              type="button"
+              [class.category-active]="deviceCategory() === item.id"
+              [attr.aria-pressed]="deviceCategory() === item.id"
+              (click)="setDeviceCategory(item.id)"
+            >
+              <span>{{ item.label }}</span>
+              <small>{{ item.count }}</small>
+            </button>
+          }
+        }
+        <div class="help-card">
+          <span aria-hidden="true">
+            <svg viewBox="0 0 20 20" fill="none">
+              <path
+                d="M5 6.5h10v8H8l-3 2v-10Z"
+                stroke="currentColor"
+                stroke-width="1.3"
+                stroke-linejoin="round"
+              />
+              <path
+                d="M8 9h4M8 12h2"
+                stroke="currentColor"
+                stroke-width="1.3"
+                stroke-linecap="round"
+              />
+            </svg>
+          </span>
+          <strong>ไม่เจอคำตอบ?</strong>
+          <p>เปิดผู้ช่วย AI จากหน้าโปรเจกต์ แล้วแนบไฟล์ซอร์สที่กำลังเปิดอยู่ไปด้วย</p>
+        </div>
+      </aside>
+
+      <main class="article-browser">
+        <div class="browser-heading">
+          <div>
+            <span class="eyebrow">{{ tab() === 'guides' ? 'แนะนำ' : 'อ้างอิง' }}</span>
+            <h2>{{ tab() === 'guides' ? 'คู่มือการพัฒนางาน IoT' : 'อุปกรณ์ที่ระบบรองรับ' }}</h2>
+          </div>
+          <span>{{ resultCount() }} {{ tab() === 'guides' ? 'บทความ' : 'รายการ' }}</span>
+        </div>
+
+        @if (tab() === 'guides') {
+          @if (articles().length) {
+            <div class="article-grid" [class.replay]="replay()">
+              @for (article of articles(); track article.id; let first = $first, i = $index) {
+                <button
+                  type="button"
+                  class="article-card"
+                  [style.--i]="i"
+                  [class.article-featured]="first && category() === 'all' && !query()"
+                  (click)="openArticle(article, $event)"
+                >
+                  <span class="article-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none">
+                      <path
+                        d="M6 3.5h8l4 4V20.5H6z"
+                        stroke="currentColor"
+                        stroke-width="1.4"
+                        stroke-linejoin="round"
+                      />
+                      <path
+                        d="M14 3.5v4h4M9 12h6M9 15.5h4"
+                        stroke="currentColor"
+                        stroke-width="1.4"
+                        stroke-linecap="round"
+                      />
+                    </svg>
+                  </span>
+                  <span class="article-copy">
+                    <small>{{ categoryLabels[article.category] }}</small>
+                    <strong>{{ article.title }}</strong>
+                    <span>{{ article.description }}</span>
+                    <i>{{ article.level }} · อ่าน {{ article.readTime }}</i>
+                  </span>
+                  <svg class="article-arrow" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                    <path
+                      d="M4 10h12M12 6l4 4-4 4"
+                      stroke="currentColor"
+                      stroke-width="1.35"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                </button>
+              }
+            </div>
+          } @else {
+            <div class="no-articles">
+              <strong>ไม่พบคู่มือที่ตรงกับที่ค้นหา</strong>
+              <p>ลองใช้คำค้นที่กว้างขึ้น หรือเลือกหมวดอื่น</p>
+            </div>
+          }
+        } @else {
+          <app-device-comparison
+            [devices]="comparisonDevices()"
+            [limit]="comparisonLimit"
+            (removed)="removeComparison($event)"
+            (cleared)="comparisonDevices.set([])"
+          />
+          @if (devices().length) {
+            <div class="device-grid" [class.replay]="replay()">
+              @for (device of devices(); track device.id; let i = $index) {
+                <article
+                  class="device-card"
+                  [style.--i]="i"
+                  [class.device-card-selected]="comparisonIds().has(device.id)"
+                >
+                  <button
+                    type="button"
+                    class="device-details-button"
+                    (click)="openDevice(device, $event)"
+                    [attr.aria-label]="'ดูข้อมูล ' + device.name"
+                  >
+                    <span class="device-figure">
+                      <app-device-thumbnail [kind]="device.id" />
+                    </span>
+                    <span class="device-copy">
+                      <small>{{ device.categoryLabel }}</small>
+                      <strong>{{ device.name }}</strong>
+                      <span>{{ device.summary || device.model }}</span>
+                    </span>
+                    <span class="device-badges">
+                      @if (device.voltageLabel) {
+                        <i>{{ device.voltageLabel }}</i>
+                      }
+                      @for (label of device.interfaceLabels; track label) {
+                        <i>{{ label }}</i>
+                      }
+                      <i>{{ device.pins.length }} ขา</i>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    class="device-compare-button"
+                    [attr.aria-pressed]="comparisonIds().has(device.id)"
+                    [attr.aria-label]="'เปรียบเทียบ ' + device.name"
+                    [disabled]="comparisonFull() && !comparisonIds().has(device.id)"
+                    (click)="toggleComparison(device)"
+                  >
+                    <span aria-hidden="true">{{ comparisonIds().has(device.id) ? '✓' : '+' }}</span>
+                    {{ comparisonIds().has(device.id) ? 'เลือกแล้ว' : 'เปรียบเทียบ' }}
+                  </button>
+                </article>
+              }
+            </div>
+          } @else {
+            <div class="no-articles">
+              <strong>ไม่พบอุปกรณ์ที่ตรงกับที่ค้นหา</strong>
+              <p>ลองค้นด้วยชื่อรุ่น เช่น DHT22 หรือ HC-SR04</p>
+            </div>
+          }
+        }
+      </main>
+    </div>
+  </div>
+
+  @if (selectedArticle(); as article) {
+    <button
+      type="button"
+      class="reader-backdrop"
+      aria-label="ปิดบทความ"
+      (click)="closeReader()"
+    ></button>
+    <aside
+      class="article-reader"
+      [class.wiring-reader]="article.wiringExample"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="reader-title"
+    >
+      <header>
+        <div>
+          <span>{{ categoryLabels[article.category] }}</span>
+          <h2 id="reader-title">{{ article.title }}</h2>
+        </div>
+        <button #articleClose type="button" aria-label="ปิดบทความ" (click)="closeReader()">
+          <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <path
+              d="m5 5 10 10M15 5 5 15"
+              stroke="currentColor"
+              stroke-width="1.4"
+              stroke-linecap="round"
+            />
+          </svg>
+        </button>
+      </header>
+      <div class="reader-content">
+        <p class="reader-lead">{{ article.description }}</p>
+        <p class="reader-meta">{{ article.level }} · อ่าน {{ article.readTime }}</p>
+        @if (article.wiringExample === 'esp32-basics') {
+          <app-wiring-gallery />
+        }
+        @if (article.illustration; as illustration) {
+          <details>
+            <summary>ดูแผนผังแยกแต่ละวงจร</summary>
+            <figure class="guide-illustration">
+              <a
+                [href]="illustration.src"
+                target="_blank"
+                rel="noopener"
+                aria-label="เปิดภาพการต่อวงจรขนาดเต็มในแท็บใหม่"
+              >
+                <img
+                  [ngSrc]="illustration.src"
+                  [alt]="illustration.alt"
+                  [width]="illustration.width"
+                  [height]="illustration.height"
+                />
+              </a>
+              <figcaption>{{ illustration.caption }}</figcaption>
+              <a [href]="illustration.src" target="_blank" rel="noopener"
+                >เปิดภาพขนาดเต็ม (แท็บใหม่)</a
+              >
+            </figure>
+          </details>
+        }
+        <div class="reader-body" [innerHTML]="article.body | markdown"></div>
+      </div>
+    </aside>
+  }
+
+  @if (selectedDevice(); as device) {
+    <button
+      type="button"
+      class="reader-backdrop"
+      aria-label="ปิดข้อมูลอุปกรณ์"
+      (click)="closeReader()"
+    ></button>
+    <aside class="article-reader" role="dialog" aria-modal="true" aria-labelledby="device-title">
+      <header>
+        <div>
+          <span>{{ device.categoryLabel }}</span>
+          <h2 id="device-title">{{ device.name }}</h2>
+        </div>
+        <button #deviceClose type="button" aria-label="ปิดข้อมูลอุปกรณ์" (click)="closeReader()">
+          <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <path
+              d="m5 5 10 10M15 5 5 15"
+              stroke="currentColor"
+              stroke-width="1.4"
+              stroke-linecap="round"
+            />
+          </svg>
+        </button>
+      </header>
+      <div class="reader-content">
+        @if (device.summary) {
+          <p class="reader-lead">{{ device.summary }}</p>
+        }
+        <p class="reader-meta">รุ่น {{ device.model }}</p>
+
+        <figure class="device-preview">
+          <app-device-thumbnail [kind]="device.id" />
+          <figcaption>ภาพอุปกรณ์แบบเดียวกับที่แสดงบนพื้นที่ทำงาน</figcaption>
+        </figure>
+
+        <dl class="spec-list">
+          @if (device.voltageLabel) {
+            <div>
+              <dt>แรงดันใช้งาน</dt>
+              <dd>{{ device.voltageLabel }}</dd>
+            </div>
+          }
+          @if (device.interfaceLabels.length) {
+            <div>
+              <dt>อินเทอร์เฟซ</dt>
+              <dd>{{ device.interfaceLabels.join(' · ') }}</dd>
+            </div>
+          }
+          <div>
+            <dt>จำนวนขา</dt>
+            <dd>{{ device.pins.length }}</dd>
+          </div>
+        </dl>
+
+        @if (device.usage) {
+          <h3>ใช้ทำอะไรได้</h3>
+          <p>{{ device.usage }}</p>
+        }
+
+        @if (device.caution) {
+          <div class="device-caution">
+            <strong>ข้อควรระวัง</strong>
+            <p>{{ device.caution }}</p>
+          </div>
+        }
+
+        <h3>ขาต่อใช้งาน</h3>
+        @if (device.isBoard) {
+          <p class="pin-legend">
+            <span class="pin-advice advice-recommended">แนะนำ</span> ใช้ได้ทั่วไป
+            <span class="pin-advice advice-caution">ระวัง</span> ใช้ได้แต่มีเงื่อนไข
+            <span class="pin-advice advice-avoid">ควรหลีกเลี่ยง</span> ไม่ควรต่ออุปกรณ์
+          </p>
+        }
+        <div class="pin-table-scroll">
+          <table class="pin-table">
+            <caption class="sr-only">
+              ตารางขาของ
+              {{
+                device.name
+              }}
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">ขา</th>
+                <th scope="col">ประเภท</th>
+                <th scope="col">ทิศทาง</th>
+                <th scope="col">แรงดัน</th>
+                @if (device.isBoard) {
+                  <th scope="col">คำแนะนำ</th>
+                }
+              </tr>
+            </thead>
+            <tbody>
+              @for (pin of device.pins; track $index) {
+                <tr>
+                  <th scope="row">{{ pin.name }}</th>
+                  <td>{{ pin.typeLabel || '—' }}</td>
+                  <td>{{ pin.directionLabel || '—' }}</td>
+                  <td>{{ pin.voltageLabel || '—' }}</td>
+                  @if (device.isBoard) {
+                    <td class="pin-advice-cell">
+                      @if (pin.advice; as advice) {
+                        <span class="pin-advice" [class]="'pin-advice advice-' + advice.level">{{
+                          advice.label
+                        }}</span>
+                        @if (advice.reason) {
+                          <small>{{ advice.reason }}</small>
+                        }
+                      } @else {
+                        —
+                      }
+                    </td>
+                  }
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        @if (!device.isBoard) {
+          <app-device-toolchain [libraries]="device.libraries" />
+        }
+
+        @if (device.datasheet) {
+          <div class="reader-body datasheet-body" [innerHTML]="device.datasheet | markdown"></div>
+        } @else {
+          <p class="datasheet-pending">ยังไม่มีเอกสารฉบับเต็มของอุปกรณ์นี้</p>
+        }
+      </div>
+    </aside>
+  }
+</section>

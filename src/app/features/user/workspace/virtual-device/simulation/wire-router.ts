@@ -117,12 +117,7 @@ function segmentHitsBox(from: Point, to: Point, box: Obstacle): boolean {
   const minY = Math.min(from.y, to.y);
   const maxY = Math.max(from.y, to.y);
 
-  return (
-    maxX >= box.x &&
-    minX <= box.x + box.width &&
-    maxY >= box.y &&
-    minY <= box.y + box.height
-  );
+  return maxX >= box.x && minX <= box.x + box.width && maxY >= box.y && minY <= box.y + box.height;
 }
 
 function pathHitsAny(points: readonly Point[], boxes: readonly Obstacle[]): boolean {
@@ -144,7 +139,7 @@ function simplify(points: readonly Point[]): Point[] {
     result.push(point);
   }
 
-  for (let index = 1; index < result.length - 1; ) {
+  for (let index = 1; index < result.length - 1;) {
     const previous = result[index - 1];
     const current = result[index];
     const next = result[index + 1];
@@ -202,21 +197,11 @@ export function routeWire(
 ): Point[] {
   const startDirection = directionFor(start.side, start.point, end.point);
   const endDirection = directionFor(end.side, end.point, start.point);
-  const startStub = offset(
-    start.point,
-    startDirection,
-    exitDistance(start, startDirection),
-  );
+  const startStub = offset(start.point, startDirection, exitDistance(start, startDirection));
   const endStub = offset(end.point, endDirection, exitDistance(end, endDirection));
 
   if (manualWaypoints.length > 0) {
-    return simplify([
-      start.point,
-      startStub,
-      ...manualWaypoints,
-      endStub,
-      end.point,
-    ]);
+    return simplify([start.point, startStub, ...manualWaypoints, endStub, end.point]);
   }
 
   // Every component is an obstacle, including the two a wire is attached to.

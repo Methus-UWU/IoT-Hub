@@ -7,6 +7,8 @@ import {
   RemoteComponent,
 } from '../../../../../core/services/projects-api.service';
 import { WorkspaceContextService } from '../../../../../core/services/workspace-context.service';
+import { deviceById } from '../devices/device-catalog';
+import { layoutNewParts } from '../layout/auto-layout';
 
 export interface CanvasComponent {
   /** Server id. Used directly as the canvas instance id so the two cannot drift. */
@@ -26,11 +28,8 @@ export interface ComponentLimitRefusal {
   used: number;
 }
 
-export function asComponentLimitRefusal(
-  error: unknown,
-): ComponentLimitRefusal | null {
-  const body = (error as { error?: { error?: Record<string, unknown> } })?.error
-    ?.error;
+export function asComponentLimitRefusal(error: unknown): ComponentLimitRefusal | null {
+  const body = (error as { error?: { error?: Record<string, unknown> } })?.error?.error;
   if (!body || body['code'] !== 'COMPONENT_LIMIT_REACHED') return null;
 
   return {
@@ -38,6 +37,25 @@ export function asComponentLimitRefusal(
     limit: typeof body['limit'] === 'number' ? body['limit'] : 0,
     used: typeof body['used'] === 'number' ? body['used'] : 0,
   };
+}
+
+export function asBoardLimitRefusal(error: unknown): ComponentLimitRefusal | null {
+  const body = (error as { error?: { error?: Record<string, unknown> } })?.error?.error;
+  if (!body || body['code'] !== 'BOARD_LIMIT_REACHED') return null;
+
+  return {
+    message: typeof body['message'] === 'string' ? body['message'] : '',
+    limit: typeof body['limit'] === 'number' ? body['limit'] : 0,
+    used: typeof body['used'] === 'number' ? body['used'] : 0,
+  };
+}
+
+/** Fields of a component that are written in the background. */
+interface ComponentPatch {
+  x?: number;
+  y?: number;
+  rotation?: number;
+  state?: Record<string, unknown>;
 }
 
 /** Namespaces a connection in the shared timer map, away from component ids. */
@@ -67,14 +85,8 @@ export class ProjectCanvasService {
   private readonly workspaces = inject(WorkspaceContextService);
 
   private readonly pendingSaves = new Map<string, ReturnType<typeof setTimeout>>();
-  private readonly pendingPatches = new Map<
-    string,
-    { x?: number; y?: number; rotation?: number }
-  >();
-  private readonly pendingWaypoints = new Map<
-    string,
-    { x: number; y: number }[]
-  >();
+  private readonly pendingPatches = new Map<string, ComponentPatch>();
+  private readonly pendingWaypoints = new Map<string, { x: number; y: number }[]>();
 
   /** Device and connection counts against the plan, for the toolbar. */
   async usage(projectId: string): Promise<ProjectUsageReport | null> {
@@ -87,9 +99,7 @@ export class ProjectCanvasService {
     const workspaceId = await this.workspaceId();
     if (!workspaceId) return [];
 
-    const remote = await firstValueFrom(
-      this.api.listComponents(workspaceId, projectId),
-    );
+    const remote = await firstValueFrom(this.api.listComponents(workspaceId, projectId));
     return remote.map((component) => toCanvasComponent(component));
   }
 
@@ -110,9 +120,7 @@ export class ProjectCanvasService {
     const created = await firstValueFrom(
       this.api.addComponent(workspaceId, projectId, {
         definitionId,
-        ...(placement
-          ? { x: placement.x, y: placement.y, label: placement.label }
-          : {}),
+        ...(placement ? { x: placement.x, y: placement.y, label: placement.label } : {}),
       }),
     );
     return toCanvasComponent(created);
@@ -129,6 +137,41 @@ export class ProjectCanvasService {
     componentId: string,
     patch: { x?: number; y?: number; rotation?: number },
   ): void {
+    this.queuePatch(projectId, componentId, patch);
+  }
+
+  /**
+   * Queues the part's saved property values.
+   *
+   * Shares the move debounce, so a slider dragged across its range is one write,
+   * and a move and a setting change made together land in the same request.
+   */
+  queueState(projectId: string, componentId: string, state: Record<string, unknown>): void {
+    this.queuePatch(projectId, componentId, { state });
+  }
+
+  /**
+   * Switches a placed part to another catalog variant, with the values it keeps.
+   *
+   * Any queued move is written first, so the change never races a pending patch.
+   */
+  async changeDefinition(
+    projectId: string,
+    componentId: string,
+    definitionId: string,
+    state: Record<string, unknown>,
+  ): Promise<void> {
+    await this.flush(projectId, componentId);
+
+    const workspaceId = await this.workspaceId();
+    if (!workspaceId) return;
+
+    await firstValueFrom(
+      this.api.updateComponent(workspaceId, projectId, componentId, { definitionId, state }),
+    );
+  }
+
+  private queuePatch(projectId: string, componentId: string, patch: ComponentPatch): void {
     const merged = { ...this.pendingPatches.get(componentId), ...patch };
     this.pendingPatches.set(componentId, merged);
 
@@ -143,6 +186,39 @@ export class ProjectCanvasService {
     );
   }
 
+  /**
+   * Moves freshly added parts beside the board they are wired to.
+   *
+   * Used after the assistant's plan lands: its parts arrive on the server's spawn
+   * grid, which ignores wiring. Parts already on the canvas are left where they are.
+   */
+  async arrangeNew(projectId: string, componentIds: readonly string[]): Promise<void> {
+    if (!componentIds.length) return;
+    const workspaceId = await this.workspaceId();
+    if (!workspaceId) return;
+
+    const [components, connections] = await Promise.all([
+      this.load(projectId),
+      this.loadConnections(projectId),
+    ]);
+    const parts = components.flatMap((component) => {
+      const definition = deviceById(component.definitionId);
+      return definition ? [{ ...component, definition }] : [];
+    });
+
+    const positions = layoutNewParts(parts, connections, componentIds);
+    await Promise.all(
+      [...positions].map(([componentId, { x, y }]) =>
+        firstValueFrom(
+          this.api.updateComponent(workspaceId, projectId, componentId, {
+            x: Math.round(x),
+            y: Math.round(y),
+          }),
+        ),
+      ),
+    );
+  }
+
   /** Writes any queued change immediately, e.g. before leaving the page. */
   async flushAll(projectId: string): Promise<void> {
     const ids = [...this.pendingPatches.keys()];
@@ -153,9 +229,7 @@ export class ProjectCanvasService {
     const workspaceId = await this.workspaceId();
     if (!workspaceId) return [];
 
-    const remote = await firstValueFrom(
-      this.api.listConnections(workspaceId, projectId),
-    );
+    const remote = await firstValueFrom(this.api.listConnections(workspaceId, projectId));
     return remote.map((connection) => ({
       id: connection.id,
       from: connection.from,
@@ -173,9 +247,7 @@ export class ProjectCanvasService {
     const workspaceId = await this.workspaceId();
     if (!workspaceId) return null;
 
-    const created = await firstValueFrom(
-      this.api.addConnection(workspaceId, projectId, input),
-    );
+    const created = await firstValueFrom(this.api.addConnection(workspaceId, projectId, input));
     return {
       id: created.id,
       from: created.from,
@@ -211,10 +283,7 @@ export class ProjectCanvasService {
     );
   }
 
-  async removeConnection(
-    projectId: string,
-    connectionId: string,
-  ): Promise<void> {
+  async removeConnection(projectId: string, connectionId: string): Promise<void> {
     const key = wireKey(connectionId);
     const timer = this.pendingSaves.get(key);
     if (timer) clearTimeout(timer);
@@ -224,15 +293,10 @@ export class ProjectCanvasService {
     const workspaceId = await this.workspaceId();
     if (!workspaceId) return;
 
-    await firstValueFrom(
-      this.api.deleteConnection(workspaceId, projectId, connectionId),
-    );
+    await firstValueFrom(this.api.deleteConnection(workspaceId, projectId, connectionId));
   }
 
-  private async flushWaypoints(
-    projectId: string,
-    connectionId: string,
-  ): Promise<void> {
+  private async flushWaypoints(projectId: string, connectionId: string): Promise<void> {
     const waypoints = this.pendingWaypoints.get(connectionId);
     this.pendingWaypoints.delete(connectionId);
     this.pendingSaves.delete(wireKey(connectionId));
@@ -242,12 +306,7 @@ export class ProjectCanvasService {
     if (!workspaceId) return;
 
     await firstValueFrom(
-      this.api.updateConnectionWaypoints(
-        workspaceId,
-        projectId,
-        connectionId,
-        waypoints,
-      ),
+      this.api.updateConnectionWaypoints(workspaceId, projectId, connectionId, waypoints),
     );
   }
 
@@ -259,9 +318,7 @@ export class ProjectCanvasService {
     const workspaceId = await this.workspaceId();
     if (!workspaceId) return;
 
-    await firstValueFrom(
-      this.api.deleteComponent(workspaceId, projectId, componentId),
-    );
+    await firstValueFrom(this.api.deleteComponent(workspaceId, projectId, componentId));
   }
 
   private cancel(componentId: string): void {
@@ -279,9 +336,7 @@ export class ProjectCanvasService {
     const workspaceId = await this.workspaceId();
     if (!workspaceId) return;
 
-    await firstValueFrom(
-      this.api.updateComponent(workspaceId, projectId, componentId, patch),
-    );
+    await firstValueFrom(this.api.updateComponent(workspaceId, projectId, componentId, patch));
   }
 
   private async workspaceId(): Promise<string | null> {
@@ -313,11 +368,8 @@ export interface CanvasConnection {
 }
 
 /** Raised when the plan's per-project connection ceiling refuses a wire. */
-export function asConnectionLimitRefusal(
-  error: unknown,
-): ComponentLimitRefusal | null {
-  const body = (error as { error?: { error?: Record<string, unknown> } })?.error
-    ?.error;
+export function asConnectionLimitRefusal(error: unknown): ComponentLimitRefusal | null {
+  const body = (error as { error?: { error?: Record<string, unknown> } })?.error?.error;
   if (!body || body['code'] !== 'CONNECTION_LIMIT_REACHED') return null;
 
   return {

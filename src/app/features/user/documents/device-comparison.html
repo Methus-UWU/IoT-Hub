@@ -1,0 +1,96 @@
+<section class="comparison-tray" aria-label="รายการเปรียบเทียบอุปกรณ์">
+  <div class="tray-heading">
+    <div>
+      <strong>เปรียบเทียบอุปกรณ์</strong>
+      <p role="status">
+        @if (devices().length === limit()) {
+          เลือกครบ {{ limit() }} รายการแล้ว นำรายการออกเพื่อเลือกอุปกรณ์อื่น
+        } @else {
+          เลือก 2–{{ limit() }} รายการจากหมวดเดียวกันหรือข้ามหมวด ({{ devices().length }}/{{
+            limit()
+          }})
+        }
+      </p>
+    </div>
+    <button type="button" class="compare-action" [disabled]="devices().length < 2" (click)="open()">
+      เปรียบเทียบ ({{ devices().length }})
+    </button>
+  </div>
+  @if (devices().length) {
+    <div class="selected-devices">
+      @for (device of devices(); track device.id) {
+        <button
+          type="button"
+          class="selected-chip"
+          (click)="removed.emit(device.id)"
+          [attr.aria-label]="'นำ ' + device.name + ' ออกจากการเปรียบเทียบ'"
+        >
+          {{ device.name }} <span aria-hidden="true">×</span>
+        </button>
+      }
+      <button type="button" class="clear-action" (click)="cleared.emit()">ล้างทั้งหมด</button>
+    </div>
+  }
+</section>
+
+<dialog #dialog aria-labelledby="comparison-title" aria-describedby="comparison-description">
+  <header class="dialog-heading">
+    <div>
+      <h2 id="comparison-title">เปรียบเทียบอุปกรณ์</h2>
+      <p id="comparison-description">ดูจุดเด่น ข้อจำกัด และการใช้งานที่เหมาะสมของแต่ละรุ่น</p>
+    </div>
+    <button
+      type="button"
+      class="close-action"
+      aria-label="ปิดการเปรียบเทียบ"
+      (click)="close()"
+      autofocus
+    >
+      ×
+    </button>
+  </header>
+  @if (mixedCategories()) {
+    <p class="comparison-note">
+      อุปกรณ์ต่างหมวดมีหน้าที่ต่างกัน ใช้เปรียบเทียบความเหมาะสมกับงาน อาจใช้แทนกันไม่ได้
+    </p>
+  }
+  <div
+    class="comparison-scroll"
+    tabindex="0"
+    role="region"
+    aria-label="ตารางเปรียบเทียบ เลื่อนแนวนอนเพื่อดูอุปกรณ์ทั้งหมด"
+  >
+    <table>
+      <caption class="sr-only">
+        จุดเด่น ข้อจำกัด และสเปกอุปกรณ์ที่เลือก
+        {{
+          devices().length
+        }}
+        รายการ
+      </caption>
+      <thead>
+        <tr>
+          <th scope="col">รายละเอียด</th>
+          @for (device of devices(); track device.id) {
+            <th scope="col">
+              <app-device-thumbnail [kind]="device.id" />
+              <strong>{{ device.name }}</strong>
+              <small>{{ device.model }}</small>
+            </th>
+          }
+        </tr>
+      </thead>
+      <tbody>
+        @for (row of rows(); track row.label) {
+          <tr>
+            <th scope="row">{{ row.label }}</th>
+            @for (value of row.values; track $index) {
+              <td>{{ value }}</td>
+            }
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  <footer>ข้อมูลจากคลังอุปกรณ์ของระบบ · กด Esc หรือปุ่มปิดเพื่อกลับไปเลือกอุปกรณ์</footer>
+</dialog>

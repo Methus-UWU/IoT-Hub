@@ -1,0 +1,215 @@
+.ai-panel-header {
+  display: grid;
+  min-width: 0;
+  gap: 0.85rem;
+  padding: 0.9rem;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+.ai-profile {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.7rem;
+}
+.ai-profile-copy {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: 0.15rem;
+}
+.ai-profile-copy strong {
+  color: var(--color-ink);
+  font-size: 0.875rem;
+  font-weight: 650;
+}
+.ai-profile-copy > span,
+.ai-session-label {
+  color: var(--color-ink-muted);
+  font-size: 0.6875rem;
+}
+.ai-session-toolbar {
+  display: flex;
+  align-items: end;
+  gap: 0.5rem;
+}
+.ai-session-picker {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: 0.3rem;
+}
+.ai-new-chat-button {
+  display: flex;
+  min-height: 2.25rem;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--color-indigo-200);
+  border-radius: 0.65rem;
+  color: var(--color-indigo-700);
+  background: var(--color-indigo-50);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.ai-new-chat-button:hover {
+  background: var(--color-indigo-100);
+}
+.ai-new-chat-button svg {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+.ai-new-chat-button:focus-visible,
+.ai-close-button:focus-visible {
+  outline: 2px solid var(--color-indigo-600);
+  outline-offset: 2px;
+}
+.ai-close-button {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  flex: none;
+  place-items: center;
+  border-radius: 0.65rem;
+  color: var(--color-ink-muted);
+  cursor: pointer;
+}
+.ai-close-button:hover {
+  color: var(--color-ink);
+  background: var(--color-surface-muted);
+}
+.ai-close-button svg {
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+
+/* Conversations and profiles load from the server; these hold their place meanwhile. */
+.ai-picker-skeleton {
+  display: block;
+  height: 2.25rem;
+  border-radius: 0.65rem;
+}
+.ai-picker-skeleton,
+.chat-skeleton-avatar,
+.chat-skeleton-lines i {
+  background: linear-gradient(90deg, #eceef3 25%, #f6f7fa 37%, #eceef3 63%);
+  background-size: 400% 100%;
+  animation: chat-shimmer 1.4s ease-in-out infinite;
+}
+.chat-skeleton {
+  display: grid;
+  gap: 1.1rem;
+  padding: 0.5rem 0;
+}
+.chat-skeleton-row {
+  display: flex;
+  gap: 0.6rem;
+}
+.chat-skeleton-user {
+  flex-direction: row-reverse;
+}
+.chat-skeleton-avatar {
+  width: 1.75rem;
+  height: 1.75rem;
+  flex: none;
+  border-radius: 999px;
+}
+.chat-skeleton-lines {
+  display: grid;
+  flex: 1;
+  gap: 0.4rem;
+  max-width: 80%;
+}
+.chat-skeleton-lines i {
+  height: 0.65rem;
+  border-radius: 0.3rem;
+}
+.chat-skeleton-lines i:last-child {
+  width: 60%;
+}
+.chat-skeleton-user .chat-skeleton-lines {
+  justify-items: end;
+}
+@keyframes chat-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ai-picker-skeleton,
+  .chat-skeleton-avatar,
+  .chat-skeleton-lines i {
+    animation: none;
+  }
+}
+.ai-delete-chat-button {
+  display: grid;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex: none;
+  place-items: center;
+  border: 1px solid var(--color-line, #e5e7eb);
+  border-radius: 0.65rem;
+  color: #b42318;
+  background: #fff;
+  cursor: pointer;
+}
+.ai-delete-chat-button svg {
+  width: 1rem;
+  height: 1rem;
+}
+.ai-delete-chat-button:focus-visible {
+  outline: 2px solid var(--color-indigo-600);
+  outline-offset: 2px;
+}
+
+/* Conversations this tab kept before ADR-007: the user decides which project gets them. */
+.ai-legacy-banner {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0 0 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid #f3d9a4;
+  border-radius: 0.65rem;
+  background: #fffbf2;
+  color: #7a4a00;
+  font-size: 0.75rem;
+}
+.ai-legacy-banner p {
+  margin: 0;
+}
+.ai-legacy-banner div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.ai-legacy-banner button {
+  padding: 0.3rem 0.65rem;
+  border: 1px solid #e5c37a;
+  border-radius: 0.5rem;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.ai-legacy-banner .ai-legacy-import {
+  border-color: #7a4a00;
+  background: #7a4a00;
+  color: #fff;
+}
+.ai-legacy-banner button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.ai-legacy-banner button:focus-visible {
+  outline: 2px solid var(--color-indigo-600);
+  outline-offset: 2px;
+}

@@ -1,10 +1,7 @@
 import { Service, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
-import {
-  ProjectsApiService,
-  RemoteProject,
-} from '../../../core/services/projects-api.service';
+import { ProjectsApiService, RemoteProject } from '../../../core/services/projects-api.service';
 import { WorkspaceContextService } from '../../../core/services/workspace-context.service';
 
 export type ProjectSetupMode = 'ai' | 'manual';
@@ -45,8 +42,7 @@ export interface PlanLimitError {
 }
 
 export function isPlanLimitError(error: unknown): PlanLimitError | null {
-  const body = (error as { error?: { error?: Record<string, unknown> } })?.error
-    ?.error;
+  const body = (error as { error?: { error?: Record<string, unknown> } })?.error?.error;
   if (!body || typeof body['code'] !== 'string') return null;
   if (!body['code'].endsWith('_LIMIT_REACHED')) return null;
 
@@ -59,26 +55,25 @@ export function isPlanLimitError(error: unknown): PlanLimitError | null {
   };
 }
 
-/**
- * The user's projects, owned by the API.
- *
- * This store previously seeded three sample projects — Smart Greenhouse, Air
- * Quality Node, Smart Irrigation — into browser storage, so every account appeared
- * to own projects it had never created and the usage panel counted them. That data
- * is gone: a new account now legitimately has none, and the page renders its empty
- * state. Sample content belongs to a separate demo environment, never to a real
- * user's account.
- */
+/** The signed-in user's projects, loaded from the authorized workspace API. */
 @Service()
 export class ProjectStore {
+  private readonly pendingAiSetups = new Set<string>();
+
+  /** Consume the create-dialog handoff once; reopening a project must not resubmit it. */
+  takeAiSetupRequest(projectId: string): boolean {
+    return this.pendingAiSetups.delete(projectId);
+  }
   private readonly api = inject(ProjectsApiService);
   private readonly workspaces = inject(WorkspaceContextService);
 
   private readonly projectState = signal<IoTProject[]>([]);
   private readonly loadingState = signal(false);
+  private readonly loadedState = signal(false);
   private readonly errorState = signal<string | null>(null);
   private readonly fileCreationRequestState = signal<string | null>(null);
-  private loaded = false;
+  private loadRequest: Promise<void> | null = null;
+  private loadGeneration = 0;
 
   readonly projects = this.projectState.asReadonly();
   readonly loading = this.loadingState.asReadonly();
@@ -86,30 +81,56 @@ export class ProjectStore {
   readonly projectCount = computed(() => this.projectState().length);
   readonly fileCreationRequest = this.fileCreationRequestState.asReadonly();
   /** True once a load has completed, so the page can tell "empty" from "not yet". */
-  readonly hasLoaded = computed(() => this.loaded && !this.loadingState());
+  readonly hasLoaded = computed(() => this.loadedState() && !this.loadingState());
 
-  async load(force = false): Promise<void> {
-    if (this.loaded && !force) return;
+  load(force = false): Promise<void> {
+    if (this.loadRequest) return this.loadRequest;
+    if (this.loadedState() && !force) return Promise.resolve();
 
+    const generation = ++this.loadGeneration;
+    const request = this.loadFromApi(generation);
+    this.loadRequest = request;
+    return request.finally(() => {
+      if (this.loadRequest === request) this.loadRequest = null;
+    });
+  }
+
+  private async loadFromApi(generation: number): Promise<void> {
     this.loadingState.set(true);
     this.errorState.set(null);
 
     try {
       const workspace = await firstValueFrom(this.workspaces.ensureLoaded());
+      if (generation !== this.loadGeneration) return;
       if (!workspace) {
         this.projectState.set([]);
-        this.loaded = true;
+        this.loadedState.set(true);
         return;
       }
 
       const remote = await firstValueFrom(this.api.listProjects(workspace.id));
+      if (generation !== this.loadGeneration) return;
       this.projectState.set(remote.map((project) => toProject(project)));
-      this.loaded = true;
+      this.loadedState.set(true);
     } catch {
-      this.errorState.set('ไม่สามารถโหลดรายการโปรเจกต์ได้');
+      if (generation === this.loadGeneration) {
+        this.errorState.set('ไม่สามารถโหลดรายการโปรเจกต์ได้');
+      }
     } finally {
-      this.loadingState.set(false);
+      if (generation === this.loadGeneration) this.loadingState.set(false);
     }
+  }
+
+  /** Clears user-scoped data before another account can enter the application. */
+  reset(): void {
+    this.pendingAiSetups.clear();
+    this.loadGeneration += 1;
+    this.projectState.set([]);
+    this.loadingState.set(false);
+    this.loadedState.set(false);
+    this.errorState.set(null);
+    this.fileCreationRequestState.set(null);
+    this.loadRequest = null;
   }
 
   projectById(id: string | null): IoTProject | undefined {
@@ -123,8 +144,10 @@ export class ProjectStore {
    * here rather than being predicted locally. The caller surfaces it.
    */
   async create(value: NewProjectValue): Promise<IoTProject> {
+    const generation = this.loadGeneration;
     const workspace = await firstValueFrom(this.workspaces.ensureLoaded());
     if (!workspace) throw new Error('No workspace available');
+    if (generation !== this.loadGeneration) throw new Error('Workspace changed');
 
     const created = await firstValueFrom(
       this.api.createProject(workspace.id, {
@@ -132,22 +155,41 @@ export class ProjectStore {
         description: value.description.trim(),
         boardId: value.boardId,
         framework: value.framework,
+        deviceIds: value.setupMode === 'manual' ? value.devices : [],
       }),
     );
 
+    if (
+      generation !== this.loadGeneration ||
+      this.workspaces.activeWorkspaceId() !== workspace.id
+    ) {
+      throw new Error('Workspace changed');
+    }
     const project = toProject(created, value);
+    project.devices = created.components.map((component) => component.definitionId);
+    if (value.setupMode === 'ai' && value.description.trim()) {
+      this.pendingAiSetups.add(project.id);
+    }
     this.projectState.update((projects) => [project, ...projects]);
     return project;
   }
 
-  async delete(projectId: string): Promise<void> {
+  async delete(projectId: string, expectedWorkspaceId: string): Promise<void> {
+    const generation = this.loadGeneration;
     const workspace = await firstValueFrom(this.workspaces.ensureLoaded());
-    if (!workspace) return;
+    if (!workspace || workspace.id !== expectedWorkspaceId || generation !== this.loadGeneration) {
+      throw new Error('Workspace changed');
+    }
 
     await firstValueFrom(this.api.deleteProject(workspace.id, projectId));
-    this.projectState.update((projects) =>
-      projects.filter((project) => project.id !== projectId),
-    );
+    if (
+      generation !== this.loadGeneration ||
+      this.workspaces.activeWorkspaceId() !== workspace.id
+    ) {
+      throw new Error('Workspace changed');
+    }
+    this.projectState.update((projects) => projects.filter((project) => project.id !== projectId));
+    if (this.fileCreationRequestState() === projectId) this.fileCreationRequestState.set(null);
   }
 
   /** Loads the project's file paths, which the editor needs as a plain list. */
@@ -155,9 +197,7 @@ export class ProjectStore {
     const workspace = await firstValueFrom(this.workspaces.ensureLoaded());
     if (!workspace) return [];
 
-    const files = await firstValueFrom(
-      this.api.listFiles(workspace.id, projectId),
-    );
+    const files = await firstValueFrom(this.api.listFiles(workspace.id, projectId));
     const paths = files.map((file) => file.path);
     this.patch(projectId, { files: paths });
     return paths;
@@ -194,18 +234,13 @@ export class ProjectStore {
   private patch(projectId: string, changes: Partial<IoTProject>): void {
     this.projectState.update((projects) =>
       projects.map((project) =>
-        project.id === projectId
-          ? { ...project, ...changes, updatedAt: Date.now() }
-          : project,
+        project.id === projectId ? { ...project, ...changes } : project,
       ),
     );
   }
 }
 
-function toProject(
-  remote: RemoteProject,
-  value?: NewProjectValue,
-): IoTProject {
+function toProject(remote: RemoteProject, value?: NewProjectValue): IoTProject {
   return {
     id: remote.id,
     name: remote.name,

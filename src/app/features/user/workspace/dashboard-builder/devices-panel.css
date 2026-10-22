@@ -1,0 +1,263 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  height: 100%;
+  overflow-y: auto;
+  padding: 1rem;
+  color: #1f2937;
+  font-size: 0.75rem;
+}
+
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+h2 {
+  font-size: 0.95rem;
+}
+
+h3 {
+  font-size: 0.8rem;
+}
+
+code {
+  font-size: 0.68rem;
+  overflow-wrap: anywhere;
+}
+
+.devices-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.devices-head p,
+small,
+.empty,
+.devices-foot {
+  color: #6b7280;
+}
+
+.icon-button {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 0.5rem;
+  background: transparent;
+  cursor: pointer;
+}
+
+.devices-status {
+  padding: 0.5rem 0.65rem;
+  border: 1px solid #c7e6d2;
+  border-radius: 0.5rem;
+  background: #f0faf4;
+  color: #14532d;
+}
+
+.devices-status.warning {
+  border-color: #f3d9a4;
+  background: #fff8eb;
+  color: #7a4a00;
+}
+
+.token-reveal {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border: 1px solid #f3d9a4;
+  border-radius: 0.75rem;
+  background: #fffbf2;
+}
+
+.token-warning {
+  color: #7a4a00;
+  font-weight: 600;
+}
+
+.token-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.4rem;
+}
+
+input {
+  min-width: 0;
+  min-height: 2rem;
+  padding: 0.3rem 0.55rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.45rem;
+  background: #fff;
+  font: inherit;
+}
+
+.token-row input[readonly] {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+details pre {
+  max-height: 16rem;
+  margin: 0.5rem 0;
+  padding: 0.6rem;
+  overflow: auto;
+  border-radius: 0.5rem;
+  background: #111827;
+  color: #e5e7eb;
+  font-size: 0.66rem;
+  line-height: 1.5;
+}
+
+summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.device-create {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.device-create label {
+  font-weight: 600;
+}
+
+button {
+  padding: 0.4rem 0.7rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.45rem;
+  background: #fff;
+  color: #1f2937;
+  font: inherit;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+button:focus-visible,
+input:focus-visible,
+summary:focus-visible {
+  outline: 2px solid #6366f1;
+  outline-offset: 1px;
+}
+
+button.primary {
+  border-color: #2b2b2b;
+  background: #2b2b2b;
+  color: #fff;
+}
+
+button.danger {
+  border-color: #b42318;
+  background: #b42318;
+  color: #fff;
+}
+
+button.danger-text {
+  border-color: transparent;
+  color: #b42318;
+}
+
+.device-list ul {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.device-list li {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.7rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.75rem;
+}
+
+.device-list li.selected {
+  border-color: #6366f1;
+}
+
+.device-meta {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.device-meta strong {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  overflow-wrap: anywhere;
+}
+
+.status-dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  flex: none;
+  border-radius: 999px;
+  background: #9ca3af;
+}
+
+.status-dot.online {
+  background: #16a34a;
+  box-shadow: 0 0 0 3px rgb(22 163 74 / 18%);
+}
+
+.device-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.device-skeleton {
+  display: grid;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+  padding: 0.7rem;
+  border: 1px solid #eef0f3;
+  border-radius: 0.75rem;
+}
+
+.device-skeleton span {
+  height: 0.65rem;
+  border-radius: 0.3rem;
+  background: linear-gradient(90deg, #ececec 25%, #f5f5f5 37%, #ececec 63%);
+  background-size: 400% 100%;
+  animation: device-shimmer 1.4s ease-in-out infinite;
+}
+
+.device-skeleton span:first-child {
+  width: 50%;
+}
+
+@keyframes device-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .device-skeleton span {
+    animation: none;
+  }
+}
+
+.devices-foot {
+  margin-top: auto;
+  padding-top: 0.6rem;
+  border-top: 1px solid #f1f2f4;
+  line-height: 1.6;
+}

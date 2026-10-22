@@ -69,7 +69,7 @@ function createTransistor(polarity: Polarity, model: string): VirtualDevice {
         mono: true,
         detail: 'normal',
       }),
-      text(CX, BODY_TOP + u(3.6), polarity.toUpperCase(), {
+      text(CX, BODY_TOP + u(1.3), polarity.toUpperCase(), {
         size: u(0.8),
         fill: SILK.dim,
         anchor: 'middle',
@@ -77,11 +77,12 @@ function createTransistor(polarity: Polarity, model: string): VirtualDevice {
         mono: true,
         detail: 'high',
       }),
-      // E / B / C markers.
+      // E / B / C markers, printed on the flat face above the leg each one names.
+      // At the leg tips they covered the pin ends a wire is aimed at.
       ...['E', 'B', 'C'].map((label, index) =>
-        text(PIN_START_X + index * HEADER_PITCH, HEIGHT - u(0.2), label, {
-          size: u(0.9),
-          fill: '#6b7280',
+        text(CX + (index - 1) * u(1.27), BODY_BOTTOM - u(0.85), label, {
+          size: u(0.7),
+          fill: SILK.soft,
           anchor: 'middle',
           weight: 700,
           mono: true,

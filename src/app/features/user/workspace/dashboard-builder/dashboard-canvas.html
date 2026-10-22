@@ -71,6 +71,7 @@
               [layout]="layoutFor(widget)"
               [selected]="isSelected(widget.id)"
               [editMode]="editMode()"
+              [series]="liveMode() ? (series()[widget.datasource] ?? []) : null"
               [moving]="movingWidgetId() === widget.id"
               [invalid]="movingWidgetId() === widget.id && invalidDrop()"
               (selectRequested)="selectWidget($event)"

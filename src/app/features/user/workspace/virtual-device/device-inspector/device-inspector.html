@@ -1,0 +1,318 @@
+<header class="head">
+  <div class="head-title">
+    <h2>{{ device().name }}</h2>
+    @if (device().model) {
+      <p>{{ device().model }}</p>
+    }
+  </div>
+  <div class="head-actions">
+    <button
+      type="button"
+      class="icon-button"
+      aria-label="หมุน 90 องศา"
+      title="หมุน 90°"
+      [disabled]="running()"
+      (click)="rotate.emit()"
+    >
+      <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+        <path
+          d="M15.5 10a5.5 5.5 0 1 1-1.6-3.9M14.5 3v3.5H11"
+          stroke="currentColor"
+          stroke-width="1.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </svg>
+    </button>
+    <button
+      type="button"
+      class="icon-button is-danger"
+      aria-label="ลบอุปกรณ์"
+      title="ลบ"
+      [disabled]="running()"
+      (click)="remove.emit()"
+    >
+      <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+        <path
+          d="M4.5 6h11M8 6V4.5h4V6m-6.2 0 .7 9.5h7l.7-9.5M8.8 9v3.8m2.4-3.8v3.8"
+          stroke="currentColor"
+          stroke-width="1.4"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </svg>
+    </button>
+    <button
+      type="button"
+      class="icon-button"
+      aria-label="ปิดแผงตั้งค่า"
+      title="ปิด"
+      (click)="closed.emit()"
+    >
+      <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+        <path
+          d="m5 5 10 10M15 5 5 15"
+          stroke="currentColor"
+          stroke-width="1.5"
+          stroke-linecap="round"
+        />
+      </svg>
+    </button>
+  </div>
+</header>
+
+@if (issues().length) {
+  <section class="block" aria-labelledby="inspector-issues-title">
+    <h3 id="inspector-issues-title" class="block-title">ปัญหาการต่อสาย</h3>
+    <ul class="issues">
+      @for (issue of issues(); track issue.id) {
+        <li class="issue" [attr.data-severity]="issue.severity">
+          <p class="issue-title">
+            <span class="issue-badge">{{ severityLabels[issue.severity] }}</span>
+            {{ issue.title }}
+          </p>
+          <p class="issue-detail">{{ issue.detail }}</p>
+          <div class="issue-actions">
+            @if (issue.wireIds.length) {
+              <button type="button" class="text-button" (click)="revealIssue.emit(issue)">
+                ดูสาย
+              </button>
+            }
+            <button type="button" class="text-button" (click)="dismissIssue.emit(issue.id)">
+              ซ่อน
+            </button>
+          </div>
+        </li>
+      }
+    </ul>
+  </section>
+}
+
+@if (device().variants || settingFields().length) {
+  <section class="block" aria-labelledby="inspector-settings-title">
+    <div class="block-head">
+      <h3 id="inspector-settings-title" class="block-title">ตั้งค่า</h3>
+      @if (settingFields().length) {
+        <button type="button" class="text-button" (click)="reset.emit()">ค่าเริ่มต้น</button>
+      }
+    </div>
+
+    @if (device().variants; as variants) {
+      <fieldset class="field" [disabled]="running()">
+        <legend class="field-label">{{ variants.label }}</legend>
+        <div class="segmented">
+          @for (option of variants.options; track option.deviceId) {
+            <label class="segment">
+              <input
+                type="radio"
+                [name]="device().instanceId + '-variant'"
+                [checked]="option.deviceId === device().id"
+                (change)="variantChange.emit(option.deviceId)"
+              />
+              <span>{{ option.label }}</span>
+            </label>
+          }
+        </div>
+        @if (running()) {
+          <p class="hint">หยุดจำลองก่อนเปลี่ยนชนิด</p>
+        }
+      </fieldset>
+    }
+
+    @for (field of settingFields(); track field.property.id) {
+      <ng-container [ngTemplateOutlet]="control" [ngTemplateOutletContext]="{ $implicit: field }" />
+    }
+  </section>
+}
+
+@if (liveFields().length || readings().length) {
+  <section class="block" aria-labelledby="inspector-live-title">
+    <div class="block-head">
+      <h3 id="inspector-live-title" class="block-title">ขณะจำลอง</h3>
+      @if (!running()) {
+        <span class="block-note">กด Start เพื่อใช้งาน</span>
+      }
+    </div>
+
+    @if (readings().length) {
+      <dl class="readings" aria-live="polite">
+        @for (reading of readings(); track reading.id) {
+          <div class="reading" [attr.title]="reading.description ?? null">
+            <dt>{{ reading.label }}</dt>
+            <dd>{{ reading.value }}</dd>
+          </div>
+        }
+      </dl>
+    }
+
+    @for (field of liveFields(); track field.property.id) {
+      <ng-container [ngTemplateOutlet]="control" [ngTemplateOutletContext]="{ $implicit: field }" />
+    }
+  </section>
+}
+
+<ng-template #control let-field>
+  @switch (field.control) {
+    @case ('segmented') {
+      <fieldset class="field" [disabled]="disabled(field.property)">
+        <legend class="field-label">{{ field.property.label }}</legend>
+        <div class="segmented">
+          @for (option of field.property.options; track option.value) {
+            <label class="segment">
+              <input
+                type="radio"
+                [name]="fieldId(field.property)"
+                [checked]="text(field.property) === option.value"
+                (change)="choose(field.property, option.value)"
+              />
+              <span>{{ option.label }}</span>
+            </label>
+          }
+        </div>
+        @if (field.property.description) {
+          <p class="hint">{{ field.property.description }}</p>
+        }
+      </fieldset>
+    }
+    @case ('swatches') {
+      <fieldset class="field" [disabled]="disabled(field.property)">
+        <legend class="field-label">
+          {{ field.property.label }}
+          <span class="field-value">{{ optionLabel(field.property) }}</span>
+        </legend>
+        <div class="swatches">
+          @for (option of field.property.options; track option.value) {
+            <label class="swatch" [title]="option.label">
+              <input
+                type="radio"
+                [name]="fieldId(field.property)"
+                [checked]="text(field.property) === option.value"
+                (change)="choose(field.property, option.value)"
+              />
+              <span class="swatch-dot" [style.background]="swatches[option.value]"></span>
+              <span class="sr-only">{{ option.label }}</span>
+            </label>
+          }
+        </div>
+      </fieldset>
+    }
+    @case ('dropdown') {
+      <div class="field">
+        <span class="field-label" aria-hidden="true">{{ field.property.label }}</span>
+        <app-custom-select
+          [options]="field.property.options ?? []"
+          [value]="text(field.property)"
+          [ariaLabel]="field.property.label"
+          [disabled]="disabled(field.property)"
+          [compact]="true"
+          (valueChange)="choose(field.property, $event)"
+        />
+        @if (field.property.description) {
+          <p class="hint">{{ field.property.description }}</p>
+        }
+      </div>
+    }
+    @case ('switch') {
+      <div class="field">
+        <div class="field-row">
+          <label class="field-label" [for]="fieldId(field.property)">{{
+            field.property.label
+          }}</label>
+          <input
+            type="checkbox"
+            role="switch"
+            class="switch"
+            [id]="fieldId(field.property)"
+            [checked]="checked(field.property)"
+            [disabled]="disabled(field.property)"
+            (change)="toggle(field.property, $event)"
+          />
+        </div>
+        @if (field.property.description) {
+          <p class="hint">{{ field.property.description }}</p>
+        }
+      </div>
+    }
+    @case ('slider') {
+      <div class="field">
+        <div class="field-row">
+          <label class="field-label" [for]="numberFieldId(field.property)">
+            {{ field.property.label }}
+          </label>
+          <span class="slider-editor">
+            <input
+              type="number"
+              class="slider-number"
+              inputmode="decimal"
+              [id]="numberFieldId(field.property)"
+              [min]="field.property.min"
+              [max]="field.property.max"
+              [step]="field.property.step ?? 1"
+              [value]="number(field.property)"
+              [disabled]="disabled(field.property)"
+              (change)="setNumber(field.property, $event)"
+            />
+            @if (field.property.unit) {
+              <span class="slider-unit">{{ field.property.unit }}</span>
+            }
+          </span>
+        </div>
+        <input
+          type="range"
+          class="range"
+          [id]="fieldId(field.property)"
+          [attr.aria-label]="field.property.label + ' slider'"
+          [min]="field.property.min"
+          [max]="field.property.max"
+          [step]="field.property.step ?? 1"
+          [value]="number(field.property)"
+          [style.--range-progress]="rangeProgress(field.property)"
+          [disabled]="disabled(field.property)"
+          (input)="setNumber(field.property, $event)"
+        />
+        @if (field.property.description) {
+          <p class="hint">{{ field.property.description }}</p>
+        }
+      </div>
+    }
+    @case ('number') {
+      <div class="field">
+        <div class="field-row">
+          <label class="field-label" [for]="fieldId(field.property)">
+            {{ field.property.label }}
+            @if (field.property.unit) {
+              <span class="field-unit">{{ field.property.unit }}</span>
+            }
+          </label>
+          <input
+            type="number"
+            class="number"
+            [id]="fieldId(field.property)"
+            [step]="field.property.step ?? 1"
+            [value]="number(field.property)"
+            [disabled]="disabled(field.property)"
+            (change)="setNumber(field.property, $event)"
+          />
+        </div>
+        @if (field.property.description) {
+          <p class="hint">{{ field.property.description }}</p>
+        }
+      </div>
+    }
+    @default {
+      <div class="field">
+        <label class="field-label" [for]="fieldId(field.property)">{{
+          field.property.label
+        }}</label>
+        <input
+          type="text"
+          class="text"
+          [id]="fieldId(field.property)"
+          [value]="text(field.property)"
+          [disabled]="disabled(field.property)"
+          (input)="setText(field.property, $event)"
+        />
+      </div>
+    }
+  }
+</ng-template>

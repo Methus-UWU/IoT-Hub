@@ -29,7 +29,7 @@ const LEGACY_LEFT_OVERHANG = 40;
         aria-hidden="true"
         focusable="false"
       >
-        <g appDeviceArt [device]="part" [state]="state()" detail="low" [showCaption]="false"></g>
+        <g appDeviceArt [device]="part" [state]="state()" detail="normal" [showCaption]="false"></g>
       </svg>
     }
   `,

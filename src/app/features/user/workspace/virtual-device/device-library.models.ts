@@ -16,7 +16,7 @@ export const DEVICE_CATEGORY_OPTIONS = [
   { id: 'input-devices', label: 'อุปกรณ์อินพุต' },
   { id: 'output-devices', label: 'อุปกรณ์เอาต์พุต' },
   { id: 'displays', label: 'จอแสดงผล' },
-  { id: 'leds', label: 'LED และแสงสว่าง' },
+  { id: 'leds', label: 'แสงสว่าง' },
   { id: 'motors-actuators', label: 'มอเตอร์และแอกชูเอเตอร์' },
   { id: 'communication', label: 'โมดูลสื่อสาร' },
   { id: 'power', label: 'โมดูลจ่ายไฟ' },
@@ -27,7 +27,6 @@ export const DEVICE_CATEGORY_OPTIONS = [
   { id: 'relay-modules', label: 'รีเลย์' },
   { id: 'audio', label: 'เสียง' },
   { id: 'storage', label: 'หน่วยความจำ' },
-  { id: 'connectors', label: 'คอนเนกเตอร์' },
   { id: 'breadboards', label: 'เบรดบอร์ด' },
   { id: 'prototyping', label: 'งานต้นแบบ' },
   { id: 'misc', label: 'อื่น ๆ' },
@@ -35,6 +34,17 @@ export const DEVICE_CATEGORY_OPTIONS = [
 
 export type DeviceCategoryId = (typeof DEVICE_CATEGORY_OPTIONS)[number]['id'];
 export type DeviceLibraryFilterId = 'all' | 'favorites' | 'recently-used' | DeviceCategoryId;
+
+const BOARD_CATEGORY_IDS: ReadonlySet<DeviceCategoryId> = new Set([
+  'microcontrollers',
+  'dev-boards',
+  'sbc',
+]);
+
+/** Categories that count toward the two-board workspace limit. */
+export function isBoardCategory(id: DeviceCategoryId): boolean {
+  return BOARD_CATEGORY_IDS.has(id);
+}
 
 export function deviceCategoryLabel(id: DeviceCategoryId): string {
   return DEVICE_CATEGORY_OPTIONS.find((option) => option.id === id)?.label ?? id;

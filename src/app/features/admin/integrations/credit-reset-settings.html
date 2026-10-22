@@ -1,0 +1,92 @@
+<form [formGroup]="form" (ngSubmit)="save()" aria-labelledby="credit-reset-title">
+  <h3 id="credit-reset-title" class="text-sm font-medium text-ink">รอบรีเซ็ตโควตา</h3>
+  <p class="mt-1 text-xs text-ink-muted">
+    เวลาไทย (UTC+7) · ใช้กับทุกคน รวมผู้ใช้ที่มี limit เฉพาะ
+  </p>
+  <fieldset [disabled]="saving()" class="mt-3 grid min-w-0 gap-2">
+    <legend class="sr-only">ตั้งเวลาเริ่มรอบใหม่</legend>
+    <div
+      class="grid grid-cols-2 items-center gap-3 rounded-xl bg-surface-soft p-3 sm:grid-cols-[7rem_minmax(0,1fr)_minmax(0,1fr)]"
+    >
+      <label for="daily-reset-time" class="col-span-2 text-xs font-medium text-ink sm:col-span-1"
+        >รายวัน</label
+      >
+      <p class="flex min-h-9 items-center px-3 text-xs text-ink-muted">ทุกวัน</p>
+      <input
+        id="daily-reset-time"
+        type="time"
+        required
+        step="60"
+        formControlName="dailyTime"
+        aria-label="เวลารีเซ็ตรายวัน"
+        class="min-h-9 min-w-0 w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs font-normal focus-visible:outline-primary"
+      />
+    </div>
+    <div
+      class="grid grid-cols-2 items-center gap-3 rounded-xl bg-surface-soft p-3 sm:grid-cols-[7rem_minmax(0,1fr)_minmax(0,1fr)]"
+    >
+      <label for="weekly-reset-time" class="col-span-2 text-xs font-medium text-ink sm:col-span-1"
+        >รายสัปดาห์</label
+      >
+      <app-custom-select
+        ariaLabel="วันรีเซ็ตรายสัปดาห์"
+        textWeight="normal"
+        [compact]="true"
+        [options]="weekdays"
+        [disabled]="saving()"
+        [value]="form.controls.weeklyDay.value"
+        (valueChange)="setDay('weeklyDay', $event)"
+      />
+      <input
+        id="weekly-reset-time"
+        type="time"
+        required
+        step="60"
+        formControlName="weeklyTime"
+        aria-label="เวลารีเซ็ตรายสัปดาห์"
+        class="min-h-9 min-w-0 w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs font-normal focus-visible:outline-primary"
+      />
+    </div>
+    <div
+      class="grid grid-cols-2 items-center gap-3 rounded-xl bg-surface-soft p-3 sm:grid-cols-[7rem_minmax(0,1fr)_minmax(0,1fr)]"
+    >
+      <label for="monthly-reset-time" class="col-span-2 text-xs font-medium text-ink sm:col-span-1"
+        >รายเดือน</label
+      >
+      <app-custom-select
+        ariaLabel="วันที่รีเซ็ตรายเดือน"
+        textWeight="normal"
+        [compact]="true"
+        [options]="monthDays"
+        [disabled]="saving()"
+        [value]="form.controls.monthlyDay.value"
+        (valueChange)="setDay('monthlyDay', $event)"
+      />
+      <input
+        id="monthly-reset-time"
+        type="time"
+        required
+        step="60"
+        formControlName="monthlyTime"
+        aria-label="เวลารีเซ็ตรายเดือน"
+        class="min-h-9 min-w-0 w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs font-normal focus-visible:outline-primary"
+      />
+    </div>
+  </fieldset>
+  <p class="mt-3 text-xs leading-relaxed text-ink-muted">
+    รายเดือนเลือกวันที่ 1–28 เพื่อให้มีวันรีเซ็ตในทุกเดือน
+    การเปลี่ยนรอบจะคำนวณโควตาจากประวัติการใช้ใหม่
+  </p>
+  @if (form.invalid && form.dirty) {
+    <p role="alert" class="mt-2 text-xs text-error">กรอกเวลาและวันรีเซ็ตให้ครบ</p>
+  }
+  <div class="mt-4 flex justify-end">
+    <button
+      type="submit"
+      [disabled]="form.invalid || form.pristine || saving()"
+      class="rounded-lg border border-border px-4 py-2 text-xs font-medium text-ink hover:bg-surface-soft disabled:opacity-50"
+    >
+      {{ saving() ? 'กำลังบันทึก…' : 'บันทึกรอบรีเซ็ต' }}
+    </button>
+  </div>
+</form>

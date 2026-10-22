@@ -1,8 +1,5 @@
 import type { VirtualDevice } from '../../models/virtual-device.model';
-import type {
-  DeviceDrawContext,
-  DevicePropertyDefinition,
-} from '../core/device-definition';
+import type { DeviceDrawContext, DevicePropertyDefinition } from '../core/device-definition';
 import { HEADER_PITCH, u, UNITS_PER_MM } from '../core/device-metrics';
 import { OUTLINE, PART, SILK } from '../core/device-palette';
 import { pin } from '../core/device-pin';
@@ -57,25 +54,30 @@ function createDipSwitch(positions: DipPositions): VirtualDevice {
       }),
 
       // Actuators. Up is ON, matching the silkscreen arrow on a real package.
-      ...repeat(positions, { x: SWITCH_PITCH }, (index, x) => {
-        const on = context.state[`switch${index + 1}`] === true;
-        return [
-          rect(x - u(0.6), on ? u(2.9) : u(4.8), u(1.2), u(1.9), {
-            rx: u(0.15),
-            fill: on ? PART.plasticCream : '#cfc6b0',
-            stroke: OUTLINE,
-            strokeWidth: u(0.08),
-          }),
-          text(x, u(2.2), String(index + 1), {
-            size: u(0.9),
-            fill: SILK.white,
-            anchor: 'middle',
-            weight: 700,
-            mono: true,
-            detail: 'normal',
-          }),
-        ];
-      }, { x: firstX, y: 0 }),
+      ...repeat(
+        positions,
+        { x: SWITCH_PITCH },
+        (index, x) => {
+          const on = context.state[`switch${index + 1}`] === true;
+          return [
+            rect(x - u(0.6), on ? u(2.9) : u(4.8), u(1.2), u(1.9), {
+              rx: u(0.15),
+              fill: on ? PART.plasticCream : '#cfc6b0',
+              stroke: OUTLINE,
+              strokeWidth: u(0.08),
+            }),
+            text(x, u(2.2), String(index + 1), {
+              size: u(0.9),
+              fill: SILK.white,
+              anchor: 'middle',
+              weight: 700,
+              mono: true,
+              detail: 'normal',
+            }),
+          ];
+        },
+        { x: firstX, y: 0 },
+      ),
 
       text(width - u(0.6), height - u(0.7), 'ON', {
         size: u(0.9),
@@ -87,13 +89,18 @@ function createDipSwitch(positions: DipPositions): VirtualDevice {
       }),
 
       // Gull-wing leads.
-      ...repeat(positions, { x: SWITCH_PITCH }, (_, x) => [
-        rect(x - u(0.35), -u(0.7), u(0.7), u(0.8), { fill: PART.headerGold, detail: 'normal' }),
-        rect(x - u(0.35), height - u(0.1), u(0.7), u(0.8), {
-          fill: PART.headerGold,
-          detail: 'normal',
-        }),
-      ], { x: firstX, y: 0 }),
+      ...repeat(
+        positions,
+        { x: SWITCH_PITCH },
+        (_, x) => [
+          rect(x - u(0.35), -u(0.7), u(0.7), u(0.8), { fill: PART.headerGold, detail: 'normal' }),
+          rect(x - u(0.35), height - u(0.1), u(0.7), u(0.8), {
+            fill: PART.headerGold,
+            detail: 'normal',
+          }),
+        ],
+        { x: firstX, y: 0 },
+      ),
     ];
   }
 

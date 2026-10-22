@@ -36,8 +36,8 @@ const PROPERTIES: readonly DevicePropertyDefinition[] = [
     group: 'general',
     description: 'Which end terminal the common pin is bonded to.',
     options: [
-      { value: 'a', label: 'A — COM to pin 1' },
-      { value: 'b', label: 'B — COM to pin 3' },
+      { value: 'a', label: 'A (pin 1)' },
+      { value: 'b', label: 'B (pin 3)' },
     ],
   },
 ];

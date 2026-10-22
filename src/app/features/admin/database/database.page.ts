@@ -1,15 +1,20 @@
-import { Component } from '@angular/core';
+﻿import { DatePipe, DecimalPipe } from '@angular/common';
+import { Component, inject } from '@angular/core';
 
-import { EmptyState } from '../../../shared/components/empty-state/empty-state';
+import { FileSizePipe } from '../../../shared/pipes/file-size.pipe';
+import { DatabaseStore } from './database.store';
 
 @Component({
   selector: 'app-database-page',
-  imports: [EmptyState],
-  template: `
-    <app-empty-state
-      title="Database"
-      description="Inspect Supabase connection status, database size, active connections, slow queries, migrations, and RLS status, with actions to run a health check or create a backup, once this feature ships."
-    />
-  `
+  imports: [FileSizePipe, DatePipe, DecimalPipe],
+  providers: [DatabaseStore],
+  templateUrl: './database.page.html',
+  styleUrl: './database.page.css',
 })
-export class DatabasePage {}
+export class DatabasePage {
+  protected readonly store = inject(DatabaseStore);
+
+  constructor() {
+    this.store.load();
+  }
+}

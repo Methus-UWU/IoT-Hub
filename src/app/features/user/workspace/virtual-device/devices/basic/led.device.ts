@@ -8,10 +8,11 @@ import {
 import { bodyFromMm, HEADER_PITCH, u } from '../core/device-metrics';
 import { PART } from '../core/device-palette';
 import { pin } from '../core/device-pin';
-import { circle, ellipse, line, path, text, type Shape } from '../core/device-shape';
+import { circle, ellipse, path, text, type Shape } from '../core/device-shape';
 import {
   type DeviceBehavior,
   type DeviceSimulationContext,
+  type NodeState,
 } from '../core/device-simulation';
 
 /**
@@ -30,12 +31,28 @@ const CENTER_X = WIDTH / 2;
 
 /** Where the epoxy meets the flange. */
 const BODY_BOTTOM = u(8.6);
-const BODY_TOP = u(0.6);
 /** Half the dome at the reference 5 mm package. */
 const BODY_HALF_WIDTH = u(2.5);
 
+/**
+ * A T-1¾ stands 8.6 mm over a 5 mm dome, so the epoxy is 3.44 half-widths tall
+ * — a straight barrel roughly twice the height of the hemisphere that caps it.
+ * Deriving the height from the width is what keeps every package the same
+ * slender shape instead of a squat blob whose barrel disappears as it grows.
+ */
+const HEIGHT_PER_HALF_WIDTH = 8.6 / 2.5;
+
+/**
+ * Tallest the epoxy may stand. A 10 mm package is genuinely taller than this
+ * part's 14 mm box, so it is clipped to what the artwork's bleed can hold
+ * rather than being drawn over the parts above it on the canvas.
+ */
+const MAX_BODY_HEIGHT = BODY_BOTTOM + u(3);
+
 const ANODE_X = CENTER_X - HEADER_PITCH / 2;
 const CATHODE_X = CENTER_X + HEADER_PITCH / 2;
+const ANODE_EXIT_X = CENTER_X - u(1.05);
+const CATHODE_EXIT_X = CENTER_X + u(1.05);
 /** The cathode leg is cut shorter, which is how you tell it apart in hand. */
 const CATHODE_LENGTH = HEIGHT - u(1.6);
 
@@ -52,7 +69,7 @@ const LED_TONES: Readonly<Record<string, { color: string; edge: string; forward:
 const PROPERTIES: readonly DevicePropertyDefinition[] = [
   {
     id: 'color',
-    label: 'Colour',
+    label: 'สี',
     kind: 'select',
     defaultValue: 'red',
     group: 'general',
@@ -67,10 +84,9 @@ const PROPERTIES: readonly DevicePropertyDefinition[] = [
   },
   {
     id: 'size',
-    label: 'Package',
+    label: 'ขนาด',
     kind: 'select',
     defaultValue: '5',
-    unit: 'mm',
     group: 'general',
     options: [
       { value: '3', label: '3 mm' },
@@ -104,6 +120,32 @@ export function ledBrightness(across: number, forwardVoltage: number): number {
   return Math.min((across - forwardVoltage) / 1.2, 1);
 }
 
+/**
+ * Brightness of an LED whose anode or cathode may be on a PWM pin.
+ *
+ * A pulsed node reports its average voltage and the duty it is high for. The
+ * LED does not see that average: it sees the full level for the high part of
+ * each period and nothing for the rest, and the eye averages the light. So the
+ * level is the brightness at the peak, scaled by how long the LED is on — which
+ * is what makes `analogWrite(pin, 64)` glow at a quarter instead of sitting dark
+ * because 0.8 V is below the forward voltage.
+ *
+ * On the cathode the pin sinks current, so the LED is on while the pin is low.
+ */
+export function pulsedLedBrightness(
+  anode: NodeState,
+  cathode: NodeState,
+  forwardVoltage: number,
+): number {
+  if (anode.duty !== undefined) {
+    return ledBrightness(anode.voltage / anode.duty - cathode.voltage, forwardVoltage) * anode.duty;
+  }
+  if (cathode.duty !== undefined) {
+    return ledBrightness(anode.voltage, forwardVoltage) * (1 - cathode.duty);
+  }
+  return ledBrightness(anode.voltage - cathode.voltage, forwardVoltage);
+}
+
 function draw(context: DeviceDrawContext): readonly Shape[] {
   const tone = LED_TONES[stringState(context, 'color', 'red')] ?? LED_TONES['red'];
   const level = numberState(context, 'brightness', 0) / 100;
@@ -113,21 +155,34 @@ function draw(context: DeviceDrawContext): readonly Shape[] {
   // 0.1 in pitch in every package — so only the body scales.
   const millimetres = Number(stringState(context, 'size', '5')) || 5;
   const halfWidth = u(millimetres / 2);
-  const domeTop = BODY_BOTTOM - halfWidth * 1.6;
-  const domeShoulder = domeTop + halfWidth;
+  const bodyHeight = Math.min(halfWidth * HEIGHT_PER_HALF_WIDTH, MAX_BODY_HEIGHT);
+  // The hemisphere caps the barrel, so the shoulder is one radius below the top.
+  const domeShoulder = BODY_BOTTOM - bodyHeight + halfWidth;
 
   return [
     // Leads. The anode is drawn longer, as on a real through-hole LED.
-    line(ANODE_X, BODY_BOTTOM - u(0.1), ANODE_X, HEIGHT, {
-      stroke: PART.metal,
-      strokeWidth: u(0.5),
-      strokeLinecap: 'round',
-    }),
-    line(CATHODE_X, BODY_BOTTOM - u(0.1), CATHODE_X, CATHODE_LENGTH, {
-      stroke: PART.metal,
-      strokeWidth: u(0.5),
-      strokeLinecap: 'round',
-    }),
+    path(
+      `M ${ANODE_EXIT_X} ${BODY_BOTTOM - u(0.25)}` +
+        ` C ${ANODE_EXIT_X} ${BODY_BOTTOM + u(0.65)}, ${ANODE_X} ${BODY_BOTTOM + u(0.75)}, ${ANODE_X} ${BODY_BOTTOM + u(1.45)}` +
+        ` V ${HEIGHT}`,
+      {
+        fill: 'none',
+        stroke: PART.metal,
+        strokeWidth: u(0.5),
+        strokeLinecap: 'round',
+      },
+    ),
+    path(
+      `M ${CATHODE_EXIT_X} ${BODY_BOTTOM - u(0.25)}` +
+        ` C ${CATHODE_EXIT_X} ${BODY_BOTTOM + u(0.65)}, ${CATHODE_X} ${BODY_BOTTOM + u(0.75)}, ${CATHODE_X} ${BODY_BOTTOM + u(1.45)}` +
+        ` V ${CATHODE_LENGTH}`,
+      {
+        fill: 'none',
+        stroke: PART.metal,
+        strokeWidth: u(0.5),
+        strokeLinecap: 'round',
+      },
+    ),
 
     // Halo only while lit, and scaled by brightness so PWM reads visually.
     ...(lit
@@ -203,7 +258,7 @@ function createBehavior(): DeviceBehavior {
         return;
       }
 
-      const level = ledBrightness(anode.voltage - cathode.voltage, forward);
+      const level = pulsedLedBrightness(anode, cathode, forward);
       context.emit('brightness', Math.round(level * 100));
     },
     reset() {
@@ -234,7 +289,7 @@ export const LED_5MM: VirtualDevice = {
   ],
   properties: PROPERTIES,
   // A 10 mm package and its halo spill past the 6.2 mm body.
-  render: { draw, bleed: { left: u(3), right: u(3), top: u(2) } },
+  render: { draw, bleed: { left: u(3), right: u(3), top: u(3) } },
   requiresSeriesResistor: true,
   simulation: createBehavior,
   catalog: {

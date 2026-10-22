@@ -1,42 +1,39 @@
 import type { VirtualDevice } from '../../models/virtual-device.model';
 import { numberState, type DeviceDrawContext } from '../core/device-definition';
 import { bodyFromMm, HEADER_PITCH, u } from '../core/device-metrics';
-import { OUTLINE, PART, SILK } from '../core/device-palette';
-import { mountingHole, silkLabel } from '../core/device-parts';
+import { OUTLINE, SILK } from '../core/device-palette';
 import { pin } from '../core/device-pin';
-import { circle, path, rect, type Shape } from '../core/device-shape';
+import { circle, line, path, rect, text, type Shape } from '../core/device-shape';
+import { requiresSupply } from '../core/device-simulation';
+import { servoFollower } from '../core/bus-peripherals';
 
 /**
- * TowerPro SG90 micro servo, drawn from the side.
+ * TowerPro SG90 micro servo, drawn from above.
  *
- * Side-on is the only view that shows what a servo actually does: the output
- * horn sweeps in the plane of the drawing, so the angle property is visible as
- * an angle rather than as a number printed on a box. The case is the real
- * 22.8 × 22.7 mm with its mounting tabs spanning 32.2 mm, which is what makes a
- * servo read as roughly one-and-a-half times the height of an HC-SR04 board —
- * as it does on a desk.
+ * The top view keeps the horn sweep visible while using the slim 12.2 mm case
+ * dimension. It occupies far less vertical canvas space than the old side view
+ * while retaining the connector, wire loom and mounting flange.
  */
 
-const BODY = bodyFromMm({ widthMm: 32.2, heightMm: 31 });
-const WIDTH = BODY.width;
+const BODY = bodyFromMm({ widthMm: 38, heightMm: 17 });
 const HEIGHT = BODY.height;
 
-/** Case, centred between the mounting tabs. */
-const CASE_X = u(4.7);
-const CASE_WIDTH = u(22.8);
-const TAB_Y = u(8);
-const TAB_HEIGHT = u(3);
-const CASE_TOP = TAB_Y;
-const CASE_BOTTOM = HEIGHT - u(0.3);
+const CONNECTOR_X = u(0.5);
+const CONNECTOR_WIDTH = u(4.8);
+const CASE_X = u(13.2);
+const CASE_Y = u(4.2);
+const CASE_WIDTH = u(20);
+const CASE_HEIGHT = u(9.8);
+const TAB_X = u(10.2);
+const TAB_Y = u(6.1);
+const TAB_WIDTH = u(27);
+const TAB_HEIGHT = u(5.8);
 
-/** Output shaft: offset toward the gear end, as on the real case. */
-const SHAFT_X = u(10.5);
-const SHAFT_Y = TAB_Y;
-/** Horn arm length from the shaft centre. */
+const SHAFT_X = u(18.2);
+const SHAFT_Y = u(9.1);
 const HORN_R = u(8);
 
-/** The three lead wires leave the right-hand side of the case. */
-const LEAD_X = WIDTH + u(3.5);
+const LEAD_X = CONNECTOR_X;
 const LEAD_TOP = HEIGHT / 2 - HEADER_PITCH;
 
 const LEADS = [
@@ -45,16 +42,8 @@ const LEADS = [
   ['PWM', 'pwm', '#f59e0b', 'Control pulse, 1–2 ms every 20 ms, the orange lead'],
 ] as const;
 
-/**
- * Where the horn points for a commanded angle.
- *
- * 0° points left, 90° straight up, 180° right — the sweep an SG90 makes when
- * viewed from this side with the output shaft nearest the viewer.
- */
+/** 0° points left, 90° straight up and 180° points right. */
 function hornTip(angle: number, reach = HORN_R): { x: number; y: number } {
-  // Only the commanded angle is clamped. The opposite arm is derived by negating
-  // the reach rather than by adding 180°, which the clamp would fold back on
-  // itself and leave the two arms meeting at a corner instead of in a line.
   const clamped = Math.min(Math.max(angle, 0), 180);
   const radians = ((180 - clamped) * Math.PI) / 180;
   return {
@@ -63,103 +52,131 @@ function hornTip(angle: number, reach = HORN_R): { x: number; y: number } {
   };
 }
 
+function hornHole(angle: number, reach: number): Shape {
+  const point = hornTip(angle, reach);
+  return circle(point.x, point.y, u(0.48), {
+    fill: '#343a40',
+    stroke: '#aeb4ba',
+    strokeWidth: u(0.08),
+    detail: 'normal',
+  });
+}
+
 function draw(context: DeviceDrawContext): readonly Shape[] {
   const angle = numberState(context, 'angle', 90);
   const tip = hornTip(angle);
-  // The SG90 ships with a double arm; the short side keeps the hub visible.
-  const opposite = hornTip(angle, -HORN_R * 0.55);
+  const opposite = hornTip(angle, -HORN_R * 0.35);
 
   return [
-    // Mounting tabs run the full width, behind the case.
-    rect(0, TAB_Y, WIDTH, TAB_HEIGHT, {
-      rx: u(0.6),
-      fill: '#2f6fbf',
-      stroke: '#1f4f8c',
-      strokeWidth: u(0.15),
+    // Mounting flange behind the motor case.
+    rect(TAB_X, TAB_Y, TAB_WIDTH, TAB_HEIGHT, {
+      rx: u(0.45),
+      fill: '#575b60',
+      stroke: '#30343a',
+      strokeWidth: u(0.14),
     }),
-    mountingHole(u(2.1), TAB_Y + TAB_HEIGHT / 2, u(1)),
-    mountingHole(WIDTH - u(2.1), TAB_Y + TAB_HEIGHT / 2, u(1)),
-
-    // Case.
-    rect(CASE_X, CASE_TOP, CASE_WIDTH, CASE_BOTTOM - CASE_TOP, {
-      rx: u(0.8),
-      fill: PART.plasticBlue,
-      stroke: '#1f4f8c',
-      strokeWidth: u(0.2),
-    }),
-    // Upper gearbox section, moulded in a lighter shade on the real part.
-    rect(CASE_X, CASE_TOP, CASE_WIDTH, u(6), {
-      rx: u(0.8),
-      fill: '#3d81d1',
-      stroke: '#1f4f8c',
-      strokeWidth: u(0.15),
-    }),
-    // Case seam.
-    rect(CASE_X, u(20), CASE_WIDTH, u(0.3), {
-      fill: '#1f4f8c',
-      opacity: 0.5,
-      detail: 'normal',
-    }),
-    silkLabel(CASE_X + CASE_WIDTH / 2, u(25.5), 'SG90', {
-      size: u(2),
-      fill: SILK.white,
-      weight: 700,
-      detail: 'normal',
-    }),
-    silkLabel(CASE_X + CASE_WIDTH / 2, u(28.5), 'TowerPro', {
-      size: u(1.2),
-      fill: SILK.soft,
-      detail: 'high',
-    }),
-
-    // Output boss and shaft.
-    circle(SHAFT_X, SHAFT_Y, u(2.6), {
-      fill: '#3d81d1',
-      stroke: '#1f4f8c',
-      strokeWidth: u(0.15),
-    }),
-
-    // Horn: a double arm, as the SG90 ships with. Drawn as a rounded bar
-    // through the shaft so the sweep is legible at any zoom.
-    path(`M ${tip.x} ${tip.y} L ${opposite.x} ${opposite.y}`, {
-      fill: 'none',
-      stroke: PART.plasticWhite,
-      strokeWidth: u(1.6),
-      strokeLinecap: 'round',
-    }),
-    circle(tip.x, tip.y, u(0.7), { fill: '#c9ced4', stroke: PART.metalDark, strokeWidth: u(0.1), detail: 'normal' }),
-    circle(opposite.x, opposite.y, u(0.7), {
-      fill: '#c9ced4',
-      stroke: PART.metalDark,
-      strokeWidth: u(0.1),
-      detail: 'normal',
-    }),
-    circle(SHAFT_X, SHAFT_Y, u(1.1), {
-      fill: PART.metalLight,
-      stroke: PART.metalDark,
+    circle(u(35.2), TAB_Y + TAB_HEIGHT / 2, u(1.35), {
+      fill: '#2d3034',
+      stroke: '#70757c',
       strokeWidth: u(0.12),
     }),
 
-    // Lead wires out of the right-hand face.
-    ...LEADS.map(([, , color], index) =>
-      path(
-        `M ${CASE_X + CASE_WIDTH} ${u(14) + index * u(2)} ` +
-          `C ${WIDTH} ${u(14) + index * u(2)}, ${WIDTH} ${LEAD_TOP + index * HEADER_PITCH}, ` +
-          `${LEAD_X} ${LEAD_TOP + index * HEADER_PITCH}`,
+    // Three-colour loom; both ends tuck beneath the case and connector.
+    ...LEADS.map(([, , color], index) => {
+      const connectorY = LEAD_TOP + index * HEADER_PITCH;
+      const caseY = u(8) + index * u(1.15);
+      return path(
+        `M ${CONNECTOR_X + CONNECTOR_WIDTH} ${connectorY} ` +
+          `C ${u(8)} ${connectorY}, ${u(9.5)} ${caseY}, ${CASE_X + u(1)} ${caseY}`,
         {
           fill: 'none',
           stroke: color,
-          strokeWidth: u(0.7),
+          strokeWidth: u(0.62),
           strokeLinecap: 'round',
         },
-      ),
-    ),
-    // Connector shell at the end of the loom.
-    rect(LEAD_X - u(1.2), LEAD_TOP - u(1.6), u(2.4), HEADER_PITCH * 2 + u(3.2), {
+      );
+    }),
+
+    // Slim top-view case.
+    rect(CASE_X, CASE_Y, CASE_WIDTH, CASE_HEIGHT, {
+      rx: u(1),
+      fill: '#686b70',
+      stroke: '#363a40',
+      strokeWidth: u(0.16),
+    }),
+    rect(CASE_X + u(0.25), CASE_Y + u(0.25), CASE_WIDTH - u(0.5), u(1.15), {
+      rx: u(0.55),
+      fill: '#7b7e83',
+      opacity: 0.75,
+      detail: 'normal',
+    }),
+    line(u(28.2), CASE_Y + u(0.4), u(28.2), CASE_Y + CASE_HEIGHT - u(0.4), {
+      stroke: '#4c5055',
+      strokeWidth: u(0.18),
+      detail: 'normal',
+    }),
+    text(u(30), CASE_Y + CASE_HEIGHT - u(1), 'SG90', {
+      size: u(0.82),
+      fill: SILK.white,
+      anchor: 'middle',
+      mono: true,
+      weight: 600,
+      detail: 'high',
+    }),
+
+    // Gearbox boss and movable horn.
+    circle(SHAFT_X, SHAFT_Y, u(4.1), {
+      fill: '#85888c',
+      stroke: '#52565b',
+      strokeWidth: u(0.14),
+    }),
+    circle(SHAFT_X, SHAFT_Y, u(3.15), {
+      fill: '#bfc2c5',
+      stroke: '#777c82',
+      strokeWidth: u(0.12),
+    }),
+    path(`M ${tip.x} ${tip.y} L ${opposite.x} ${opposite.y}`, {
+      fill: 'none',
+      stroke: '#d1d4d6',
+      strokeWidth: u(2.15),
+      strokeLinecap: 'round',
+    }),
+    ...[u(3.2), u(4.8), u(6.35), u(7.65)].map((reach) => hornHole(angle, reach)),
+    circle(SHAFT_X, SHAFT_Y, u(1.65), {
+      fill: '#d8dadd',
+      stroke: '#8b9096',
+      strokeWidth: u(0.15),
+    }),
+    line(SHAFT_X - u(0.75), SHAFT_Y - u(0.75), SHAFT_X + u(0.75), SHAFT_Y + u(0.75), {
+      stroke: '#777c82',
+      strokeWidth: u(0.24),
+      strokeLinecap: 'round',
+    }),
+    line(SHAFT_X + u(0.75), SHAFT_Y - u(0.75), SHAFT_X - u(0.75), SHAFT_Y + u(0.75), {
+      stroke: '#777c82',
+      strokeWidth: u(0.24),
+      strokeLinecap: 'round',
+    }),
+
+    // Three-position connector shell and its contacts.
+    rect(CONNECTOR_X, LEAD_TOP - u(1.2), CONNECTOR_WIDTH, HEADER_PITCH * 2 + u(2.4), {
       rx: u(0.3),
-      fill: PART.plasticBlack,
+      fill: '#4a4d52',
       stroke: OUTLINE,
       strokeWidth: u(0.12),
+    }),
+    ...LEADS.flatMap((_, index) => {
+      const y = LEAD_TOP + index * HEADER_PITCH;
+      return [
+        rect(CONNECTOR_X + u(0.85), y - u(0.45), u(2.5), u(0.9), {
+          fill: '#171a1e',
+          stroke: '#787d84',
+          strokeWidth: u(0.08),
+        }),
+        rect(CONNECTOR_X + u(1.05), y - u(0.16), u(1.9), u(0.32), {
+          fill: '#b8bec5',
+        }),
+      ];
     }),
   ];
 }
@@ -177,7 +194,7 @@ export const SG90_SERVO: VirtualDevice = {
   properties: [
     {
       id: 'angle',
-      label: 'มุม',
+      label: 'Angle',
       kind: 'number',
       defaultValue: 90,
       min: 0,
@@ -190,18 +207,21 @@ export const SG90_SERVO: VirtualDevice = {
   ],
   pins: LEADS.map(([name, type, , detail], index) =>
     pin(name, LEAD_X, LEAD_TOP + index * HEADER_PITCH, type, {
-      side: 'right',
+      side: 'left',
+      direction: name === 'PWM' ? 'input' : undefined,
       description: detail,
       voltage: name === 'VCC' ? 5 : undefined,
     }),
   ),
-  render: { draw, bleed: { right: u(5) } },
+  render: { draw },
+  // Turns to what the sketch's Servo.write() sends; needs its 5 V to move.
+  simulation: requiresSupply(servoFollower('PWM'), { minimumVolts: 4 }),
   catalog: {
     categoryId: 'motors-actuators',
     category: 'Motors & Actuators',
     aliases: ['micro servo', 'RC servo', '9 gram servo'],
     tags: ['servo', 'motor', 'actuator', 'PWM', 'SG90', 'output'],
-    interfaceLabel: 'PWM · 3 ขา',
+    interfaceLabel: 'PWM · 3 pins',
     typicalUsage: 'Small mechanisms, gauges, locks, and positional control.',
   },
 };

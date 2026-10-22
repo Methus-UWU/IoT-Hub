@@ -184,22 +184,86 @@
               </div>
             </div>
             <label class="field-label">
-              <span>Device</span>
-              <select [value]="selectedWidget.deviceId" (change)="patchText('deviceId', $event)">
-                <option value="greenhouse-01">Greenhouse sensor</option>
-                <option value="climate-controller">Climate controller</option>
-                <option value="pump-controller">Pump controller</option>
-                <option value="all-devices">All devices</option>
+              <span>Datastream</span>
+              <select [value]="selectedWidget.datasource" (change)="bindDatastream($event)">
+                <option value="">Not bound</option>
+                @for (stream of datastreams(); track stream.id) {
+                  <option [value]="stream.key">
+                    {{ stream.name }} ({{ stream.key }}{{ stream.unit ? ', ' + stream.unit : '' }})
+                  </option>
+                }
               </select>
             </label>
-            <label class="field-label">
-              <span>Datastream</span>
-              <input
-                type="text"
-                [value]="selectedWidget.datasource"
-                (change)="patchText('datasource', $event)"
-              />
-            </label>
+            <p class="field-hint">
+              @if (boundComponentLabel(); as part) {
+                Part: {{ part }}
+              } @else if (datastreams().length === 0) {
+                This project has no datastreams yet. Add one for a value a part produces.
+              } @else {
+                Pick the value this widget shows or controls.
+              }
+            </p>
+            @if (creatingStream()) {
+              <form class="stream-form" (submit)="submitDatastream($event)">
+                <label class="field-label">
+                  <span>Key</span>
+                  <input
+                    name="key"
+                    required
+                    pattern="[A-Za-z][A-Za-z0-9_]{0,31}"
+                    placeholder="temperature"
+                    autocomplete="off"
+                  />
+                </label>
+                <label class="field-label">
+                  <span>Name</span>
+                  <input name="name" maxlength="80" placeholder="Room temperature" />
+                </label>
+                <label class="field-label">
+                  <span>Type</span>
+                  <select name="dataType">
+                    @for (type of dataTypes; track type) {
+                      <option [value]="type">{{ type }}</option>
+                    }
+                  </select>
+                </label>
+                <label class="field-label">
+                  <span>Part</span>
+                  <select name="componentId">
+                    <option value="">None (computed in code)</option>
+                    @for (component of components(); track component.id) {
+                      <option [value]="component.id">{{ component.label }}</option>
+                    }
+                  </select>
+                </label>
+                <div class="stream-form-row">
+                  <label class="field-label">
+                    <span>Unit</span>
+                    <input name="unit" maxlength="16" placeholder="°C" />
+                  </label>
+                  <label class="field-label">
+                    <span>Min</span>
+                    <input name="min" type="number" step="any" />
+                  </label>
+                  <label class="field-label">
+                    <span>Max</span>
+                    <input name="max" type="number" step="any" />
+                  </label>
+                </div>
+                <label class="field-label">
+                  <span>Reading</span>
+                  <input name="source" maxlength="64" placeholder="temperature" />
+                </label>
+                <div class="stream-form-actions">
+                  <button type="button" (click)="creatingStream.set(false)">Cancel</button>
+                  <button type="submit" class="primary">Add datastream</button>
+                </div>
+              </form>
+            } @else {
+              <button type="button" class="stream-add" (click)="creatingStream.set(true)">
+                + New datastream
+              </button>
+            }
             <label class="field-label">
               <span>Runtime state</span>
               <select [value]="selectedWidget.state" (change)="patchState($event)">
@@ -216,8 +280,11 @@
           <section class="binding-preview">
             <span><app-dashboard-icon name="device" /></span>
             <div>
-              <strong>Binding active</strong
-              ><small>{{ selectedWidget.deviceId }} / {{ selectedWidget.datasource }}</small>
+              <strong>{{ selectedWidget.datasource ? 'Binding active' : 'Not bound' }}</strong
+              ><small
+                >{{ boundComponentLabel() || 'No part' }} /
+                {{ selectedWidget.datasource || 'no datastream' }}</small
+              >
             </div>
             <i aria-hidden="true"></i>
           </section>
@@ -423,16 +490,18 @@
           <span><app-dashboard-icon name="data" /></span>
           <div>
             <h3>Data source</h3>
-            <p>Which devices are included</p>
+            <p>Which device the widgets show in preview</p>
           </div>
         </div>
         <label class="field-label"
-          ><span>Device scope</span
+          ><span>Device</span
           ><select [value]="deviceScope()" (change)="updateDashboardSetting('deviceScope', $event)">
-            <option>All devices</option>
-            <option>Greenhouse sensors</option>
-            <option>Climate controllers</option>
-            <option>Pump controllers</option>
+            <option value="">No device (layout only)</option>
+            @for (device of devices(); track device.id) {
+              <option [value]="device.id" [selected]="device.id === deviceScope()">
+                {{ device.name }}
+              </option>
+            }
           </select></label
         >
       </section>

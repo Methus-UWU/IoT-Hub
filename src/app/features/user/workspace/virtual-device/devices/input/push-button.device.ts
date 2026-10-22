@@ -5,10 +5,11 @@ import {
   type DeviceDrawContext,
   type DevicePropertyDefinition,
 } from '../core/device-definition';
+import { circleHotspot } from '../core/device-hotspots';
 import { bodyFromMm, u } from '../core/device-metrics';
-import { OUTLINE, PART, SILK } from '../core/device-palette';
+import { FLAT } from '../core/device-palette';
 import { pin } from '../core/device-pin';
-import { circle, line, rect, text, type Shape } from '../core/device-shape';
+import { circle, rect, type Shape } from '../core/device-shape';
 import {
   propertyString,
   type DeviceBehavior,
@@ -36,8 +37,14 @@ const CASE_Y = (HEIGHT - CASE) / 2;
 const LEG_TOP = HEIGHT / 2 - u(2.25);
 const LEG_BOTTOM = HEIGHT / 2 + u(2.25);
 
-/** Actuator cap. Exported so the canvas hit target matches what is drawn. */
-export const BUTTON_CAP = { cx: WIDTH / 2, cy: HEIGHT / 2, r: u(2.1) };
+/**
+ * Actuator cap. Exported so the canvas hit target matches what is drawn.
+ *
+ * 3.5 mm across on the real part, so 1.75 mm of radius. It was drawn at 2.1 mm
+ * and swallowed most of the 6 mm case, which is what made the part read as a
+ * cartoon button rather than a tact switch.
+ */
+export const BUTTON_CAP = { cx: WIDTH / 2, cy: HEIGHT / 2, r: u(1.75) };
 
 const PROPERTIES: readonly DevicePropertyDefinition[] = [
   {
@@ -50,17 +57,41 @@ const PROPERTIES: readonly DevicePropertyDefinition[] = [
     description: 'Closes the contact between the two sides of the package.',
   },
   {
+    id: 'capColor',
+    label: 'Cap colour',
+    kind: 'select',
+    defaultValue: 'silver',
+    group: 'general',
+    description: 'Colour of the moulded actuator cap fitted over the dome.',
+    options: [
+      { value: 'silver', label: 'Bare steel dome' },
+      { value: 'red', label: 'Red cap' },
+      { value: 'yellow', label: 'Yellow cap' },
+      { value: 'blue', label: 'Blue cap' },
+      { value: 'green', label: 'Green cap' },
+    ],
+  },
+  {
     id: 'mode',
     label: 'Contact type',
     kind: 'select',
     defaultValue: 'no',
     group: 'general',
+    description: 'NO closes the contact while pressed; NC opens it while pressed.',
     options: [
-      { value: 'no', label: 'Normally open (NO)' },
-      { value: 'nc', label: 'Normally closed (NC)' },
+      { value: 'no', label: 'NO' },
+      { value: 'nc', label: 'NC' },
     ],
   },
 ];
+
+const CAP_COLORS: Readonly<Record<string, { base: string; dark: string }>> = {
+  silver: { base: FLAT.metalLight, dark: FLAT.metalDark },
+  red: { base: FLAT.red, dark: FLAT.plastic },
+  yellow: { base: FLAT.gold, dark: FLAT.goldDark },
+  blue: { base: FLAT.blue, dark: FLAT.boardEdge },
+  green: { base: '#2f9e57', dark: '#1a6234' },
+};
 
 /** True when the contact conducts, accounting for NO vs NC wiring. */
 export function contactClosed(pressed: boolean, mode: string): boolean {
@@ -69,54 +100,48 @@ export function contactClosed(pressed: boolean, mode: string): boolean {
 
 function draw(context: DeviceDrawContext): readonly Shape[] {
   const pressed = booleanState(context, 'pressed');
-  const closed = contactClosed(pressed, stringState(context, 'mode', 'no'));
+  const cap = CAP_COLORS[stringState(context, 'capColor', 'silver')] ?? CAP_COLORS['silver'];
+  const legWidth = u(0.9);
 
   return [
-    // Four gull-wing legs.
+    // Four legs. Each is a stub of tinned strip emerging from under the case,
+    // widening into the solder tab at the tip — the shape that makes the part
+    // read as four terminals rather than two wires passing through a block.
     ...[LEG_TOP, LEG_BOTTOM].flatMap((y) => [
-      line(0, y, CASE_X + u(0.4), y, {
-        stroke: PART.metal,
-        strokeWidth: u(0.5),
-        strokeLinecap: 'round',
+      rect(0, y - legWidth / 2, CASE_X + u(0.6), legWidth, {
+        rx: legWidth / 2,
+        fill: FLAT.metal,
+        stroke: FLAT.metalDark,
+        strokeWidth: u(0.06),
       }),
-      line(WIDTH, y, CASE_X + CASE - u(0.4), y, {
-        stroke: PART.metal,
-        strokeWidth: u(0.5),
-        strokeLinecap: 'round',
+      rect(CASE_X + CASE - u(0.6), y - legWidth / 2, WIDTH - CASE_X - CASE + u(0.6), legWidth, {
+        rx: legWidth / 2,
+        fill: FLAT.metal,
+        stroke: FLAT.metalDark,
+        strokeWidth: u(0.06),
       }),
     ]),
 
+    // Moulded case. Black nylon, not grey: the contrast against the steel plate
+    // is what makes the part legible at thumbnail size.
     rect(CASE_X, CASE_Y, CASE, CASE, {
       rx: u(0.4),
-      fill: PART.plasticBlack,
-      stroke: OUTLINE,
-      strokeWidth: u(0.15),
+      fill: FLAT.plastic,
+      stroke: FLAT.plastic,
+      strokeWidth: u(0.18),
     }),
-    rect(CASE_X + u(0.6), CASE_Y + u(0.6), CASE - u(1.2), CASE - u(1.2), {
-      rx: u(0.3),
-      fill: '#1a1d21',
+    // The stainless top plate crimped over the dome, inset from the case edge.
+    rect(CASE_X + u(0.55), CASE_Y + u(0.55), CASE - u(1.1), CASE - u(1.1), {
+      rx: u(0.25),
+      fill: FLAT.metalLight,
+      stroke: FLAT.metalDark,
+      strokeWidth: u(0.1),
       detail: 'normal',
     }),
-
-    // Actuator. Pressing sinks and darkens the cap — this is the only state
-    // cue on the canvas, so it has to read without a label underneath.
-    circle(BUTTON_CAP.cx, BUTTON_CAP.cy, pressed ? BUTTON_CAP.r * 0.86 : BUTTON_CAP.r, {
-      fill: pressed ? '#8d959f' : PART.metalLight,
-      stroke: PART.metalDark,
-      strokeWidth: u(0.15),
-    }),
-    circle(BUTTON_CAP.cx, BUTTON_CAP.cy, pressed ? BUTTON_CAP.r * 0.52 : BUTTON_CAP.r * 0.65, {
-      fill: pressed ? '#7d848d' : '#c9ced6',
-      detail: 'normal',
-    }),
-
-    text(WIDTH / 2, HEIGHT - u(0.2), closed ? 'CLOSED' : 'OPEN', {
-      size: u(0.9),
-      fill: closed ? '#4ade80' : SILK.dim,
-      anchor: 'middle',
-      weight: 700,
-      mono: true,
-      detail: 'high',
+    circle(BUTTON_CAP.cx, BUTTON_CAP.cy, pressed ? BUTTON_CAP.r * 0.88 : BUTTON_CAP.r, {
+      fill: pressed ? cap.dark : cap.base,
+      stroke: cap.dark,
+      strokeWidth: u(0.12),
     }),
   ];
 }
@@ -153,13 +178,31 @@ export const PUSH_BUTTON: VirtualDevice = {
   pins: [
     pin('1', 0, LEG_TOP, 'passive', { side: 'left', description: 'Side A, common with pin 2' }),
     pin('2', 0, LEG_BOTTOM, 'passive', { side: 'left', description: 'Side A, common with pin 1' }),
-    pin('3', WIDTH, LEG_TOP, 'passive', { side: 'right', description: 'Side B, common with pin 4' }),
+    pin('3', WIDTH, LEG_TOP, 'passive', {
+      side: 'right',
+      description: 'Side B, common with pin 4',
+    }),
     pin('4', WIDTH, LEG_BOTTOM, 'passive', {
       side: 'right',
       description: 'Side B, common with pin 3',
     }),
   ],
   properties: PROPERTIES,
+  // The cap is pressable straight on the canvas. Momentary, so it releases with
+  // the pointer exactly as the real part does.
+  hotspots: [
+    circleHotspot(
+      'cap',
+      'Press the push button',
+      'pressed',
+      BUTTON_CAP.cx,
+      BUTTON_CAP.cy,
+      // A 3.5 mm cap is a small target at working zoom, so the hit area is
+      // grown to the case. Nothing else on this part is clickable, so there is
+      // nothing for it to steal a click from.
+      CASE / 2,
+    ),
+  ],
   render: { draw },
   simulation: createBehavior,
   catalog: {

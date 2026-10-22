@@ -1,20 +1,21 @@
-import type { VirtualDevice } from '../../models/virtual-device.model';
+import type { OnboardLed, VirtualDevice } from '../../models/virtual-device.model';
 import type { DeviceDrawContext } from '../core/device-definition';
 import { bodyFromMm, HEADER_PITCH, u } from '../core/device-metrics';
-import { OUTLINE, PART, SILK } from '../core/device-palette';
+import { LED_COLORS, SILK, WOKWI } from '../core/device-palette';
 import {
-  chip,
-  dipChip,
-  femaleHeader,
-  indicatorLed,
-  mountingHole,
+  flatButton,
+  flatChip,
+  flatDipChip,
+  flatHeader,
+  flatLed,
+  flatMountingHole,
+  flatUsbConnector,
   silkLabel,
-  tactileButton,
-  usbConnector,
 } from '../core/device-parts';
 import { pin } from '../core/device-pin';
 import { circle, line, path, rect, repeat, text, type Shape } from '../core/device-shape';
 import type { PinType } from '../core/device-types';
+import { createBoardBehavior, AVR_RUNTIME, onboardLedColor } from './board-behavior';
 
 /**
  * Arduino Uno R3 — the reference 5 V ATmega328P board.
@@ -96,6 +97,9 @@ const ANALOG: readonly PinSpec[] = [
   ['A5', 'A5', 'analog', 'ADC channel 5, doubles as I2C SCL'],
 ];
 
+/** The board's user LED: what `LED_BUILTIN` names, and what the artwork lights. */
+const ONBOARD_LED: OnboardLed = { pin: '13', label: 'L' };
+
 function headerPins(specs: readonly PinSpec[], startX: number, y: number, side: 'top' | 'bottom') {
   return specs.map(([id, label, type, detail], index) =>
     pin(id, startX + index * HEADER_PITCH, y, type, {
@@ -103,6 +107,7 @@ function headerPins(specs: readonly PinSpec[], startX: number, y: number, side: 
       description: detail,
       aliases: label === id ? undefined : [label],
       voltage: type !== 'vcc' ? undefined : id === '3V3' ? 3.3 : 5,
+      maxCurrentMa: id === '3V3' ? 50 : id === '5V' ? 500 : undefined,
     }),
   );
 }
@@ -136,60 +141,62 @@ function draw(context: DeviceDrawContext): readonly Shape[] {
       `M ${u(1)} 0 H ${u(64)} L ${WIDTH} ${u(2.6)} V ${u(50.8)} L ${u(66)} ${HEIGHT} ` +
         `H ${u(1)} Q 0 ${HEIGHT} 0 ${u(52.4)} V ${u(1)} Q 0 0 ${u(1)} 0 Z`,
       {
-        fill: '#2f739f',
-        stroke: '#205778',
+        fill: WOKWI.arduinoBoard,
+        stroke: WOKWI.arduinoBoardEdge,
         strokeWidth: u(0.2),
         strokeLinejoin: 'round',
       },
     ),
-    path(`M ${u(1.4)} ${u(0.35)} H ${u(63.6)} L ${u(67.7)} ${u(2.9)}`, {
-      fill: 'none',
-      stroke: '#5d95b9',
-      strokeWidth: u(0.12),
-      opacity: 0.65,
-      detail: 'normal',
-    }),
+    // Inset trace following the same silhouette, as on the Mega and the Nano.
+    path(
+      `M ${u(1.2)} ${u(0.35)} H ${u(63.85)} L ${WIDTH - u(0.35)} ${u(2.75)} ` +
+        `V ${u(50.65)} L ${u(65.85)} ${HEIGHT - u(0.35)} H ${u(1.2)} ` +
+        `Q ${u(0.35)} ${HEIGHT - u(0.35)} ${u(0.35)} ${u(52.2)} V ${u(1.2)} ` +
+        `Q ${u(0.35)} ${u(0.35)} ${u(1.2)} ${u(0.35)} Z`,
+      {
+        fill: 'none',
+        stroke: WOKWI.arduinoBoardTrace,
+        strokeWidth: u(0.1),
+        opacity: 0.7,
+        detail: 'normal',
+      },
+    ),
 
     // Mounting holes in the Uno's asymmetric M3 pattern.
-    mountingHole(u(2.5), HEIGHT - u(2.5)),
-    mountingHole(WIDTH - u(2.5), u(17)),
-    mountingHole(WIDTH - u(2.5), HEIGHT - u(4.5)),
-    mountingHole(u(33.5), HEIGHT - u(2.5)),
+    flatMountingHole(u(2.5), HEIGHT - u(2.5)),
+    flatMountingHole(WIDTH - u(2.5), u(17)),
+    flatMountingHole(WIDTH - u(2.5), HEIGHT - u(4.5)),
+    flatMountingHole(u(57), HEIGHT - u(2.5)),
 
     // USB-B socket and barrel jack, both overhanging the left edge.
-    ...usbConnector(-u(3), u(11), u(16), u(12), 'type-b'),
+    ...flatUsbConnector(-u(3), u(11), u(16), u(12)),
     rect(-u(2.5), u(33), u(13), u(11), {
       rx: u(0.6),
-      fill: PART.plasticBlack,
-      stroke: OUTLINE,
-      strokeWidth: u(0.13),
+      fill: WOKWI.chip,
+      stroke: WOKWI.espBoardEdge,
+      strokeWidth: u(0.2),
     }),
-    rect(-u(3), u(34), u(3), u(9), { rx: u(0.3), fill: '#050607', detail: 'normal' }),
+    rect(-u(3), u(34), u(3), u(9), { rx: u(0.3), fill: WOKWI.socket, detail: 'normal' }),
 
-    // Red reset switch on its pale carrier, as on a physical Uno R3.
-    ...tactileButton(u(16.5), u(6.4), u(6)),
-    circle(u(16.5), u(6.4), u(1.8), {
-      fill: '#b51217',
-      stroke: '#7d0c10',
-      strokeWidth: u(0.1),
-    }),
+    // Red reset cap, as on a physical Uno R3.
+    ...flatButton(u(16.5), u(6.4), u(6), { cap: '#b51217', capEdge: '#7d0c10' }),
 
     // Female headers.
-    ...femaleHeader(DIGITAL_HIGH_X, TOP_Y, DIGITAL_HIGH.length, 'horizontal'),
-    ...femaleHeader(DIGITAL_LOW_X, TOP_Y, DIGITAL_LOW.length, 'horizontal'),
-    ...femaleHeader(POWER_X, BOTTOM_Y, POWER.length, 'horizontal'),
-    ...femaleHeader(ANALOG_X, BOTTOM_Y, ANALOG.length, 'horizontal'),
+    ...flatHeader(DIGITAL_HIGH_X, TOP_Y, DIGITAL_HIGH.length),
+    ...flatHeader(DIGITAL_LOW_X, TOP_Y, DIGITAL_LOW.length),
+    ...flatHeader(POWER_X, BOTTOM_Y, POWER.length),
+    ...flatHeader(ANALOG_X, BOTTOM_Y, ANALOG.length),
 
     // ATmega328P as a real DIP-28: 34.7 mm long, 7.5 mm across the package.
-    ...dipChip(u(23), u(34), u(34.7), u(7.5), 14, 'ATMEGA328P', { labelSize: u(1.4) }),
+    ...flatDipChip(u(23), u(34), u(34.7), u(7.5), 14, 'ATMEGA328P', u(1.4)),
     // ATmega16U2 USB bridge, a 5 mm QFN.
-    ...chip(u(15.5), u(13), u(5), u(5), '16U2', { labelSize: u(0.75) }),
+    ...flatChip(u(15.5), u(13), u(5), u(5), '16U2', u(0.75)),
 
     // 16 MHz crystal.
     rect(u(33), u(25), u(11), u(4), {
       rx: u(2),
-      fill: PART.crystal,
-      stroke: PART.metalDark,
+      fill: WOKWI.shield,
+      stroke: WOKWI.shieldEdge,
       strokeWidth: u(0.12),
       detail: 'normal',
     }),
@@ -199,21 +206,51 @@ function draw(context: DeviceDrawContext): readonly Shape[] {
       3,
       { x: HEADER_PITCH },
       (_, holeX) => [
-        circle(holeX, u(10), u(0.8), { fill: PART.headerGold, detail: 'normal' }),
-        circle(holeX, u(12.5), u(0.8), { fill: PART.headerGold, detail: 'normal' }),
+        circle(holeX, u(10), u(0.8), { fill: WOKWI.gold, detail: 'normal' }),
+        circle(holeX, u(12.5), u(0.8), { fill: WOKWI.gold, detail: 'normal' }),
       ],
       { x: u(60) },
     ),
 
-    // Status LEDs — L (pin 13), TX and RX by the bridge, ON by the power rail.
-    ...indicatorLed(u(19), u(16), 'orange', live),
-    ...indicatorLed(u(19), u(18.5), 'green', live),
-    ...indicatorLed(u(19), u(21), 'yellow', live),
-    ...indicatorLed(u(52), u(20), 'green', true),
-    text(u(17.6), u(16.4), 'L', { size: u(0.85), fill: SILK.white, anchor: 'end', mono: true, detail: 'high' }),
-    text(u(17.6), u(18.9), 'TX', { size: u(0.85), fill: SILK.white, anchor: 'end', mono: true, detail: 'high' }),
-    text(u(17.6), u(21.4), 'RX', { size: u(0.85), fill: SILK.white, anchor: 'end', mono: true, detail: 'high' }),
-    text(u(53.6), u(20.4), 'ON', { size: u(0.85), fill: SILK.white, anchor: 'start', mono: true, detail: 'high' }),
+    // Status LEDs — L (pin 13), TX and RX beside the bridge, ON by the power
+    // rail. Kept clear of the 16U2 and the UNO frame so neither label is covered.
+    ...flatLed(
+      u(23),
+      u(16),
+      onboardLedColor(context, LED_COLORS.orange.on, LED_COLORS.orange.off),
+      u(0.6),
+    ),
+    ...flatLed(u(23), u(18.5), live ? LED_COLORS.green.on : LED_COLORS.green.off, u(0.6)),
+    ...flatLed(u(23), u(21), live ? LED_COLORS.yellow.on : LED_COLORS.yellow.off, u(0.6)),
+    ...flatLed(u(54.5), u(20), LED_COLORS.green.on, u(0.6)),
+    text(u(21.8), u(16.4), 'L', {
+      size: u(0.85),
+      fill: SILK.white,
+      anchor: 'end',
+      mono: true,
+      detail: 'high',
+    }),
+    text(u(21.8), u(18.9), 'TX', {
+      size: u(0.85),
+      fill: SILK.white,
+      anchor: 'end',
+      mono: true,
+      detail: 'high',
+    }),
+    text(u(21.8), u(21.4), 'RX', {
+      size: u(0.85),
+      fill: SILK.white,
+      anchor: 'end',
+      mono: true,
+      detail: 'high',
+    }),
+    text(u(56.1), u(20.4), 'ON', {
+      size: u(0.85),
+      fill: SILK.white,
+      anchor: 'start',
+      mono: true,
+      detail: 'high',
+    }),
 
     // Arduino infinity mark. Original geometry — two rings crossed by an X —
     // drawn from primitives rather than traced from anyone's artwork.
@@ -242,7 +279,8 @@ function draw(context: DeviceDrawContext): readonly Shape[] {
     }),
     text(u(46.5), u(21), 'UNO', { size: u(3.4), fill: SILK.white, anchor: 'middle', weight: 500 }),
 
-    silkLabel(u(37), u(6.2), 'DIGITAL (PWM ~)', { size: u(1.1) }),
+    // Below the longest rotated pin name, so the two never print over each other.
+    silkLabel(u(37), u(8.4), 'DIGITAL (PWM ~)', { size: u(1.1) }),
     silkLabel(u(24), HEIGHT - u(6.6), 'POWER', { size: u(1.1) }),
     silkLabel(u(44.5), HEIGHT - u(6.6), 'ANALOG IN', { size: u(1.1) }),
 
@@ -257,6 +295,7 @@ function draw(context: DeviceDrawContext): readonly Shape[] {
 }
 
 export const ARDUINO_UNO_R3: VirtualDevice = {
+  defaultSpi: { mosi: '11', miso: '12', clock: '13', select: '10' },
   id: 'arduino-uno-r3',
   name: 'Arduino Uno',
   model: 'Arduino Uno R3',
@@ -267,6 +306,9 @@ export const ARDUINO_UNO_R3: VirtualDevice = {
   initiallyVisible: false,
   // The board silkscreens every pin name, so the hover overlay is redundant.
   printsOwnPinLabels: true,
+  powerSource: true,
+  logicVoltage: 5,
+  maxLogicInputVoltage: 5.5,
   operatingVoltage: { min: 7, max: 12, recommended: 5 },
   interfaces: ['digital', 'analog', 'pwm', 'i2c', 'spi', 'uart', 'power'],
   pins: [
@@ -276,6 +318,8 @@ export const ARDUINO_UNO_R3: VirtualDevice = {
     ...headerPins(ANALOG, ANALOG_X, BOTTOM_Y, 'bottom'),
   ],
   render: { draw, bleed: { left: u(3) } },
+  onboardLed: ONBOARD_LED,
+  simulation: (instanceId) => createBoardBehavior(instanceId, AVR_RUNTIME, ONBOARD_LED),
   catalog: {
     categoryId: 'microcontrollers',
     category: 'Microcontrollers',

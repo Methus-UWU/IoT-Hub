@@ -1,0 +1,131 @@
+<section class="plan-page" aria-labelledby="plan-heading">
+  <div class="plan-container">
+    <header class="page-heading">
+      <div>
+        <span class="eyebrow">การสมัครใช้งาน</span>
+        <h1 id="plan-heading">แพ็กเกจและการใช้งาน</h1>
+        <p>จัดการทรัพยากรที่โปรเจกต์ การบิลด์ AI และการนำขึ้นเว็บของคุณใช้อยู่</p>
+      </div>
+      <button type="button" class="billing-button">ตั้งค่าการชำระเงิน</button>
+    </header>
+
+    <article class="current-plan">
+      <div class="plan-summary">
+        <span class="plan-mark" aria-hidden="true"
+          ><svg viewBox="0 0 24 24" fill="none">
+            <path
+              d="M12 3 4.5 7.2V16L12 20.5l7.5-4.5V7.2L12 3Z"
+              stroke="currentColor"
+              stroke-width="1.4"
+            />
+            <path
+              d="m4.8 7.5 7.2 4.2 7.2-4.2M12 11.7v8.4"
+              stroke="currentColor"
+              stroke-width="1.4"
+            /></svg
+        ></span>
+        <div>
+          <span class="eyebrow">แพ็กเกจปัจจุบัน</span>
+          <h2>Builder Free</h2>
+          <p>สำหรับการเรียนรู้ การทำต้นแบบ และอุปกรณ์เชื่อมต่อชิ้นแรกของคุณ</p>
+        </div>
+      </div>
+      <div class="plan-price">
+        <strong>$0</strong><span>USD<br />ต่อเดือน</span>
+      </div>
+      <button type="button" class="upgrade-button">อัปเกรดแพ็กเกจ</button>
+    </article>
+
+    <section class="usage-section" aria-labelledby="usage-heading">
+      <div class="section-heading">
+        <div>
+          <span class="eyebrow">รอบบิลนี้</span>
+          <h2 id="usage-heading">การใช้ทรัพยากร</h2>
+        </div>
+        <span>ต่ออายุ 1 ส.ค. 2026</span>
+      </div>
+      <div class="usage-grid">
+        @for (item of usage; track item.label) {
+          <article class="usage-card">
+            <div class="usage-title">
+              <span>{{ item.label }}</span
+              ><strong>{{ item.value }}</strong>
+            </div>
+            <div
+              class="usage-track"
+              role="progressbar"
+              [attr.aria-label]="item.label"
+              [attr.aria-valuenow]="item.percent"
+              aria-valuemin="0"
+              aria-valuemax="100"
+            >
+              <i [style.width.%]="item.percent"></i>
+            </div>
+            <div class="usage-footer">
+              <span>ใช้ไป {{ item.percent }}%</span><span>{{ item.limit }}</span>
+            </div>
+          </article>
+        }
+      </div>
+    </section>
+
+    <div class="plan-lower-grid">
+      <section class="included-card" aria-labelledby="included-heading">
+        <span class="eyebrow">สิ่งที่รวมอยู่</span>
+        <h2 id="included-heading">ครบทุกอย่างสำหรับการทำต้นแบบ</h2>
+        <ul>
+          <li>
+            <span aria-hidden="true">✓</span>
+            <div>
+              <strong>สูงสุด 5 โปรเจกต์</strong
+              ><small>ตอนนี้คุณมี {{ projectCount() }} โปรเจกต์ที่ใช้งานอยู่</small>
+            </div>
+          </li>
+          <li>
+            <span aria-hidden="true">✓</span>
+            <div>
+              <strong>IoT IDE พร้อมผู้ช่วย AI</strong
+              ><small>สร้าง อธิบาย และแก้บั๊กเฟิร์มแวร์ได้ในที่เดียว</small>
+            </div>
+          </li>
+          <li>
+            <span aria-hidden="true">✓</span>
+            <div>
+              <strong>เว็บเซิร์ฟเวอร์ 3 ตัว</strong
+              ><small>นำแดชบอร์ดโปรเจกต์ขึ้นใช้งานพร้อมปลายทางที่ปลอดภัย</small>
+            </div>
+          </li>
+          <li>
+            <span aria-hidden="true">✓</span>
+            <div>
+              <strong>เข้าถึงคลังความรู้</strong
+              ><small>ดูคู่มืออุปกรณ์และแนวทางการนำขึ้นใช้งาน</small>
+            </div>
+          </li>
+        </ul>
+      </section>
+
+      <aside class="pro-card">
+        <span class="pro-label">สำหรับใช้งานจริง</span>
+        <h2>ต้องการทรัพยากรเพิ่ม?</h2>
+        <p>
+          Builder Pro เพิ่มพื้นที่ทำงานแบบทีม โซนนำขึ้นใช้งานส่วนตัว 50 โปรเจกต์ และขีดจำกัด AI
+          ที่สูงขึ้น
+        </p>
+        <div><strong>$19</strong><span>/ เดือน</span></div>
+        <button type="button">
+          เปรียบเทียบแพ็กเกจ
+          <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <path
+              d="M4 10h12M12 6l4 4-4 4"
+              stroke="currentColor"
+              stroke-width="1.4"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </button>
+      </aside>
+    </div>
+  </div>
+</section>

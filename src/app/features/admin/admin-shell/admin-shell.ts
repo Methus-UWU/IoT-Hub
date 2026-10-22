@@ -1,28 +1,13 @@
-import { Component, signal } from '@angular/core';
-import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { Component, computed, inject, signal } from '@angular/core';
+import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+
+import { AiProfilesStore } from '../../../core/services/ai-profiles.store';
+import { AuthService } from '../../../core/services/auth.service';
+import { AccountAvatar } from '../../../shared/components/account-avatar/account-avatar';
+import { AccountMenu } from '../../../shared/components/account-menu/account-menu';
 
 export type AdminNavIcon =
-  | 'dashboard'
-  | 'users'
-  | 'devices'
-  | 'projects'
-  | 'documents'
-  | 'plans'
-  | 'quotas'
-  | 'ai-assistant'
-  | 'server'
-  | 'services'
-  | 'websites'
-  | 'database'
-  | 'redis'
-  | 'backup'
-  | 'deployments'
-  | 'logs'
-  | 'alerts'
-  | 'settings'
-  | 'permissions'
-  | 'api-keys'
-  | 'billing';
+  'dashboard' | 'server' | 'database' | 'logs' | 'users' | 'integrations' | 'ai';
 
 interface AdminNavItem {
   label: string;
@@ -37,63 +22,59 @@ interface AdminNavGroup {
 
 const NAV_GROUPS: AdminNavGroup[] = [
   {
-    label: 'Overview',
-    items: [{ label: 'Dashboard', path: 'dashboard', icon: 'dashboard' }]
+    label: 'ภาพรวม',
+    items: [{ label: 'แดชบอร์ด', path: 'dashboard', icon: 'dashboard' }],
   },
   {
-    label: 'Management',
+    label: 'เซิร์ฟเวอร์',
     items: [
-      { label: 'Users', path: 'users', icon: 'users' },
-      { label: 'Devices', path: 'devices', icon: 'devices' },
-      { label: 'Projects', path: 'projects', icon: 'projects' },
-      { label: 'Documents', path: 'documents', icon: 'documents' },
-      { label: 'Plans', path: 'plans', icon: 'plans' },
-      { label: 'Quotas', path: 'quotas', icon: 'quotas' },
-      { label: 'AI Assistant', path: 'ai-assistant', icon: 'ai-assistant' }
-    ]
+      { label: 'สถานะเซิร์ฟเวอร์', path: 'server', icon: 'server' },
+      { label: 'ฐานข้อมูล', path: 'database', icon: 'database' },
+    ],
   },
   {
-    label: 'Server',
+    label: 'ระบบ',
     items: [
-      { label: 'Server Monitoring', path: 'server', icon: 'server' },
-      { label: 'Services', path: 'services', icon: 'services' },
-      { label: 'Websites', path: 'websites', icon: 'websites' },
-      { label: 'Database', path: 'database', icon: 'database' },
-      { label: 'Redis', path: 'redis', icon: 'redis' },
-      { label: 'Backups', path: 'backups', icon: 'backup' },
-      { label: 'Deployments', path: 'deployments', icon: 'deployments' }
-    ]
+      { label: 'บันทึกคำขอ', path: 'logs', icon: 'logs' },
+      { label: 'ผู้ใช้', path: 'users', icon: 'users' },
+      { label: 'จัดการ AI', path: 'integrations', icon: 'integrations' },
+      { label: 'ผู้ช่วย AI', path: 'ai-assistant', icon: 'ai' },
+    ],
   },
-  {
-    label: 'System',
-    items: [
-      { label: 'Logs', path: 'logs', icon: 'logs' },
-      { label: 'Alerts', path: 'alerts', icon: 'alerts' },
-      { label: 'Settings', path: 'settings', icon: 'settings' },
-      { label: 'Permissions', path: 'permissions', icon: 'permissions' },
-      { label: 'API Keys', path: 'api-keys', icon: 'api-keys' }
-    ]
-  },
-  {
-    label: 'Billing',
-    items: [
-      { label: 'Subscriptions', path: 'subscriptions', icon: 'billing' },
-      { label: 'Usage', path: 'usage', icon: 'billing' },
-      { label: 'Payments', path: 'payments', icon: 'billing' }
-    ]
-  }
 ];
 
 @Component({
   selector: 'app-admin-shell',
-  imports: [RouterLink, RouterLinkActive, RouterOutlet],
-  templateUrl: './admin-shell.html'
+  imports: [RouterLink, RouterLinkActive, RouterOutlet, AccountAvatar, AccountMenu],
+  templateUrl: './admin-shell.html',
+  styleUrl: './admin-shell.css',
 })
 export class AdminShell {
+  private readonly authService = inject(AuthService);
+  private readonly aiProfiles = inject(AiProfilesStore);
+  private readonly router = inject(Router);
+
   protected readonly navGroups = NAV_GROUPS;
+  protected readonly user = this.authService.currentUser;
+  protected readonly loggingOut = signal(false);
+
+  protected readonly username = computed(
+    () => this.user()?.displayName || this.user()?.username || 'Admin',
+  );
+  protected readonly profileInitials = computed(() =>
+    this.username().trim().slice(0, 2).toUpperCase().padEnd(2, 'A'),
+  );
+  protected readonly roleLabel = computed(() => {
+    const role = this.user()?.role.name.toLowerCase();
+    return role === 'admin' ? 'ผู้ดูแลระบบ' : 'ผู้ใช้งาน';
+  });
 
   private readonly _sidebarOpen = signal(false);
   protected readonly sidebarOpen = this._sidebarOpen.asReadonly();
+
+  constructor() {
+    this.authService.getCurrentUser().subscribe({ error: () => undefined });
+  }
 
   protected toggleSidebar(): void {
     this._sidebarOpen.update((open) => !open);
@@ -101,5 +82,20 @@ export class AdminShell {
 
   protected closeSidebar(): void {
     this._sidebarOpen.set(false);
+  }
+
+  protected logout(): void {
+    if (this.loggingOut()) return;
+    this.loggingOut.set(true);
+    this.authService.logout().subscribe({
+      next: () => this.finishLogout(),
+      error: () => this.finishLogout(),
+    });
+  }
+
+  private finishLogout(): void {
+    this.aiProfiles.reset();
+    this.loggingOut.set(false);
+    void this.router.navigateByUrl('/auth/login');
   }
 }

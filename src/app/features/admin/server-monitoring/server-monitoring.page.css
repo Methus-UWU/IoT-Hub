@@ -1,3 +1,138 @@
 :host {
   display: block;
+  min-height: 100%;
+}
+
+.server-page {
+  background: #fcfcfc;
+}
+
+.resource-card,
+.panel-card {
+  border: 1px solid #e1e1e1;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgb(43 43 43 / 0.025);
+}
+
+.resource-card {
+  border-radius: 1rem;
+  padding: 1.125rem;
+  transition:
+    border-color 150ms ease,
+    transform 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.resource-card:hover {
+  transform: translateY(-1px);
+  border-color: #afafaf;
+  box-shadow: 0 10px 24px rgb(43 43 43 / 0.045);
+}
+
+.panel-card {
+  border-radius: 1rem;
+  padding: 1rem;
+}
+
+.metric-icon {
+  display: grid;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex: none;
+  place-items: center;
+  border-radius: 0.75rem;
+  color: #545454;
+  background: #f1f1f1;
+}
+
+.metric-icon svg {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+.service-list {
+  scrollbar-width: thin;
+  scrollbar-color: #e1e1e1 transparent;
+}
+
+.icon-button,
+.confirm-button,
+.service-start {
+  display: inline-grid;
+  min-height: 2rem;
+  place-items: center;
+  border-radius: 0.55rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  transition: 120ms ease;
+}
+
+.icon-button {
+  width: 2rem;
+  color: #808080;
+}
+
+.icon-button svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.icon-button:hover,
+.service-start:hover {
+  color: #2b2b2b;
+  background: #f1f1f1;
+}
+
+.icon-danger:hover {
+  color: #b91c1c;
+  background: #fef2f2;
+}
+
+.confirm-button,
+.service-start {
+  padding-inline: 0.75rem;
+}
+
+.confirm-button {
+  color: #ffffff;
+  background: #2b2b2b;
+}
+
+.confirm-button:hover {
+  background: #545454;
+}
+
+.confirm-danger {
+  background: #dc2626;
+}
+
+.confirm-danger:hover {
+  background: #b91c1c;
+}
+
+.service-start {
+  color: #545454;
+  box-shadow: inset 0 0 0 1px #e1e1e1;
+}
+
+.icon-button:focus-visible,
+.confirm-button:focus-visible,
+.service-start:focus-visible {
+  outline: 2px solid #afafaf;
+  outline-offset: 2px;
+}
+
+.icon-button:disabled,
+.service-start:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .resource-card,
+  .icon-button,
+  .confirm-button,
+  .service-start {
+    transition: none;
+  }
 }

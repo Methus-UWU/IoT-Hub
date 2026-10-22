@@ -10,63 +10,58 @@ import {
   untracked,
   viewChild,
 } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
+import { SerialMonitorResize } from './serial-monitor-resize';
 
+import {
+  CustomSelect,
+  type CustomSelectOption,
+} from '../../../../shared/components/custom-select/custom-select';
 import { ProjectStore } from '../../projects/project.store';
 import { AddDeviceModal } from './add-device-modal/add-device-modal';
 import { DeviceArt } from './device-art/device-art';
 import { DeviceKind } from './device-library.models';
 import { defaultStateFor, type DevicePropertyDefinition } from './devices/core/device-definition';
-import type { DetailLevel } from './devices/core/device-shape';
 import { DEVICES, DEVICE_LIBRARY_ITEMS, deviceById } from './devices/device-catalog';
 import { drawingScaleFor } from './devices/core/device-metrics';
-import {
-  CircuitHistory,
-  type CircuitSnapshot,
-} from './services/circuit-history';
-import {
-  orthogonalPath,
-  routeWire,
-  type Obstacle,
-  type PinSide as RouterPinSide,
-} from './simulation/wire-router';
+import { CircuitHistory, type CircuitSnapshot } from './services/circuit-history';
 import {
   ProjectCanvasService,
+  asBoardLimitRefusal,
   asComponentLimitRefusal,
   asConnectionLimitRefusal,
   type CanvasConnection,
 } from './services/project-canvas.service';
-import {
-  BOARD_PINS,
-  INITIAL_CONNECTIONS,
-  WIRE_COLORS,
-} from './devices/microcontrollers/esp32-devkit.board';
-import { relayChannelBox } from './devices/relay/relay-module.device';
-import { BUTTON_CAP } from './devices/input/push-button.device';
+import { INITIAL_CONNECTIONS, WIRE_COLORS } from './devices/demo-circuit';
 import type {
-  BoardPin,
   ConnectionKind,
+  DeviceInstance,
   DevicePin,
   DevicePlacement,
+  DeviceState,
   Point,
   VirtualDevice,
   WireConnection,
   WireEndpoint,
+  WireJunction,
   WireWaypoint,
 } from './models/virtual-device.model';
+import { CanvasSnapshotCache, type CanvasSnapshot } from './services/canvas-snapshot-cache';
+import { layoutNewParts } from './layout/auto-layout';
+import { isBoardCategory } from './device-library.models';
+import { FirmwareLoaderService } from './services/firmware-loader.service';
 import type { DeviceBehavior } from './devices/core/device-simulation';
+import type { DeviceHotspot } from './devices/core/device-hotspots';
+import { pinTooltip } from './devices/core/device-pin';
 import { isPassivePinType } from './devices/core/device-types';
+import { CircuitAudioService, type SustainedSound } from './services/circuit-audio.service';
 import { DevicePreferenceService } from './services/device-preference.service';
 import { devicePinKey, simulateTick, type SimulationResult } from './simulation/circuit-simulator';
 import { SEVERITY_LABELS, validateCircuit, type WireIssue } from './simulation/wire-validation';
+import { DeviceInspector, type PropertyChange } from './device-inspector/device-inspector';
 
 interface DragState {
   deviceId: string;
-  pointerId: number;
-  offset: Point;
-}
-
-interface BoardDragState {
   pointerId: number;
   offset: Point;
 }
@@ -75,6 +70,23 @@ interface WireCurveDragState {
   pointerId: number;
   wireId: string;
   waypointIndex: number;
+}
+
+/** Folds any angle into (-180, 180], so a turn past the seam does not wrap. */
+function normalizeDegrees(degrees: number): number {
+  const wrapped = ((degrees + 180) % 360) - 180;
+  return wrapped <= -180 ? wrapped + 360 : wrapped;
+}
+
+/** A knob being turned: the pointer's angle about the shaft drives a property. */
+interface RotaryDragState {
+  pointerId: number;
+  deviceId: string;
+  hotspot: DeviceHotspot;
+  /** Pointer angle at the previous sample, in canvas degrees clockwise from up. */
+  lastAngle: number;
+  /** Travel accumulated since the grab, in degrees either side of centre. */
+  travel: number;
 }
 
 interface WireGeometry {
@@ -90,9 +102,11 @@ interface WireControlHandle extends Point {
   readonly label: string;
 }
 
-interface WireJunction extends Point {
-  readonly id: string;
-  readonly kind: ConnectionKind;
+/** The signal values a cached layout was shown with; a different value means the user edited. */
+interface CanvasSnapshotRefs {
+  readonly placements: Record<string, DevicePlacement>;
+  readonly deviceStates: Record<string, DeviceState>;
+  readonly connections: readonly WireConnection[];
 }
 
 interface PanState {
@@ -102,14 +116,20 @@ interface PanState {
   moved: boolean;
 }
 
-interface DeviceInstance extends VirtualDevice {
-  readonly instanceId: string;
-}
-
-type DeviceState = Readonly<Record<string, string | number | boolean>>;
 
 /** Shared empty state so parts without properties never allocate per render. */
 const EMPTY_STATE: DeviceState = Object.freeze({});
+
+/** Runtime key a relay publishes per channel: `ch1`, `ch2`, … */
+const RELAY_CONTACT_KEY = /^ch\d+$/;
+
+/** Whether two merged states carry the same values, which is all the art reads. */
+function sameState(a: DeviceState, b: DeviceState): boolean {
+  if (a === b) return true;
+  const keys = Object.keys(a);
+  if (keys.length !== Object.keys(b).length) return false;
+  return keys.every((key) => a[key] === b[key]);
+}
 
 /** Result used whenever the simulation is stopped. */
 const EMPTY_SIMULATION: SimulationResult = Object.freeze({
@@ -118,14 +138,38 @@ const EMPTY_SIMULATION: SimulationResult = Object.freeze({
   shorts: [],
 });
 
-/** Diagram coordinate system. The SVG is 1:1 with CSS pixels before transform. */
+/** The property values worth saving: everything except what the solver writes. */
+function savedStateOf(
+  device: VirtualDevice,
+  state: DeviceState | undefined,
+): Record<string, string | number | boolean> {
+  const saved: Record<string, string | number | boolean> = {};
+  for (const property of device.properties ?? []) {
+    const value = state?.[property.id];
+    if (!property.simulationOnly && value !== undefined) saved[property.id] = value;
+  }
+  return saved;
+}
+
+/** Diagram coordinate system. CSS dimensions scale this viewBox without rasterizing it. */
+const CANVAS_WIDTH = 1000;
+const CANVAS_HEIGHT = 720;
 const BASE_CANVAS_SCALE = 0.6;
 const GRID_SIZE = 25;
-const MIN_ZOOM = 0.25;
+const MIN_ZOOM = 0.2;
 const MAX_ZOOM = 4;
 const ZOOM_STEP = 0.1;
+const MAX_BOARD_COUNT = 1;
+/** Standard rates the ESP32 bootloader and Arduino serial monitor both accept. */
+const SERIAL_BAUD_OPTIONS: readonly CustomSelectOption[] = [
+  9600, 19200, 38400, 57600, 115200, 230400, 460800, 921600,
+].map((baud) => ({ value: baud.toString(), label: `${baud} baud` }));
+/** Above this pin count a part only ever labels the pin under the pointer. */
+const MAX_LABELLED_PINS = 24;
 /** Simulation tick interval. 20 Hz is ample for the parts in this catalog. */
 const SIMULATION_TICK_MS = 50;
+/** Shortest press a momentary button reports: three ticks, as long as a quick tap. */
+const MIN_PRESS_MS = 150;
 
 const INITIAL_DEVICE_INSTANCES: readonly DeviceInstance[] = DEVICES.map((device) => ({
   ...device,
@@ -149,12 +193,21 @@ const INITIAL_DEVICE_STATES: Readonly<Record<string, DeviceState>> = Object.from
 
 @Component({
   selector: 'app-virtual-device-page',
-  imports: [AddDeviceModal, DeviceArt],
+  imports: [
+    AddDeviceModal,
+    CustomSelect,
+    DeviceArt,
+    DeviceInspector,
+    RouterLink,
+    SerialMonitorResize,
+  ],
   templateUrl: './virtual-device.page.html',
   styleUrls: [
     './virtual-device.page.css',
     './virtual-device.devices.css',
     './device-inspector.css',
+    './virtual-device.feedback.css',
+    './virtual-device.serial.css',
   ],
   host: {
     '(window:pointermove)': 'continueDeviceDrag($event)',
@@ -165,12 +218,15 @@ const INITIAL_DEVICE_STATES: Readonly<Record<string, DeviceState>> = Object.from
 export class VirtualDevicePage {
   private readonly route = inject(ActivatedRoute);
   private readonly canvasPersistence = inject(ProjectCanvasService);
+  private readonly snapshotCache = inject(CanvasSnapshotCache);
   private readonly destroyRef = inject(DestroyRef);
   private readonly projectStore = inject(ProjectStore);
   private readonly preferences = inject(DevicePreferenceService);
+  private readonly audio = inject(CircuitAudioService);
   private readonly canvasSvg = viewChild<ElementRef<SVGSVGElement>>('canvasSvg');
   private readonly canvasViewport = viewChild<ElementRef<HTMLElement>>('canvasViewport');
   private readonly addPartTrigger = viewChild<ElementRef<HTMLButtonElement>>('addPartTrigger');
+  private readonly serialOutputRef = viewChild<ElementRef<HTMLElement>>('serialOutput');
   /**
    * Undo/redo over the editable circuit state.
    *
@@ -178,17 +234,13 @@ export class VirtualDevicePage {
    * records, so capturing them is cheap and every operation gets undo without
    * having to author an inverse.
    */
-  private readonly history = new CircuitHistory<
-    DevicePlacement,
-    WireConnection,
-    DeviceState
-  >();
+  private readonly history = new CircuitHistory<DevicePlacement, WireConnection, DeviceState>();
   protected readonly canUndo = signal(false);
   protected readonly canRedo = signal(false);
 
   private dragState: DragState | null = null;
-  private boardDragState: BoardDragState | null = null;
   private wireCurveDragState: WireCurveDragState | null = null;
+  private rotaryDragState: RotaryDragState | null = null;
   private panState: PanState | null = null;
   private partsOpener: HTMLButtonElement | null = null;
   private wireSequence = INITIAL_CONNECTIONS.length;
@@ -201,17 +253,20 @@ export class VirtualDevicePage {
   protected readonly deviceInstances = signal<readonly DeviceInstance[]>([
     ...INITIAL_DEVICE_INSTANCES,
   ]);
-  protected readonly libraryDevices = DEVICE_LIBRARY_ITEMS;
-  protected readonly boardPins = BOARD_PINS;
+  /**
+   * The board is picked when the project is created and cannot be swapped
+   * afterwards, so the Add Device picker lists everything except boards.
+   */
+  protected readonly libraryDevices = DEVICE_LIBRARY_ITEMS.filter(
+    (device) => !isBoardCategory(device.categoryId),
+  );
   /** Actuator geometry, so the press target is exactly the cap that is drawn. */
-  protected readonly buttonCap = BUTTON_CAP;
   protected readonly wireColors = WIRE_COLORS;
   protected readonly placements = signal<Record<string, DevicePlacement>>({
     ...INITIAL_PLACEMENTS,
   });
   protected readonly connections = signal<readonly WireConnection[]>([...INITIAL_CONNECTIONS]);
   protected readonly selectedDeviceId = signal<string | null>(null);
-  protected readonly boardSelected = signal(false);
   protected readonly selectedWireId = signal<string | null>(null);
   protected readonly pendingPin = signal<WireEndpoint | null>(null);
   protected readonly wirePointer = signal<Point | null>(null);
@@ -223,18 +278,17 @@ export class VirtualDevicePage {
   protected readonly favoriteDeviceIds = this.preferences.favorites;
   protected readonly recentDeviceIds = this.preferences.recents;
   protected readonly serialOpen = signal(false);
+  protected readonly serialHeight = signal(224);
+  protected readonly serialBaud = signal(115200);
+  /** Rate the running sketch opened the port at, refreshed each tick. */
+  protected readonly sketchBaud = signal(0);
+  protected readonly baudOptions = SERIAL_BAUD_OPTIONS;
   protected readonly inspectorOpen = signal(false);
-  protected readonly openPropertyDropdownId = signal<string | null>(null);
   protected readonly zoom = signal(1);
   protected readonly canvasPan = signal<Point>({ x: 0, y: 0 });
-  protected readonly boardPosition = signal<Point>({ x: 0, y: 0 });
   protected readonly panning = signal(false);
-  protected readonly buttonPressedStates = signal<Readonly<Record<string, boolean>>>({});
   protected readonly canZoomOut = computed(() => this.zoom() > MIN_ZOOM);
   protected readonly canZoomIn = computed(() => this.zoom() < MAX_ZOOM);
-  protected readonly canvasDeviceDetail = computed<DetailLevel>(() =>
-    this.zoom() < 0.85 ? 'low' : 'normal',
-  );
 
   /** Part waiting to be dropped on the canvas, and where its ghost currently sits. */
   protected readonly placingDeviceId = signal<DeviceKind | null>(null);
@@ -282,9 +336,35 @@ export class VirtualDevicePage {
   protected readonly deviceStates =
     signal<Readonly<Record<string, DeviceState>>>(INITIAL_DEVICE_STATES);
 
-  protected readonly selectedProperties = computed<readonly DevicePropertyDefinition[]>(
-    () => this.selectedDevice()?.properties ?? [],
-  );
+  /** Configured values of the selected part, as the inspector edits them. */
+  protected readonly selectedState = computed<DeviceState>(() => {
+    const id = this.selectedDeviceId();
+    return (id && this.deviceStates()[id]) || EMPTY_STATE;
+  });
+
+  /**
+   * Live values the selected part is publishing, ready to print.
+   *
+   * Only the readings the part declares appear, and only while the simulation
+   * runs: a value shown on a stopped board would be the last thing the circuit
+   * did, read as though it were still doing it.
+   */
+  protected readonly selectedReadings = computed<
+    readonly { id: string; label: string; value: string; description?: string }[]
+  >(() => {
+    const device = this.selectedDevice();
+    if (!device?.readings?.length || !this.simulationRunning()) return [];
+
+    const runtime = this.simulation().runtime[device.instanceId] ?? {};
+    return device.readings
+      .filter((reading) => runtime[reading.id] !== undefined)
+      .map((reading) => ({
+        id: reading.id,
+        label: reading.label,
+        description: reading.description,
+        value: reading.unit ? `${runtime[reading.id]} ${reading.unit}` : `${runtime[reading.id]}`,
+      }));
+  });
 
   /**
    * The circuit solve.
@@ -339,12 +419,20 @@ export class VirtualDevicePage {
         {
           devices,
           connections: this.visibleConnections(),
-          boardPins: this.boardPins,
           deltaMs,
         },
         this.behaviors,
       ),
     );
+
+    // A short acts like the fuse on a real bench supply: the run stops rather
+    // than carrying on with the error merely listed beside a working circuit.
+    // The findings are captured first, because stopping clears the solve.
+    const shorts = this.shortIssues();
+    if (shorts.length) {
+      this.shortTrip.set(shorts);
+      this.toggleSimulation();
+    }
   }
 
   /** Creates behaviours for new parts and drops them for removed ones. */
@@ -356,7 +444,7 @@ export class VirtualDevicePage {
       live.add(device.instanceId);
       if (this.behaviors.has(device.instanceId)) continue;
       const factory = device.definition.simulation;
-      if (factory) this.behaviors.set(device.instanceId, factory());
+      if (factory) this.behaviors.set(device.instanceId, factory(device.instanceId));
     }
     for (const instanceId of [...this.behaviors.keys()]) {
       if (!live.has(instanceId)) this.behaviors.delete(instanceId);
@@ -378,6 +466,8 @@ export class VirtualDevicePage {
       if (elapsed < SIMULATION_TICK_MS) return;
       this.lastTickAt = now;
       this.solveCircuit(elapsed);
+      this.firmware.pumpSerial();
+      this.sketchBaud.set(this.firmware.sketchBaud());
     };
     this.tickHandle = requestAnimationFrame(step);
   }
@@ -388,6 +478,77 @@ export class VirtualDevicePage {
     for (const behavior of this.behaviors.values()) behavior.reset?.();
     this.behaviors.clear();
     this.simulation.set(EMPTY_SIMULATION);
+  }
+
+  /**
+   * Relay contacts as the last tick left them, so only a *change* clicks.
+   *
+   * Keyed by instance and channel, rebuilt each tick: a relay deleted mid-run
+   * has to leave with its entry, or replacing it would click on arrival.
+   */
+  private contactPositions = new Map<string, boolean>();
+
+  /**
+   * Gives the noisy parts a voice.
+   *
+   * The audio service is told what should be sounding, never which part is
+   * which: a relay is anything publishing a `chN` contact, a motor anything
+   * publishing `spinning`, a pump anything publishing `pumping`, a buzzer
+   * anything publishing `sounding` and the `toneHz` to sound it at. The runtime
+   * values are the same ones the artwork already reads, so a part becomes
+   * audible by emitting them rather than by being listed here.
+   */
+  private readonly audioEffect = effect(() => {
+    const running = this.simulationRunning();
+    const states = this.renderStates();
+
+    if (!running) {
+      this.audio.silence();
+      this.contactPositions.clear();
+      return;
+    }
+
+    const sustained: SustainedSound[] = [];
+    const contacts = new Map<string, boolean>();
+
+    for (const [instanceId, state] of Object.entries(states)) {
+      const effort = typeof state['effort'] === 'number' ? state['effort'] : 0;
+      // One voice per part: the chain is exclusive so a part that somehow
+      // published two of these keys still gets a single, stable voice rather
+      // than two fighting over the same id every tick.
+      if (state['spinning'] === true) {
+        sustained.push({ id: instanceId, kind: 'motor', intensity: effort });
+      } else if (state['pumping'] === true) {
+        sustained.push({ id: instanceId, kind: 'pump', intensity: effort });
+      } else if (state['sounding'] === true) {
+        sustained.push({
+          id: instanceId,
+          kind: 'buzzer',
+          intensity: 1,
+          hertz: typeof state['toneHz'] === 'number' ? state['toneHz'] : undefined,
+        });
+      }
+
+      for (const [key, value] of Object.entries(state)) {
+        if (typeof value !== 'boolean' || !RELAY_CONTACT_KEY.test(key)) continue;
+        const contact = `${instanceId}:${key}`;
+        contacts.set(contact, value);
+        const before = this.contactPositions.get(contact);
+        // An unknown previous position is the first tick of a run or a part
+        // that has just appeared; neither is a contact throwing over.
+        if (before !== undefined && before !== value) this.audio.click(value);
+      }
+    }
+
+    this.contactPositions = contacts;
+    this.audio.sustain(sustained);
+  });
+
+  /** True while the canvas is silenced; the preference survives a reload. */
+  protected readonly soundMuted = this.audio.muted;
+
+  protected toggleSound(): void {
+    this.audio.toggleMuted();
   }
 
   /** Short circuits found by the last solve, surfaced in the inspector. */
@@ -401,9 +562,9 @@ export class VirtualDevicePage {
       devices: this.visibleDevices().map((device) => ({
         instanceId: device.instanceId,
         definition: device,
+        properties: this.deviceStates()[device.instanceId],
       })),
       connections: this.visibleConnections(),
-      boardPins: this.boardPins,
     }),
   );
 
@@ -431,6 +592,19 @@ export class VirtualDevicePage {
       }
     }
 
+    // The wires landing on those pins, so the canvas dashes the short itself
+    // rather than only outlining the part it runs through.
+    const connections = this.visibleConnections();
+    const wiresOn = (instanceId: string, pinNames: readonly string[]) =>
+      connections
+        .filter((wire) =>
+          [wire.start, wire.end].some(
+            (end) =>
+              end.type === 'device' && end.deviceId === instanceId && pinNames.includes(end.pinId),
+          ),
+        )
+        .map((wire) => wire.id);
+
     return [...owners].map(([instanceId, pinNames]) => ({
       id: `short:${instanceId}:${pinNames.join('-')}`,
       code: 'live-short',
@@ -438,13 +612,20 @@ export class VirtualDevicePage {
       title: 'ตรวจพบไฟลัดขณะจำลอง',
       detail: `ขา ${pinNames.join(', ')} อยู่บนจุดที่มีทั้งไฟเลี้ยงและกราวด์จ่ายพร้อมกัน ถ้าเป็นวงจรจริงจะเกิดกระแสลัดวงจร`,
       deviceIds: [instanceId],
-      wireIds: [],
+      wireIds: wiresOn(instanceId, pinNames),
     }));
   });
 
+  /**
+   * The shorts that stopped the last run. Kept after the stop so the user sees
+   * why the circuit went dead; cleared by the next Start.
+   */
+  protected readonly shortTrip = signal<readonly WireIssue[]>([]);
+
   protected readonly wireIssues = computed(() => {
     const dismissed = this.dismissedIssueIds();
-    return [...this.allIssues(), ...this.shortIssues()].filter((issue) => !dismissed.has(issue.id));
+    const shorts = this.simulationRunning() ? this.shortIssues() : this.shortTrip();
+    return [...this.allIssues(), ...shorts].filter((issue) => !dismissed.has(issue.id));
   });
 
   /** Findings that touch the selected part, shown in its inspector. */
@@ -495,6 +676,7 @@ export class VirtualDevicePage {
     const deviceId = issue.deviceIds[0];
     if (deviceId) {
       this.selectDevice(deviceId);
+      this.inspectorOpen.set(true);
       return;
     }
     this.revealIssue(issue);
@@ -518,7 +700,6 @@ export class VirtualDevicePage {
     if (!wireId) return;
     this.selectedWireId.set(wireId);
     this.selectedDeviceId.set(null);
-    this.boardSelected.set(false);
     this.inspectorOpen.set(true);
   }
 
@@ -536,10 +717,7 @@ export class VirtualDevicePage {
    * looked empty for as long as the round trip took, then filled in.
    */
   protected readonly canvasEmpty = computed(
-    () =>
-      !this.layoutLoading() &&
-      this.visibleDevices().length === 0 &&
-      !this.placingDeviceId(),
+    () => !this.layoutLoading() && this.visibleDevices().length === 0 && !this.placingDeviceId(),
   );
   protected readonly visibleConnections = computed(() =>
     this.connections().filter(
@@ -555,17 +733,18 @@ export class VirtualDevicePage {
     () => this.connections().find((wire) => wire.id === this.selectedWireId()) ?? null,
   );
   protected readonly junctionPoints = computed(() => Object.values(this.wireJunctions()));
-  protected readonly selectedConnections = computed(() => {
-    const id = this.selectedDeviceId();
-    return id
-      ? this.connections().filter((connection) => this.connectionHasDevice(connection, id))
-      : [];
-  });
+  protected readonly placedBoardCount = computed(
+    () =>
+      this.visibleDevices().filter((device) => isBoardCategory(device.catalog.categoryId)).length,
+  );
   protected readonly placingDevice = computed(() => {
     const id = this.placingDeviceId();
     return id ? (deviceById(id) ?? null) : null;
   });
   protected readonly canvasScale = computed(() => BASE_CANVAS_SCALE * this.zoom());
+  protected readonly canvasPixelWidth = computed(() => CANVAS_WIDTH * this.canvasScale());
+  protected readonly canvasPixelHeight = computed(() => CANVAS_HEIGHT * this.canvasScale());
+  protected readonly canvasViewBox = `0 0 ${CANVAS_WIDTH} ${CANVAS_HEIGHT}`;
 
   /**
    * Dot grid, kept deliberately quiet.
@@ -611,21 +790,19 @@ export class VirtualDevicePage {
       .join(', '),
   );
 
-  protected readonly activeReading = computed(() => {
-    const device = this.selectedDevice();
-    if (!device) return 'No part selected';
-
-    return this.liveReadingFor(device);
-  });
-
   /** Route project id. Null only if the canvas is opened outside a project. */
+  private readonly firmware = inject(FirmwareLoaderService);
+
   private readonly persistedProjectId =
     this.route.snapshot.paramMap.get('projectId') ??
     this.route.parent?.snapshot.paramMap.get('projectId') ??
     null;
 
   constructor() {
-    afterNextRender(() => this.centerCanvasAtZoom(1));
+    const cached = this.persistedProjectId ? this.snapshotCache.get(this.persistedProjectId) : undefined;
+    afterNextRender(() => {
+      if (!cached) this.centerCanvasAtZoom(1);
+    });
 
     // Inside a project the canvas shows that project and nothing else. The
     // starter circuit — board, LCD, servo — is demo content for the standalone
@@ -640,14 +817,58 @@ export class VirtualDevicePage {
       this.deviceStates.set({});
     }
 
-    void this.restorePersistedComponents();
+    // Coming back to a project this session: draw it as it was left, at once,
+    // and let the fetch below refresh it quietly.
+    const shown = cached ? this.showCachedSnapshot(cached) : null;
+    void this.restorePersistedComponents(shown);
 
-    // A drag in progress when the user navigates away would otherwise be lost:
-    // its write is still sitting in the debounce window.
     this.destroyRef.onDestroy(() => {
+      // The ticker is a bare requestAnimationFrame loop and the firmware bus is
+      // app-wide, so neither ends with the component. Left running, the old loop
+      // keeps advancing this project's sketches from a canvas that is gone, and
+      // the next visit adds a second loop on top: every machine is then stepped
+      // twice a frame from two different node snapshots, which is what made a
+      // working circuit start flickering after navigating away and back.
+      this.stopTicker();
+      this.firmware.stop();
+      this.audio.silence();
+
+      // A drag in progress when the user navigates away would otherwise be lost:
+      // its write is still sitting in the debounce window.
       const projectId = this.persistedProjectId;
-      if (projectId) void this.canvasPersistence.flushAll(projectId);
+      if (projectId) {
+        void this.canvasPersistence.flushAll(projectId);
+        // Only a layout that actually loaded is worth drawing next time.
+        if (!this.layoutLoading() && !this.layoutLoadFailed()) {
+          this.snapshotCache.set(projectId, {
+            instances: this.deviceInstances(),
+            placements: this.placements(),
+            deviceStates: this.deviceStates(),
+            connections: this.connections(),
+            junctions: this.wireJunctions(),
+            zoom: this.zoom(),
+            pan: this.canvasPan(),
+          });
+        }
+      }
     });
+  }
+
+  /** Puts a remembered layout on screen and returns what was shown, to tell later edits apart. */
+  private showCachedSnapshot(cached: CanvasSnapshot): CanvasSnapshotRefs {
+    this.deviceInstances.set([...cached.instances]);
+    this.placements.set({ ...cached.placements });
+    this.deviceStates.set({ ...cached.deviceStates });
+    this.connections.set([...cached.connections]);
+    this.wireJunctions.set({ ...cached.junctions });
+    this.zoom.set(cached.zoom);
+    this.canvasPan.set(cached.pan);
+    this.layoutLoading.set(false);
+    return {
+      placements: this.placements(),
+      deviceStates: this.deviceStates(),
+      connections: this.connections(),
+    };
   }
 
   /**
@@ -656,12 +877,15 @@ export class VirtualDevicePage {
    * A project created with a board already has that board stored, so it appears
    * here rather than the canvas opening empty after the user chose one.
    */
-  private async restorePersistedComponents(): Promise<void> {
+  private async restorePersistedComponents(shown: CanvasSnapshotRefs | null = null): Promise<void> {
     const projectId = this.persistedProjectId;
     if (!projectId) return;
 
     try {
-      const stored = await this.canvasPersistence.load(projectId);
+      const [stored, storedConnections] = await Promise.all([
+        this.canvasPersistence.load(projectId),
+        this.canvasPersistence.loadConnections(projectId),
+      ]);
 
       const instances: DeviceInstance[] = [];
       const placements: Record<string, DevicePlacement> = {};
@@ -688,16 +912,40 @@ export class VirtualDevicePage {
         }
       }
 
+      const connections = this.restoreConnections(
+        storedConnections,
+        new Set(Object.keys(placements)),
+      );
+
       void this.refreshUsage();
+      // The user started editing the remembered layout before this arrived. Their
+      // edits are already on their way to the server; replacing the canvas now
+      // would snap the part they are dragging back to where it was.
+      if (
+        shown &&
+        (this.placements() !== shown.placements ||
+          this.deviceStates() !== shown.deviceStates ||
+          this.connections() !== shown.connections)
+      ) {
+        return;
+      }
       this.deviceInstances.set(instances);
       this.placements.set(placements);
       this.deviceStates.set(states);
-      await this.restorePersistedConnections(projectId, new Set(Object.keys(placements)));
+      this.connections.set(connections);
+      this.layoutLoadFailed.set(false);
     } catch {
-      this.layoutLoadFailed.set(true);
+      // A remembered layout on screen is better than an error over it.
+      if (!shown) this.layoutLoadFailed.set(true);
     } finally {
       this.layoutLoading.set(false);
     }
+  }
+
+  protected async retryLayout(): Promise<void> {
+    if (!this.layoutLoadFailed() || this.layoutLoading()) return;
+    this.layoutLoading.set(true);
+    await this.restorePersistedComponents();
   }
 
   // ---------------------------------------------------------------- geometry
@@ -727,19 +975,9 @@ export class VirtualDevicePage {
     } ${device.height / 2})`;
   }
 
-  /** Keeps the selection label upright no matter how the part is rotated. */
-  protected labelTransform(device: DeviceInstance): string {
-    return `rotate(${-this.placementFor(device.instanceId).rotation} ${device.width / 2} -22)`;
-  }
-
-  protected boardTransform(): string {
-    const position = this.boardPosition();
-    return `translate(${position.x} ${position.y})`;
-  }
-
   protected canvasTransform(): string {
     const pan = this.canvasPan();
-    return `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${this.canvasScale()})`;
+    return `translate(${pan.x}px, ${pan.y}px)`;
   }
 
   // ------------------------------------------------------- device properties
@@ -750,127 +988,36 @@ export class VirtualDevicePage {
    * values while running, from a single input.
    */
   /**
-   * One-line status for a part on the declarative pipeline.
+   * Last merge handed to the artwork, kept so an unchanged part keeps its object.
    *
-   * Prefers whatever the simulation published, then the part's own headline
-   * property, so a new device gets a sensible readout without this method
-   * growing a case for it.
+   * DeviceArt rebuilds its entire shape list whenever this input changes
+   * *reference*, so returning a fresh merge every time made every placed part
+   * redraw on every change detection pass — a hover, a pan, each of the twenty
+   * solves a second — whether or not a single value had moved.
    */
-  private liveReadingFor(device: DeviceInstance): string {
-    const state = this.deviceStateFor(device.instanceId);
+  private renderStateCache: Record<string, DeviceState> = {};
 
-    if (typeof state['brightness'] === 'number') {
-      return state['brightness'] > 0 ? `On · ${state['brightness']}%` : 'Off';
-    }
-    if (typeof state['closed'] === 'boolean') return state['closed'] ? 'Closed' : 'Open';
-    if (typeof state['sounding'] === 'boolean') return state['sounding'] ? 'Sounding' : 'Silent';
-    if (typeof state['motion'] === 'boolean') return state['motion'] ? 'Motion' : 'Clear';
+  private readonly renderStates = computed<Record<string, DeviceState>>(() => {
+    const properties = this.deviceStates();
+    const runtime = this.simulation().runtime;
+    const previous = this.renderStateCache;
+    const next: Record<string, DeviceState> = {};
 
-    const headline = device.properties?.[0];
-    if (headline) {
-      const value = state[headline.id];
-      if (value !== undefined && typeof value !== 'boolean') {
-        return `${value}${headline.unit ? ` ${headline.unit}` : ''}`;
-      }
+    for (const device of this.visibleDevices()) {
+      const id = device.instanceId;
+      const base = properties[id] ?? EMPTY_STATE;
+      const live = runtime[id];
+      const merged = live ? { ...base, ...live } : base;
+      const before = previous[id];
+      next[id] = before && sameState(before, merged) ? before : merged;
     }
-    return this.simulationRunning() ? 'Running' : 'Idle';
-  }
+
+    this.renderStateCache = next;
+    return next;
+  });
 
   protected deviceStateFor(instanceId: string): DeviceState {
-    const properties = this.deviceStates()[instanceId] ?? EMPTY_STATE;
-    const runtime = this.simulation().runtime[instanceId];
-    return runtime ? { ...properties, ...runtime } : properties;
-  }
-
-  protected propertyValue(property: DevicePropertyDefinition): string | number | boolean {
-    const id = this.selectedDeviceId();
-    const current = id ? this.deviceStates()[id]?.[property.id] : undefined;
-    return current ?? property.defaultValue;
-  }
-
-  protected propertyNumber(property: DevicePropertyDefinition): number {
-    const value = this.propertyValue(property);
-    return typeof value === 'number' ? value : Number(value) || 0;
-  }
-
-  protected propertyChecked(property: DevicePropertyDefinition): boolean {
-    return this.propertyValue(property) === true;
-  }
-
-  protected propertyText(property: DevicePropertyDefinition): string {
-    return String(this.propertyValue(property));
-  }
-
-  protected propertyOptionLabel(property: DevicePropertyDefinition): string {
-    const value = this.propertyText(property);
-    return property.options?.find((option) => option.value === value)?.label ?? value;
-  }
-
-  protected propertyColorSwatch(value: string): string | null {
-    const colors: Readonly<Record<string, string>> = {
-      red: '#ef4444',
-      green: '#22c55e',
-      blue: '#3b82f6',
-      yellow: '#facc15',
-      white: '#f8fafc',
-      orange: '#f97316',
-    };
-    return colors[value] ?? null;
-  }
-
-  protected togglePropertyDropdown(propertyId: string): void {
-    this.openPropertyDropdownId.update((openId) => (openId === propertyId ? null : propertyId));
-  }
-
-  protected openPropertyDropdownFromKeyboard(event: Event, propertyId: string): void {
-    event.preventDefault();
-    this.openPropertyDropdownId.set(propertyId);
-  }
-
-  protected closePropertyDropdownOnEscape(event: Event): void {
-    event.preventDefault();
-    this.openPropertyDropdownId.set(null);
-    const dropdown = event.currentTarget as HTMLElement;
-    dropdown.querySelector<HTMLButtonElement>('.property-select-trigger')?.focus();
-  }
-
-  protected closePropertyDropdownOnFocusOut(event: FocusEvent, propertyId: string): void {
-    const dropdown = event.currentTarget as HTMLElement;
-    const nextTarget = event.relatedTarget;
-    if (nextTarget instanceof Node && dropdown.contains(nextTarget)) return;
-    if (this.openPropertyDropdownId() === propertyId) this.openPropertyDropdownId.set(null);
-  }
-
-  protected choosePropertyOption(property: DevicePropertyDefinition, value: string): void {
-    this.updateSelectProperty(property, value);
-    this.openPropertyDropdownId.set(null);
-  }
-
-  /** Simulation-only knobs are inert until the workspace is running. */
-  protected propertyDisabled(property: DevicePropertyDefinition): boolean {
-    return Boolean(property.simulationOnly) && !this.simulationRunning();
-  }
-
-  protected updateNumberProperty(property: DevicePropertyDefinition, event: Event): void {
-    const raw = Number((event.target as HTMLInputElement).value);
-    if (!Number.isFinite(raw)) return;
-    const clamped = Math.min(
-      property.max ?? Number.POSITIVE_INFINITY,
-      Math.max(property.min ?? Number.NEGATIVE_INFINITY, raw),
-    );
-    this.setDeviceProperty(property.id, clamped);
-  }
-
-  protected updateBooleanProperty(property: DevicePropertyDefinition, event: Event): void {
-    this.setDeviceProperty(property.id, (event.target as HTMLInputElement).checked);
-  }
-
-  protected updateTextProperty(property: DevicePropertyDefinition, event: Event): void {
-    this.setDeviceProperty(property.id, (event.target as HTMLInputElement).value);
-  }
-
-  protected updateSelectProperty(property: DevicePropertyDefinition, value: string): void {
-    this.setDeviceProperty(property.id, value);
+    return this.renderStates()[instanceId] ?? EMPTY_STATE;
   }
 
   /** Restores every property on the selected part to its catalog default. */
@@ -882,46 +1029,114 @@ export class VirtualDevicePage {
       ...states,
       [id]: defaultStateFor(device.properties),
     }));
+    this.persistDeviceState(id);
   }
 
-  private setDeviceProperty(propertyId: string, value: string | number | boolean): void {
+  protected setSelectedProperty(change: PropertyChange): void {
     const id = this.selectedDeviceId();
     const device = this.selectedDevice();
     if (!id || !device) return;
     this.deviceStates.update((states) => ({
       ...states,
-      [id]: { ...(states[id] ?? defaultStateFor(device.properties)), [propertyId]: value },
+      [id]: { ...(states[id] ?? defaultStateFor(device.properties)), [change.id]: change.value },
     }));
+    this.persistDeviceState(id);
+  }
+
+  /**
+   * Turns the selected part into another variant of itself, in place.
+   *
+   * The instance keeps its id, position and wires. A wire keeps its pin name when
+   * the new variant has that pin, and otherwise moves to the pin in the same
+   * position: an RGB LED's common leg is `CATH` on one polarity and `ANODE` on
+   * the other, but it is the second leg on both.
+   */
+  protected async changeVariant(definitionId: string): Promise<void> {
+    const current = this.selectedDevice();
+    const next = deviceById(definitionId);
+    if (!current || !next || current.id === next.id || this.simulationRunning()) return;
+    const id = current.instanceId;
+
+    const pinFor = (pinId: string): string => {
+      if (next.pins.some((pin) => pin.name === pinId)) return pinId;
+      return next.pins[current.pins.findIndex((pin) => pin.name === pinId)]?.name ?? pinId;
+    };
+    const moveEndpoint = (endpoint: WireEndpoint): WireEndpoint => {
+      if (endpoint.type !== 'device' || endpoint.deviceId !== id) return endpoint;
+      const pinId = pinFor(endpoint.pinId);
+      return pinId === endpoint.pinId ? endpoint : { ...endpoint, pinId };
+    };
+
+    const moved: WireConnection[] = [];
+    const connections = this.connections().map((wire) => {
+      const start = moveEndpoint(wire.start);
+      const end = moveEndpoint(wire.end);
+      if (start === wire.start && end === wire.end) return wire;
+      const rewired = { ...wire, start, end };
+      moved.push(rewired);
+      return rewired;
+    });
+
+    const previous = this.deviceStates()[id] ?? EMPTY_STATE;
+    const state = defaultStateFor(next.properties);
+    for (const property of next.properties ?? []) {
+      if (previous[property.id] !== undefined) state[property.id] = previous[property.id];
+    }
+
+    this.deviceInstances.update((devices) =>
+      devices.map((device) => (device.instanceId === id ? { ...next, instanceId: id } : device)),
+    );
+    this.deviceStates.update((states) => ({ ...states, [id]: state }));
+    this.connections.set(connections);
+    // Undo snapshots hold wires on the old variant's pin names, which the new
+    // part does not have, so they can no longer be restored safely.
+    this.history.clear();
+    this.syncHistoryFlags();
+
+    const projectId = this.persistedProjectId;
+    if (!projectId) return;
+    try {
+      await this.canvasPersistence.changeDefinition(
+        projectId,
+        id,
+        next.id,
+        savedStateOf(next, state),
+      );
+      // A stored wire names its pins, so a moved wire is replaced rather than edited.
+      for (const wire of moved) {
+        await this.canvasPersistence.removeConnection(projectId, wire.id);
+        await this.persistNewConnection(wire);
+      }
+    } catch {
+      this.componentLimitMessage.set('บันทึกการเปลี่ยนชนิดอุปกรณ์ไม่สำเร็จ');
+    }
+  }
+
+  /**
+   * Queues the part's settings for saving.
+   *
+   * Values flagged `simulationOnly` are left out: the solver writes those back
+   * every tick, and saving one would reopen the project with a relay latched on.
+   */
+  private persistDeviceState(id: string): void {
+    const projectId = this.persistedProjectId;
+    const device = this.deviceInstances().find((candidate) => candidate.instanceId === id);
+    if (!projectId || !device) return;
+    this.canvasPersistence.queueState(projectId, id, savedStateOf(device, this.deviceStates()[id]));
   }
 
   /** Hit target for one relay block, matching the drawn artwork exactly. */
-  protected relayBox(device: VirtualDevice, index: number) {
-    return relayChannelBox(device.relayChannels?.length ?? 1, index);
-  }
-
   // --------------------------------------------------------------- selection
 
   protected selectDevice(id: string): void {
-    this.openPropertyDropdownId.set(null);
     this.selectedDeviceId.set(id);
-    this.boardSelected.set(false);
-    this.selectedWireId.set(null);
-    this.inspectorOpen.set(true);
-  }
-
-  protected selectBoard(): void {
-    this.openPropertyDropdownId.set(null);
-    this.selectedDeviceId.set(null);
-    this.boardSelected.set(true);
     this.selectedWireId.set(null);
   }
 
   protected selectWire(event: Event, id: string): void {
     event.stopPropagation();
-    this.openPropertyDropdownId.set(null);
     this.selectedWireId.set(id);
     this.selectedDeviceId.set(null);
-    this.boardSelected.set(false);
     this.inspectorOpen.set(true);
   }
 
@@ -935,9 +1150,7 @@ export class VirtualDevicePage {
   }
 
   protected clearSelection(): void {
-    this.openPropertyDropdownId.set(null);
     this.selectedDeviceId.set(null);
-    this.boardSelected.set(false);
     this.selectedWireId.set(null);
     this.inspectorOpen.set(false);
   }
@@ -1071,6 +1284,61 @@ export class VirtualDevicePage {
     this.zoomAtViewportCenter(this.normalizedZoom(this.zoom() - ZOOM_STEP));
   }
 
+  /**
+   * Re-lays every unrotated part into columns beside the board, the same layout
+   * an applied assistant plan gets. The board and rotated parts stay put. Hand-drawn
+   * bends are dropped from the wires that move, since they were drawn for the old
+   * positions; a bend that is a junction is kept. One undo step reverts it all.
+   */
+  protected autoArrange(): void {
+    if (this.simulationRunning()) return;
+    const before = this.snapshot();
+    const placements = this.placements();
+    const parts = this.visibleDevices().map((device) => ({
+      id: device.instanceId,
+      definition: device,
+      x: placements[device.instanceId].x,
+      y: placements[device.instanceId].y,
+      rotation: placements[device.instanceId].rotation,
+    }));
+    const wires = this.connections().flatMap((wire) =>
+      wire.start.type === 'device' && wire.end.type === 'device'
+        ? [
+            {
+              from: { componentId: wire.start.deviceId, pinId: wire.start.pinId },
+              to: { componentId: wire.end.deviceId, pinId: wire.end.pinId },
+            },
+          ]
+        : [],
+    );
+    const movable = parts
+      .filter((part) => !isBoardCategory(part.definition.catalog.categoryId) && part.rotation === 0)
+      .map((part) => part.id);
+
+    const positions = layoutNewParts(parts, wires, movable);
+    if (!positions.size) return;
+    for (const [id, at] of positions) {
+      this.updatePlacement(id, { x: Math.round(at.x), y: Math.round(at.y) });
+    }
+
+    const projectId = this.persistedProjectId;
+    this.connections.update((connections) =>
+      connections.map((wire) => {
+        const touches = [wire.start, wire.end].some(
+          (end) => end.type === 'device' && positions.has(end.deviceId),
+        );
+        if (!touches || !wire.waypoints.length || wire.waypoints.some((point) => point.junctionId)) {
+          return wire;
+        }
+        if (projectId) this.canvasPersistence.queueWaypoints(projectId, wire.id, []);
+        return { ...wire, waypoints: [] };
+      }),
+    );
+
+    this.recordChange(before);
+    this.fitCanvas();
+  }
+
   /** Frames the board and every placed part inside the viewport. */
   protected fitCanvas(): void {
     const viewport = this.canvasViewport()?.nativeElement;
@@ -1093,11 +1361,12 @@ export class VirtualDevicePage {
 
   /** Axis-aligned bounds of everything currently drawn, in diagram units. */
   private contentBounds(): { minX: number; minY: number; maxX: number; maxY: number } {
-    const board = this.boardPosition();
-    let minX = 396 + board.x;
-    let minY = 124 + board.y;
-    let maxX = 664 + board.x;
-    let maxY = 572 + board.y;
+    // Start inverted so the first device establishes the box; an empty canvas
+    // falls back to a fixed frame below rather than to the retired demo board.
+    let minX = Number.POSITIVE_INFINITY;
+    let minY = Number.POSITIVE_INFINITY;
+    let maxX = Number.NEGATIVE_INFINITY;
+    let maxY = Number.NEGATIVE_INFINITY;
 
     for (const device of this.visibleDevices()) {
       const placement = this.placementFor(device.instanceId);
@@ -1112,6 +1381,10 @@ export class VirtualDevicePage {
       maxY = Math.max(maxY, centerY + height / 2 + 28);
     }
 
+    // Nothing placed: hand back a screen-sized frame so "fit" centres the empty
+    // canvas at a sane zoom instead of dividing by an infinite extent.
+    if (!Number.isFinite(minX)) return { minX: 0, minY: 0, maxX: 800, maxY: 600 };
+
     return { minX, minY, maxX, maxY };
   }
 
@@ -1120,6 +1393,13 @@ export class VirtualDevicePage {
   protected beginDeviceDrag(event: PointerEvent, id: string): void {
     if (event.button !== 0) return;
     event.stopPropagation();
+    // A running board is a wired board: moving a part would drag its wires with
+    // it and invite edits to a circuit that is mid-tick. Selection still works,
+    // so the inspector can be read while the simulation runs.
+    if (this.simulationRunning()) {
+      this.selectDevice(id);
+      return;
+    }
     if (this.placingDeviceId()) return;
     const point = this.svgPoint(event);
     if (!point) return;
@@ -1137,28 +1417,12 @@ export class VirtualDevicePage {
     event.preventDefault();
   }
 
-  protected beginBoardDrag(event: PointerEvent): void {
-    if (event.button !== 0) return;
-    event.stopPropagation();
-    if (this.placingDeviceId()) return;
-    const point = this.svgPoint(event);
-    if (!point) return;
-    const position = this.boardPosition();
-    this.selectBoard();
-    this.boardDragState = {
-      pointerId: event.pointerId,
-      offset: { x: point.x - position.x, y: point.y - position.y },
-    };
-    (event.currentTarget as SVGElement).setPointerCapture(event.pointerId);
-    event.preventDefault();
-  }
-
   protected beginWireCurveDrag(event: PointerEvent, wireId: string, waypointIndex: number): void {
     if (event.button !== 0) return;
     event.stopPropagation();
+    if (this.simulationRunning()) return;
     this.selectedWireId.set(wireId);
     this.selectedDeviceId.set(null);
-    this.boardSelected.set(false);
     this.wireCurveDragState = { pointerId: event.pointerId, wireId, waypointIndex };
     (event.currentTarget as SVGElement).setPointerCapture(event.pointerId);
     event.preventDefault();
@@ -1183,14 +1447,10 @@ export class VirtualDevicePage {
       event.preventDefault();
       return;
     }
-    if (this.boardDragState && event.pointerId === this.boardDragState.pointerId) {
-      const offset = this.boardDragState.offset;
+    if (this.rotaryDragState && event.pointerId === this.rotaryDragState.pointerId) {
+      const state = this.rotaryDragState;
       const client = { x: event.clientX, y: event.clientY };
-      this.scheduleFrame(() => {
-        const point = this.svgPointFromClient(client);
-        if (!point) return;
-        this.boardPosition.set({ x: point.x - offset.x, y: point.y - offset.y });
-      });
+      this.scheduleFrame(() => this.continueRotaryDrag(state, client));
       event.preventDefault();
       return;
     }
@@ -1224,7 +1484,7 @@ export class VirtualDevicePage {
       this.panning.set(false);
       if (!moved && event.button === 0) this.clearSelection();
     }
-    if (this.boardDragState?.pointerId === event.pointerId) this.boardDragState = null;
+    if (this.rotaryDragState?.pointerId === event.pointerId) this.rotaryDragState = null;
     if (this.wireCurveDragState?.pointerId === event.pointerId) this.wireCurveDragState = null;
     if (this.dragState?.pointerId === event.pointerId) {
       this.dragState = null;
@@ -1235,21 +1495,9 @@ export class VirtualDevicePage {
     }
   }
 
-  protected handleBoardKeydown(event: KeyboardEvent): void {
-    const step = event.shiftKey ? 20 : 5;
-    const position = this.boardPosition();
-    let next = position;
-    if (event.key === 'ArrowLeft') next = { ...position, x: position.x - step };
-    else if (event.key === 'ArrowRight') next = { ...position, x: position.x + step };
-    else if (event.key === 'ArrowUp') next = { ...position, y: position.y - step };
-    else if (event.key === 'ArrowDown') next = { ...position, y: position.y + step };
-    else return;
-    this.selectBoard();
-    this.boardPosition.set(next);
-    event.preventDefault();
-  }
-
   protected handleDeviceKeydown(event: KeyboardEvent, id: string): void {
+    // Same lock as the pointer path — the keyboard must not be a way around it.
+    if (this.simulationRunning()) return;
     const step = this.showGrid() ? GRID_SIZE : event.shiftKey ? 20 : 5;
     const placement = this.placementFor(id);
     let next = { x: placement.x, y: placement.y };
@@ -1279,8 +1527,21 @@ export class VirtualDevicePage {
     this.pendingPin.set(null);
     this.wirePointer.set(null);
     this.pendingWireWaypoints.set([]);
-    this.ghostPoint.set(null);
     this.placingDeviceId.set(id);
+    const device = deviceById(id);
+    const viewport = this.canvasViewport()?.nativeElement;
+    const bounds = viewport?.getBoundingClientRect();
+    const center = bounds
+      ? this.svgPointFromClient({
+          x: bounds.left + bounds.width / 2,
+          y: bounds.top + bounds.height / 2,
+        })
+      : null;
+    this.ghostPoint.set(
+      device && center
+        ? this.snapPoint({ x: center.x - device.width / 2, y: center.y - device.height / 2 })
+        : null,
+    );
     this.canvasViewport()?.nativeElement.focus({ preventScroll: true });
   }
 
@@ -1307,7 +1568,7 @@ export class VirtualDevicePage {
         : { x: device.x, y: device.y });
     const instanceId = this.createDeviceInstance(id, origin);
     this.clearCurrentPlacement();
-    this.selectDevice(instanceId);
+    if (instanceId) this.selectDevice(instanceId);
     this.startNextPlacement();
   }
 
@@ -1324,10 +1585,6 @@ export class VirtualDevicePage {
     this.selectWireEndpoint(event, { type: 'device', deviceId, pinId });
   }
 
-  protected selectBoardPin(event: Event, pinId: string): void {
-    this.selectWireEndpoint(event, { type: 'board', pinId });
-  }
-
   protected pendingWireColor(): string {
     const endpoint = this.pendingPin();
     const kind = endpoint ? this.endpointKind(endpoint) : null;
@@ -1341,10 +1598,7 @@ export class VirtualDevicePage {
     if (!endpoint || !source || !target) return '';
 
     const route = [source, ...this.pendingWireWaypoints(), target];
-    const distance = Math.min(
-      150,
-      Math.max(42, Math.hypot(route[1].x - source.x, route[1].y - source.y) * 0.35),
-    );
+    const distance = this.curveControlDistance(source, route[1]);
     const tangent = this.endpointOutwardVector(endpoint);
     const sourceControl = {
       x: source.x + tangent.x * distance,
@@ -1353,86 +1607,16 @@ export class VirtualDevicePage {
     return this.curvedRoutePath(route, sourceControl);
   }
 
-  /**
-   * Orthogonal route for one wire.
-   *
-   * Straight diagonals cut through parts and cross at arbitrary angles, which is
-   * what makes a busy diagram unreadable. The router lays Manhattan segments
-   * instead and steers around component boxes; hand-placed bends still win,
-   * because a user who moved a wire has already said what they want.
-   */
+  /** Keeps a completed wire on the same smooth route shown while wiring. */
   protected wirePath(connection: WireConnection): string {
     const geometry = this.wireGeometry(connection);
     if (!geometry) return '';
 
-    const points = routeWire(
-      {
-        point: geometry.source,
-        side: this.routerSideFor(geometry.source, geometry.sourceControl),
-        ownerBounds: this.endpointBounds(connection.start),
-      },
-      {
-        point: geometry.target,
-        side: this.routerSideFor(geometry.target, geometry.targetControl),
-        ownerBounds: this.endpointBounds(connection.end),
-      },
-      this.routingObstacles(),
-      this.resolvedWireWaypoints(connection),
+    return this.curvedRoutePath(
+      [geometry.source, ...this.resolvedWireWaypoints(connection), geometry.target],
+      geometry.sourceControl,
+      geometry.targetControl,
     );
-
-    return orthogonalPath(points);
-  }
-
-  /**
-   * Bounds of the component an endpoint belongs to.
-   *
-   * The router needs this to run the exit stub far enough to clear the board:
-   * headers sit inside the PCB edge, so a pin is normally within its own
-   * outline and a wire that turns too early reads as passing underneath it.
-   */
-  private endpointBounds(endpoint: WireEndpoint): Obstacle | undefined {
-    if (endpoint.type !== 'device') return undefined;
-
-    const device = this.deviceInstanceById(endpoint.deviceId);
-    if (!device) return undefined;
-
-    const placement = this.placementFor(device.instanceId);
-    const scale = this.renderScale(device);
-    return {
-      x: placement.x,
-      y: placement.y,
-      width: device.width * scale,
-      height: device.height * scale,
-    };
-  }
-
-  /** Derives the exit edge from the tangent the geometry already computed. */
-  private routerSideFor(anchor: Point, control: Point): RouterPinSide | undefined {
-    const dx = control.x - anchor.x;
-    const dy = control.y - anchor.y;
-    if (dx === 0 && dy === 0) return undefined;
-    if (Math.abs(dx) >= Math.abs(dy)) return dx >= 0 ? 'right' : 'left';
-    return dy >= 0 ? 'bottom' : 'top';
-  }
-
-  /**
-   * Bounding boxes the router should avoid.
-   *
-   * Rotation is ignored: an unrotated box is a close enough hint for routing,
-   * and computing rotated hulls for every wire on every frame is not worth the
-   * cost when the result only nudges a detour.
-   */
-  private routingObstacles(): readonly Obstacle[] {
-    return this.visibleDevices().map((device) => {
-      const placement = this.placementFor(device.instanceId);
-      const scale = this.renderScale(device);
-      return {
-        x: placement.x,
-        y: placement.y,
-        width: device.width * scale,
-        height: device.height * scale,
-      };
-    });
   }
 
   protected wireControlHandles(connection: WireConnection): readonly WireControlHandle[] {
@@ -1497,7 +1681,6 @@ export class VirtualDevicePage {
     );
     this.selectedWireId.set(wireId);
     this.selectedDeviceId.set(null);
-    this.boardSelected.set(false);
     this.inspectorOpen.set(true);
   }
 
@@ -1505,17 +1688,12 @@ export class VirtualDevicePage {
     const selectedDeviceId = this.selectedDeviceId();
     return (
       connection.id === this.selectedWireId() ||
-      (this.boardSelected() && this.connectionHasBoard(connection)) ||
       (selectedDeviceId !== null && this.connectionHasDevice(connection, selectedDeviceId))
     );
   }
 
   protected devicePinOnSelectedWire(deviceId: string, pinId: string): boolean {
     return this.selectedWireHasEndpoint({ type: 'device', deviceId, pinId });
-  }
-
-  protected boardPinOnSelectedWire(pinId: string): boolean {
-    return this.selectedWireHasEndpoint({ type: 'board', pinId });
   }
 
   protected junctionOnSelectedWire(junctionId: string): boolean {
@@ -1527,17 +1705,8 @@ export class VirtualDevicePage {
     return this.connections().some((wire) => this.connectionHasEndpoint(wire, endpoint));
   }
 
-  protected boardPinConnected(pinId: string): boolean {
-    const endpoint: WireEndpoint = { type: 'board', pinId };
-    return this.connections().some((wire) => this.connectionHasEndpoint(wire, endpoint));
-  }
-
   protected pinPending(deviceId: string, pinId: string): boolean {
     return this.endpointsEqual(this.pendingPin(), { type: 'device', deviceId, pinId });
-  }
-
-  protected boardPinPending(pinId: string): boolean {
-    return this.endpointsEqual(this.pendingPin(), { type: 'board', pinId });
   }
 
   protected devicePinCompatible(deviceId: string, pin: DevicePin): boolean {
@@ -1547,86 +1716,83 @@ export class VirtualDevicePage {
       : false;
   }
 
-  /** True while a board pin is a legal target for the wire being drawn. */
-  protected boardPinCompatible(pin: BoardPin): boolean {
-    const pending = this.pendingPin();
-    return pending ? this.endpointsCompatible(pending, { type: 'board', pinId: pin.id }) : false;
-  }
-
+  /**
+   * Pins drawn a little larger, because they are the ones a beginner aims for.
+   *
+   * Boards that print their own pinout are excluded: emphasising a handful of
+   * holes on a silkscreened header contradicts the labels beside them. Sparse
+   * parts emphasise everything, since there is nothing to prioritise against.
+   */
   protected importantDevicePin(device: DeviceInstance, pin: DevicePin): boolean {
-    if (device.id === 'ultrasonic') return false;
+    if (device.printsOwnPinLabels) return false;
     if (device.pins.length <= 6) return true;
+    // A breadboard's rails are power and ground on every column, so the
+    // power/ground rule below would paper the whole part in labels the moment
+    // it is selected. Parts this dense disclose a name on hover only.
+    if (device.pins.length > MAX_LABELLED_PINS) return false;
     return pin.kind === 'power' || pin.kind === 'ground' || pin.type === 'reset';
   }
 
+  /** Rich pin description: name, classification, voltage, authored detail. */
+  protected pinTooltip(pin: DevicePin): string {
+    return pinTooltip(pin);
+  }
+
+  /**
+   * Which edge a pin sits on, falling back to its position when the part did
+   * not declare one. The label has to sit outboard of the part, so guessing
+   * wrong would print it across the artwork.
+   */
+  private pinEdge(device: DeviceInstance, pin: DevicePin): 'left' | 'right' | 'top' | 'bottom' {
+    if (pin.side) return pin.side;
+    if (pin.y >= device.height) return 'bottom';
+    if (pin.y <= 0) return 'top';
+    return pin.x > device.width / 2 ? 'right' : 'left';
+  }
+
+  /** Label sits outboard of the pin, on whichever edge the pin belongs to. */
+  protected pinLabelX(device: DeviceInstance, pin: DevicePin): number {
+    const edge = this.pinEdge(device, pin);
+    if (edge === 'bottom' || edge === 'top') return pin.x;
+    return edge === 'right' ? pin.x - 12 : pin.x + 12;
+  }
+
+  protected pinLabelAnchor(device: DeviceInstance, pin: DevicePin): 'start' | 'middle' | 'end' {
+    const edge = this.pinEdge(device, pin);
+    if (edge === 'bottom' || edge === 'top') return 'middle';
+    return edge === 'right' ? 'end' : 'start';
+  }
+
+  protected pinLabelY(device: DeviceInstance, pin: DevicePin): number {
+    const edge = this.pinEdge(device, pin);
+    if (edge === 'bottom') return pin.y + 16;
+    if (edge === 'top') return pin.y - 10;
+    return pin.y + 4;
+  }
+
   protected devicePinPoint(device: DeviceInstance, pin: DevicePin): Point {
+    return this.deviceLocalToCanvas(device, pin);
+  }
+
+  /** A point in a part's own drawing units, placed in canvas coordinates. */
+  private deviceLocalToCanvas(device: DeviceInstance, local: Point): Point {
     const placement = this.placementFor(device.instanceId);
     const scale = this.renderScale(device);
     const center = { x: device.width / 2, y: device.height / 2 };
     const radians = (placement.rotation * Math.PI) / 180;
-    const dx = pin.x - center.x;
-    const dy = pin.y - center.y;
+    const dx = local.x - center.x;
+    const dy = local.y - center.y;
     // Mirrors deviceTransform exactly: rotate in drawing units, scale, translate.
     return {
-      x:
-        placement.x +
-        scale * (center.x + dx * Math.cos(radians) - dy * Math.sin(radians)),
-      y:
-        placement.y +
-        scale * (center.y + dx * Math.sin(radians) + dy * Math.cos(radians)),
+      x: placement.x + scale * (center.x + dx * Math.cos(radians) - dy * Math.sin(radians)),
+      y: placement.y + scale * (center.y + dx * Math.sin(radians) + dy * Math.cos(radians)),
     };
   }
 
   protected wireEndpointLabel(endpoint: WireEndpoint): string {
-    if (endpoint.type === 'board') {
-      return `ESP32:${this.boardPinById(endpoint.pinId)?.label ?? endpoint.pinId}`;
-    }
     if (endpoint.type === 'junction') return `Junction ${endpoint.junctionId}`;
     const device = this.deviceInstanceById(endpoint.deviceId);
     return `${device?.name ?? endpoint.deviceId}:${endpoint.pinId}`;
-  }
-
-  protected selectedDevicePinLabel(connection: WireConnection): string {
-    const deviceId = this.selectedDeviceId();
-    if (!deviceId) return 'Unknown';
-    const endpoint = [connection.start, connection.end].find(
-      (candidate): candidate is Extract<WireEndpoint, { type: 'device' }> =>
-        candidate.type === 'device' && candidate.deviceId === deviceId,
-    );
-    return endpoint?.pinId ?? 'Unknown';
-  }
-
-  protected selectedDeviceTargetLabel(connection: WireConnection): string {
-    const deviceId = this.selectedDeviceId();
-    if (!deviceId) return 'Unknown';
-    const endpoint = [connection.start, connection.end].find(
-      (candidate) => candidate.type !== 'device' || candidate.deviceId !== deviceId,
-    );
-    return endpoint ? this.wireEndpointLabel(endpoint) : 'Unknown';
-  }
-
-  /** Compact silkscreen label printed beside a physical board header. */
-  protected boardPinSilkscreen(pin: BoardPin): string {
-    const label = pin.label.split(' / ')[0].replace('GPIO ', '');
-    const aliases: Readonly<Record<string, string>> = {
-      TX0: 'TX',
-      RX0: 'RX',
-      SD2: 'D2',
-      SD3: 'D3',
-      SD1: 'D1',
-      SD0: 'D0',
-      VIN: '5V',
-    };
-    return aliases[label] ?? label;
-  }
-
-  protected boardPinTextX(pin: BoardPin): number {
-    return pin.side === 'left' ? pin.x + 13 : pin.x - 13;
-  }
-
-  protected boardPinTextTransform(pin: BoardPin): string {
-    const x = this.boardPinTextX(pin);
-    return `rotate(${pin.side === 'left' ? 90 : -90} ${x} ${pin.y})`;
   }
 
   // ---------------------------------------------------------------- commands
@@ -1714,60 +1880,6 @@ export class VirtualDevicePage {
    * The toolbar is HTML, not SVG, so it has to be placed in screen space while
    * following something positioned in canvas space.
    */
-  /**
-   * Where the selected part sits and what it is wired to.
-   *
-   * Connections are listed by pin on both ends — "GPIO23 -> HC-SR04 TRIG" —
-   * because a pin name is what a user checks against their circuit, and a
-   * device name alone does not answer the question they are asking.
-   */
-  protected readonly selectedDeviceInfo = computed(() => {
-    const device = this.selectedDevice();
-    if (!device) return null;
-
-    const placement = this.placementFor(device.instanceId);
-    const connections = this.connections().flatMap((wire) => {
-      const near = this.endpointOn(wire.start, device.instanceId);
-      const far = near ? wire.end : this.endpointOn(wire.end, device.instanceId) ? wire.start : null;
-      const own = near ?? this.endpointOn(wire.end, device.instanceId);
-      if (!own || !far) return [];
-
-      return [
-        {
-          id: wire.id,
-          fromPin: own,
-          to: this.endpointLabel(far),
-          color: wire.color,
-        },
-      ];
-    });
-
-    return {
-      name: device.name,
-      model: device.model,
-      x: Math.round(placement.x),
-      y: Math.round(placement.y),
-      rotation: placement.rotation,
-      pinCount: device.pins.length,
-      connections,
-    };
-  });
-
-  /** The pin name when this endpoint belongs to the given device, else null. */
-  private endpointOn(endpoint: WireEndpoint, deviceId: string): string | null {
-    return endpoint.type === 'device' && endpoint.deviceId === deviceId
-      ? endpoint.pinId
-      : null;
-  }
-
-  /** Human-readable "Device PIN" for the far end of a wire. */
-  private endpointLabel(endpoint: WireEndpoint): string {
-    if (endpoint.type === 'board') return `ESP32 ${endpoint.pinId}`;
-    if (endpoint.type === 'junction') return 'Junction';
-
-    const device = this.deviceInstanceById(endpoint.deviceId);
-    return device ? `${device.name} ${endpoint.pinId}` : endpoint.pinId;
-  }
 
   protected canvasToScreenX(x: number): number {
     return x * this.canvasScale() + this.canvasPan().x;
@@ -1787,11 +1899,15 @@ export class VirtualDevicePage {
       x: placement.x + GRID_SIZE * 2,
       y: placement.y + GRID_SIZE * 2,
     });
+    if (!created) return;
     this.recordChange(before);
     this.selectDevice(created);
   }
 
   protected deleteSelection(): void {
+    // A running circuit is edited only through part settings in the inspector;
+    // removing a part or wire mid-run would pull hardware out from under the sketch.
+    if (this.simulationRunning()) return;
     const wireId = this.selectedWireId();
     if (wireId) {
       this.connections.set(
@@ -1808,7 +1924,7 @@ export class VirtualDevicePage {
       return;
     }
     const deviceId = this.selectedDeviceId();
-    if (!deviceId || this.simulationRunning()) return;
+    if (!deviceId) return;
     this.updatePlacement(deviceId, { visible: false });
     this.selectedDeviceId.set(null);
   }
@@ -1825,14 +1941,103 @@ export class VirtualDevicePage {
     );
   }
 
+  /** Compile state per board, surfaced in the toolbar. */
+  protected readonly firmwareBoards = this.firmware.boards;
+  protected readonly firmwareLoadError = this.firmware.loadError;
+  protected readonly serialLines = this.firmware.serial;
+
+  /**
+   * What the monitor prints: the sketch's lines without the empty tail a closing
+   * newline leaves behind.
+   */
+  protected readonly serialOutputLines = computed(() => {
+    const lines = this.serialLines();
+    return lines.length && lines[lines.length - 1] === '' ? lines.slice(0, -1) : lines;
+  });
+
+  /**
+   * The sketch's own rate when it differs from the monitor's.
+   *
+   * A real monitor at the wrong rate prints garbage; saying so is more useful
+   * than silently showing text the hardware would not have produced.
+   */
+  protected readonly baudMismatch = computed(() => {
+    const sketch = this.sketchBaud();
+    return sketch && sketch !== this.serialBaud() ? sketch : null;
+  });
+
+  /** True while the reader is at the bottom, which is when new output may follow. */
+  private serialFollow = true;
+
+  private readonly serialScrollEffect = effect(() => {
+    const lines = this.serialOutputLines();
+    if (!this.serialFollow || !lines.length) return;
+    const element = untracked(() => this.serialOutputRef())?.nativeElement;
+    if (!element) return;
+    // After the rows render, not before, or the scroll lands short of the tail.
+    queueMicrotask(() => {
+      element.scrollTop = element.scrollHeight;
+    });
+  });
+
+  /** The first fault across the placed boards, which is the one worth showing. */
+  protected readonly firmwareFault = computed(
+    () => this.firmwareBoards().find((board) => board.fault)?.fault ?? null,
+  );
+
   protected toggleSimulation(): void {
     const next = !this.simulationRunning();
     this.simulationRunning.set(next);
-    if (next) this.startTicker();
-    else this.stopTicker();
+    if (next) {
+      this.shortTrip.set([]);
+      // Started before the sketch resolves: the circuit is simulated either way,
+      // and the boards pick up their firmware on the tick after it arrives.
+      void this.loadFirmware();
+      // Still inside the click, which is the only moment a browser will open an
+      // audio device that is not suspended.
+      this.audio.prime();
+      this.startTicker();
+    } else {
+      this.stopTicker();
+      this.firmware.stop();
+      this.sketchBaud.set(0);
+      this.releaseSimulationControls();
+    }
     this.pendingPin.set(null);
     this.wirePointer.set(null);
     this.pendingWireWaypoints.set([]);
+  }
+
+  private async loadFirmware(): Promise<void> {
+    const projectId = this.persistedProjectId;
+    if (!projectId) return;
+    const boards = this.visibleDevices()
+      .filter((device) => isBoardCategory(device.catalog.categoryId))
+      .map((device) => ({ instanceId: device.instanceId, definition: device }));
+    await this.firmware.start(projectId, boards);
+  }
+
+  /**
+   * Returns every live control to its default when the simulation stops.
+   *
+   * Without this a cap held down at the moment Stop was pressed stays visibly
+   * pressed on a dead board, and an energised relay keeps its channel lamp lit
+   * — both claiming a state the stopped workspace is no longer computing.
+   */
+  private releaseSimulationControls(): void {
+    this.deviceStates.update((states) => {
+      const next: Record<string, DeviceState> = { ...states };
+      for (const device of this.deviceInstances()) {
+        const live = device.properties?.filter((property) => property.simulationOnly);
+        if (!live?.length) continue;
+        const current = states[device.instanceId];
+        if (!current) continue;
+        const released: Record<string, string | number | boolean> = { ...current };
+        for (const property of live) released[property.id] = property.defaultValue;
+        next[device.instanceId] = released;
+      }
+      return next;
+    });
   }
 
   protected toggleGrid(): void {
@@ -1848,6 +2053,7 @@ export class VirtualDevicePage {
   }
 
   protected openParts(event?: Event): void {
+    if (this.simulationRunning()) return;
     this.cancelPlacement();
     this.partsOpener = (event?.currentTarget as HTMLButtonElement | null) ?? null;
     this.partsOpen.set(true);
@@ -1861,80 +2067,233 @@ export class VirtualDevicePage {
     opener?.focus();
   }
 
+  protected updateSerialBaud(value: string): void {
+    const baud = Number(value);
+    if (Number.isInteger(baud)) this.serialBaud.set(baud);
+  }
+
   protected toggleSerial(): void {
     this.serialOpen.update((open) => !open);
+  }
+
+  protected clearSerial(): void {
+    this.firmware.clear();
+  }
+
+  /** Scrolling up pauses the follow; returning to the bottom resumes it. */
+  protected trackSerialScroll(event: Event): void {
+    const element = event.target as HTMLElement;
+    this.serialFollow = element.scrollTop + element.clientHeight >= element.scrollHeight - 8;
+  }
+
+  /** Firmware comes from the project's files, so the canvas alone cannot run any. */
+  protected get insideProject(): boolean {
+    return this.persistedProjectId !== null;
   }
 
   protected toggleInspector(): void {
     this.inspectorOpen.update((open) => !open);
   }
 
-  protected buttonPressedFor(deviceId: string | null): boolean {
-    if (!deviceId) return false;
-    // Parts on the declarative pipeline keep "pressed" in their property state,
-    // so read that first or `aria-pressed` would announce a stale value.
-    const pressed = this.deviceStates()[deviceId]?.['pressed'];
-    if (typeof pressed === 'boolean') return pressed;
-    return this.buttonPressedStates()[deviceId] ?? false;
-  }
-
-  /** Keyboard equivalent of pressing the cap: toggles rather than holds. */
-  protected toggleButton(): void {
-    const deviceId = this.selectedDeviceId();
-    if (!deviceId) return;
-    this.pressButton(new Event('keyboard'), deviceId, !this.buttonPressedFor(deviceId));
+  /** Current value of the boolean property a hotspot drives. */
+  protected hotspotActive(deviceId: string, hotspot: DeviceHotspot): boolean {
+    return this.deviceStates()[deviceId]?.[hotspot.property] === true;
   }
 
   /**
-   * Momentary press straight on the canvas artwork.
+   * Pointer press or release on an operable region of a part.
    *
-   * Parts that declare a `pressed` property route through the property state so
-   * the simulation actually sees the contact close. Without this the canvas
-   * press and the inspector toggle would be two disconnected notions of
-   * "pressed", and only the inspector one would affect the circuit.
+   * A momentary hotspot follows the pointer, so it releases on pointerup and on
+   * pointerleave — without the leave case a button dragged off stays stuck down.
+   * A toggle hotspot ignores the release entirely and flips once per press.
+   *
+   * Nothing operates while the simulation is stopped: a cap that clicks on a
+   * dead board would say the circuit does something it cannot do yet. The
+   * template also drops pointer events on idle hotspots, so a press on the cap
+   * reaches the part underneath and drags it instead.
    */
-  protected pressButton(event: Event, deviceId: string, pressed: boolean): void {
+  protected pressHotspot(
+    event: Event,
+    deviceId: string,
+    hotspot: DeviceHotspot,
+    down: boolean,
+  ): void {
+    if (!this.simulationRunning()) return;
+    // A shaft is turned, not pressed: it opens a drag on the way down and
+    // ignores the release entirely.
+    if (hotspot.mode === 'rotary') {
+      if (down && event instanceof PointerEvent) this.beginRotaryDrag(event, deviceId, hotspot);
+      return;
+    }
     event.stopPropagation();
-
-    const device = this.deviceInstanceById(deviceId);
-    if (device?.properties?.some((property) => property.id === 'pressed')) {
-      this.deviceStates.update((states) => ({
-        ...states,
-        [deviceId]: {
-          ...(states[deviceId] ?? defaultStateFor(device.properties)),
-          pressed,
-        },
-      }));
+    if (hotspot.mode === 'toggle') {
+      if (down) this.setHotspotValue(deviceId, hotspot, !this.hotspotActive(deviceId, hotspot));
       return;
     }
 
-    if (pressed || this.buttonPressedFor(deviceId)) {
-      this.buttonPressedStates.update((states) => ({ ...states, [deviceId]: pressed }));
+    // A mouse click can press and release inside one 50 ms tick, so the sketch
+    // never sees the button down. A finger holds a switch for far longer; the
+    // release waits until the press has lasted at least that long.
+    const key = `${deviceId}:${hotspot.property}`;
+    if (down) {
+      this.pressedAt.set(key, performance.now());
+      this.setHotspotValue(deviceId, hotspot, true);
+      return;
     }
+    const startedAt = this.pressedAt.get(key);
+    if (startedAt === undefined) return;
+    this.pressedAt.delete(key);
+    const remaining = MIN_PRESS_MS - (performance.now() - startedAt);
+    if (remaining <= 0) {
+      this.setHotspotValue(deviceId, hotspot, false);
+      return;
+    }
+    setTimeout(() => {
+      // Pressed again meanwhile: that press owns the release now.
+      if (!this.pressedAt.has(key)) this.setHotspotValue(deviceId, hotspot, false);
+    }, remaining);
+  }
+
+  /** When each momentary hotspot went down, by `device:property`. */
+  private readonly pressedAt = new Map<string, number>();
+
+  /** Keyboard equivalent: a press-and-release cannot be expressed, so flip. */
+  protected toggleHotspot(event: Event, deviceId: string, hotspot: DeviceHotspot): void {
+    if (!this.simulationRunning()) return;
+    if (hotspot.mode === 'rotary') return;
+    event.stopPropagation();
+    this.setHotspotValue(deviceId, hotspot, !this.hotspotActive(deviceId, hotspot));
+  }
+
+  /** Where a rotary hotspot currently sits, in the units of its own range. */
+  protected rotaryValue(deviceId: string, hotspot: DeviceHotspot): number {
+    const range = hotspot.range ?? { min: 0, max: 100 };
+    const raw = this.deviceStates()[deviceId]?.[hotspot.property];
+    const value = typeof raw === 'number' ? raw : range.min + (range.max - range.min) / 2;
+    return Math.min(Math.max(value, range.min), range.max);
   }
 
   /**
-   * Relay coil state, read from the part's own `chN` property.
-   *
-   * It used to live in a separate signal on this page, which meant the canvas
-   * showed a relay closed while the simulation still saw its coil at rest. One
-   * source now feeds the artwork, the inspector and the solver alike.
+   * Grabs a knob. The value is not written yet: a press alone must not jump the
+   * shaft to wherever the user happened to click, or a click meant to select
+   * the part would silently re-tune the circuit.
    */
-  protected relayChannelOn(deviceId: string, channelIndex: number): boolean {
-    return this.deviceStates()[deviceId]?.[`ch${channelIndex + 1}`] === true;
+  private beginRotaryDrag(event: PointerEvent, deviceId: string, hotspot: DeviceHotspot): void {
+    if (event.button !== 0) return;
+    event.stopPropagation();
+    const angle = this.rotaryPointerAngle(deviceId, hotspot, {
+      x: event.clientX,
+      y: event.clientY,
+    });
+    if (angle === null) return;
+
+    this.selectDevice(deviceId);
+    this.rotaryDragState = {
+      pointerId: event.pointerId,
+      deviceId,
+      hotspot,
+      lastAngle: angle,
+      travel: this.rotaryTravel(deviceId, hotspot),
+    };
+    (event.currentTarget as SVGElement | null)?.setPointerCapture(event.pointerId);
+    event.preventDefault();
   }
 
-  protected toggleRelayChannel(event: Event, deviceId: string, channelIndex: number): void {
-    event.stopPropagation();
+  /**
+   * Turns the shaft by however far the pointer swept since the last sample.
+   *
+   * Following the pointer's absolute angle instead would make the shaft jump to
+   * the far end whenever the pointer crossed the gap below the knob: past the
+   * 135° stop the raw angle wraps through 180° and reads as the *other* stop, so
+   * dragging left off the right-hand end snapped the value to zero. Accumulating
+   * a wrapped-around delta keeps a stop a stop — the shaft sits there until the
+   * pointer sweeps back the way it came.
+   */
+  private continueRotaryDrag(state: RotaryDragState, client: Point): void {
+    const angle = this.rotaryPointerAngle(state.deviceId, state.hotspot, client);
+    if (angle === null) return;
+
+    const sweep = state.hotspot.sweep ?? 135;
+    const range = state.hotspot.range ?? { min: 0, max: 100 };
+    state.travel = Math.min(
+      Math.max(state.travel + normalizeDegrees(angle - state.lastAngle), -sweep),
+      sweep,
+    );
+    state.lastAngle = angle;
+
+    const value = range.min + ((state.travel + sweep) / (sweep * 2)) * (range.max - range.min);
+    this.setHotspotValue(state.deviceId, state.hotspot, Math.round(value));
+  }
+
+  /**
+   * The pointer's bearing on a knob, in degrees clockwise from straight up —
+   * the same zero the artwork rotates its indicator about.
+   *
+   * Measured in canvas space and then de-rotated by the part's own placement, so
+   * a knob on a part rotated 90° still follows the pointer rather than lagging a
+   * quarter turn behind it. Null when the pointer sits on the axis itself, where
+   * a bearing means nothing.
+   */
+  private rotaryPointerAngle(
+    deviceId: string,
+    hotspot: DeviceHotspot,
+    client: Point,
+  ): number | null {
     const device = this.deviceInstanceById(deviceId);
-    const key = `ch${channelIndex + 1}`;
-    if (!device?.properties?.some((property) => property.id === key)) return;
+    const region = hotspot.region;
+    if (!device || region.kind !== 'circle') return null;
+
+    const point = this.svgPointFromClient(client);
+    if (!point) return null;
+    const axis = this.deviceLocalToCanvas(device, { x: region.cx, y: region.cy });
+    const dx = point.x - axis.x;
+    const dy = point.y - axis.y;
+    if (Math.hypot(dx, dy) < 0.01) return null;
+
+    const bearing = (Math.atan2(dx, -dy) * 180) / Math.PI;
+    return normalizeDegrees(bearing - this.placementFor(deviceId).rotation);
+  }
+
+  /** Where the shaft stands now, as degrees either side of centre. */
+  private rotaryTravel(deviceId: string, hotspot: DeviceHotspot): number {
+    const range = hotspot.range ?? { min: 0, max: 100 };
+    const sweep = hotspot.sweep ?? 135;
+    const span = range.max - range.min;
+    if (span <= 0) return 0;
+    return ((this.rotaryValue(deviceId, hotspot) - range.min) / span) * sweep * 2 - sweep;
+  }
+
+  /** Keyboard equivalent of a turn: one step of travel per arrow press. */
+  protected nudgeRotary(
+    event: Event,
+    deviceId: string,
+    hotspot: DeviceHotspot,
+    step: number,
+  ): void {
+    if (!this.simulationRunning() || hotspot.mode !== 'rotary') return;
+    event.preventDefault();
+    event.stopPropagation();
+    const range = hotspot.range ?? { min: 0, max: 100 };
+    const next = this.rotaryValue(deviceId, hotspot) + step * ((range.max - range.min) / 100);
+    this.setHotspotValue(deviceId, hotspot, Math.min(Math.max(next, range.min), range.max));
+  }
+
+  /**
+   * Writes through the part's own property state.
+   *
+   * That is the same state the inspector edits and the solver reads, so a cap
+   * pressed on the canvas actually closes the contact rather than only looking
+   * as though it had.
+   */
+  private setHotspotValue(deviceId: string, hotspot: DeviceHotspot, value: boolean | number): void {
+    const device = this.deviceInstanceById(deviceId);
+    if (!device?.properties?.some((property) => property.id === hotspot.property)) return;
 
     this.deviceStates.update((states) => ({
       ...states,
       [deviceId]: {
         ...(states[deviceId] ?? defaultStateFor(device.properties)),
-        [key]: !this.relayChannelOn(deviceId, channelIndex),
+        [hotspot.property]: value,
       },
     }));
   }
@@ -1944,15 +2303,12 @@ export class VirtualDevicePage {
     this.placements.set({ ...INITIAL_PLACEMENTS });
     this.connections.set([...INITIAL_CONNECTIONS]);
     this.deviceStates.set(INITIAL_DEVICE_STATES);
-    this.buttonPressedStates.set({});
     this.selectedDeviceId.set(null);
-    this.boardSelected.set(false);
     this.selectedWireId.set(null);
     this.pendingPin.set(null);
     this.wirePointer.set(null);
     this.pendingWireWaypoints.set([]);
     this.cancelPlacement();
-    this.boardPosition.set({ x: 0, y: 0 });
     this.wireJunctions.set({});
     this.junctionSequence = 0;
     this.deviceSequence = 0;
@@ -1960,6 +2316,7 @@ export class VirtualDevicePage {
   }
 
   protected handleEditorKeydown(event: KeyboardEvent): void {
+    if (this.layoutLoading() || this.layoutLoadFailed()) return;
     if (event.key === 'Escape') {
       this.pendingPin.set(null);
       this.wirePointer.set(null);
@@ -2011,21 +2368,30 @@ export class VirtualDevicePage {
     }
   }
 
-  private createDeviceInstance(kind: DeviceKind, origin: Point): string {
+  private createDeviceInstance(kind: DeviceKind, origin: Point): string | null {
+    const definition = deviceById(kind);
+    if (
+      definition &&
+      isBoardCategory(definition.catalog.categoryId) &&
+      this.placedBoardCount() >= MAX_BOARD_COUNT
+    ) {
+      this.componentLimitMessage.set(`A workspace can contain up to ${MAX_BOARD_COUNT} boards.`);
+      return null;
+    }
+
     // Reusing a hidden instance is only safe without persistence. With a project
     // behind the canvas, hiding a component deletes it server-side, so reviving
     // that id would resurrect a row that no longer exists.
     const reusable = this.persistedProjectId
       ? undefined
       : this.deviceInstances().find(
-          (device) =>
-            device.id === kind && !this.placements()[device.instanceId]?.visible,
+          (device) => device.id === kind && !this.placements()[device.instanceId]?.visible,
         );
     let instance = reusable;
 
     if (!instance) {
-      const device = deviceById(kind);
-      if (!device) return kind;
+      const device = definition;
+      if (!device) return null;
       let instanceId = `${kind}-${++this.deviceSequence}`;
       while (this.placements()[instanceId]) instanceId = `${kind}-${++this.deviceSequence}`;
       instance = { ...device, instanceId };
@@ -2060,13 +2426,11 @@ export class VirtualDevicePage {
    * build — is skipped too, so the canvas never holds a wire pointing at a part
    * it cannot draw.
    */
-  private async restorePersistedConnections(
-    projectId: string,
+  private restoreConnections(
+    stored: readonly CanvasConnection[],
     knownComponentIds: ReadonlySet<string>,
-  ): Promise<void> {
-    const stored = await this.canvasPersistence.loadConnections(projectId);
-
-    const restored = stored
+  ): WireConnection[] {
+    return stored
       .filter(
         (connection) =>
           knownComponentIds.has(connection.from.componentId) &&
@@ -2088,8 +2452,6 @@ export class VirtualDevicePage {
         color: connection.color,
         kind: connection.kind,
       }));
-
-    this.connections.set(restored);
   }
 
   /**
@@ -2099,26 +2461,20 @@ export class VirtualDevicePage {
    * rows behind them, so a wire touching either is kept on the canvas but not
    * written. Returning null is how the caller learns that.
    */
-  private storableEndpoint(
-    endpoint: WireEndpoint,
-  ): { componentId: string; pinId: string } | null {
+  private storableEndpoint(endpoint: WireEndpoint): { componentId: string; pinId: string } | null {
     return endpoint.type === 'device'
       ? { componentId: endpoint.deviceId, pinId: endpoint.pinId }
       : null;
   }
 
-  private async persistNewConnection(
-    connection: WireConnection,
-  ): Promise<void> {
+  private async persistNewConnection(connection: WireConnection): Promise<void> {
     const projectId = this.persistedProjectId;
     if (!projectId) return;
 
     const from = this.storableEndpoint(connection.start);
     const to = this.storableEndpoint(connection.end);
     if (!from || !to) {
-      this.componentLimitMessage.set(
-        'This wire is not saved: junction taps are not stored yet.',
-      );
+      this.componentLimitMessage.set('This wire is not saved: junction taps are not stored yet.');
       return;
     }
 
@@ -2139,9 +2495,7 @@ export class VirtualDevicePage {
       }
     } catch (error) {
       const refusal = asConnectionLimitRefusal(error);
-      this.componentLimitMessage.set(
-        refusal ? refusal.message : 'Could not save this connection',
-      );
+      this.componentLimitMessage.set(refusal ? refusal.message : 'Could not save this connection');
       // Drop it rather than leaving a wire the project does not contain.
       this.connections.update((connections) =>
         connections.filter((wire) => wire.id !== connection.id),
@@ -2178,9 +2532,7 @@ export class VirtualDevicePage {
   private adoptConnectionId(localId: string, serverId: string): void {
     if (localId === serverId) return;
     this.connections.update((connections) =>
-      connections.map((wire) =>
-        wire.id === localId ? { ...wire, id: serverId } : wire,
-      ),
+      connections.map((wire) => (wire.id === localId ? { ...wire, id: serverId } : wire)),
     );
     if (this.selectedWireId() === localId) this.selectedWireId.set(serverId);
   }
@@ -2223,10 +2575,8 @@ export class VirtualDevicePage {
         void this.refreshUsage();
       }
     } catch (error) {
-      const refusal = asComponentLimitRefusal(error);
-      this.componentLimitMessage.set(
-        refusal ? refusal.message : 'Could not save this device',
-      );
+      const refusal = asComponentLimitRefusal(error) ?? asBoardLimitRefusal(error);
+      this.componentLimitMessage.set(refusal ? refusal.message : 'Could not save this device');
       // Roll the part back off the canvas: leaving it visible would promise a
       // device the project does not actually contain.
       this.discardLocalComponent(localId);
@@ -2244,9 +2594,7 @@ export class VirtualDevicePage {
 
     this.deviceInstances.update((devices) =>
       devices.map((device) =>
-        device.instanceId === localId
-          ? { ...device, instanceId: serverId }
-          : device,
+        device.instanceId === localId ? { ...device, instanceId: serverId } : device,
       ),
     );
     this.placements.update((placements) => {
@@ -2360,7 +2708,6 @@ export class VirtualDevicePage {
     this.pendingWireWaypoints.set([]);
     this.selectedWireId.set(null);
     this.selectedDeviceId.set(endpoint.type === 'device' ? endpoint.deviceId : null);
-    this.boardSelected.set(endpoint.type === 'board');
   }
 
   private connectPendingWireToWire(event: PointerEvent, wireId: string): void {
@@ -2428,7 +2775,6 @@ export class VirtualDevicePage {
     this.pendingWireWaypoints.set([]);
     this.selectedWireId.set(connection.id);
     this.selectedDeviceId.set(null);
-    this.boardSelected.set(false);
     this.inspectorOpen.set(true);
 
     this.recordChange(historyBefore);
@@ -2449,8 +2795,9 @@ export class VirtualDevicePage {
     const source = this.connectionSource(connection);
     const target = this.connectionTarget(connection);
     if (!source || !target) return null;
-    const distance = Math.hypot(target.x - source.x, target.y - source.y);
-    const controlDistance = Math.min(180, Math.max(45, distance * 0.34));
+    const waypoints = this.resolvedWireWaypoints(connection);
+    const sourceControlDistance = this.curveControlDistance(source, waypoints[0] ?? target);
+    const targetControlDistance = this.curveControlDistance(target, waypoints.at(-1) ?? source);
     const sourceTangent =
       connection.start.type === 'junction'
         ? this.unitVector(source, target)
@@ -2460,14 +2807,20 @@ export class VirtualDevicePage {
         ? this.unitVector(target, source)
         : this.endpointOutwardVector(connection.end);
     const sourceControl = {
-      x: source.x + sourceTangent.x * controlDistance,
-      y: source.y + sourceTangent.y * controlDistance,
+      x: source.x + sourceTangent.x * sourceControlDistance,
+      y: source.y + sourceTangent.y * sourceControlDistance,
     };
     const targetControl = {
-      x: target.x + targetTangent.x * controlDistance,
-      y: target.y + targetTangent.y * controlDistance,
+      x: target.x + targetTangent.x * targetControlDistance,
+      y: target.y + targetTangent.y * targetControlDistance,
     };
     return { source, sourceControl, targetControl, target };
+  }
+
+  /** Prevents a pin tangent from overshooting a nearby bend and forming a loop. */
+  private curveControlDistance(anchor: Point, neighbour: Point): number {
+    const segmentLength = Math.hypot(neighbour.x - anchor.x, neighbour.y - anchor.y);
+    return Math.min(150, Math.max(12, segmentLength * 0.35), segmentLength * 0.5);
   }
 
   private wireGeometry(connection: WireConnection): WireGeometry | null {
@@ -2684,19 +3037,13 @@ export class VirtualDevicePage {
   }
 
   private endpointPoint(endpoint: WireEndpoint): Point | null {
-    if (endpoint.type === 'board') {
-      const pin = this.boardPinById(endpoint.pinId);
-      const position = this.boardPosition();
-      return pin ? { x: pin.x + position.x, y: pin.y + position.y } : null;
-    }
     if (endpoint.type === 'junction') return this.wireJunctions()[endpoint.junctionId] ?? null;
     const device = this.deviceInstanceById(endpoint.deviceId);
     const pin = device?.pins.find((candidate) => candidate.name === endpoint.pinId);
     return device && pin ? this.devicePinPoint(device, pin) : null;
   }
 
-  private endpointKind(endpoint: WireEndpoint): BoardPin['kind'] | null {
-    if (endpoint.type === 'board') return this.boardPinById(endpoint.pinId)?.kind ?? null;
+  private endpointKind(endpoint: WireEndpoint): ConnectionKind | null {
     if (endpoint.type === 'junction')
       return this.wireJunctions()[endpoint.junctionId]?.kind ?? null;
     return (
@@ -2706,9 +3053,6 @@ export class VirtualDevicePage {
   }
 
   private endpointOutwardVector(endpoint: WireEndpoint): Point {
-    if (endpoint.type === 'board') {
-      return this.boardPinById(endpoint.pinId)?.side === 'left' ? { x: -1, y: 0 } : { x: 1, y: 0 };
-    }
     if (endpoint.type === 'junction') return { x: 0, y: 0 };
 
     const device = this.deviceInstanceById(endpoint.deviceId);
@@ -2751,7 +3095,6 @@ export class VirtualDevicePage {
 
   private endpointsEqual(left: WireEndpoint | null, right: WireEndpoint | null): boolean {
     if (!left || !right || left.type !== right.type) return false;
-    if (left.type === 'board') return right.type === 'board' && left.pinId === right.pinId;
     if (left.type === 'junction') {
       return right.type === 'junction' && left.junctionId === right.junctionId;
     }
@@ -2778,12 +3121,7 @@ export class VirtualDevicePage {
     );
   }
 
-  private connectionHasBoard(connection: WireConnection): boolean {
-    return [connection.start, connection.end].some((endpoint) => endpoint.type === 'board');
-  }
-
   private endpointVisible(endpoint: WireEndpoint): boolean {
-    if (endpoint.type === 'board') return true;
     if (endpoint.type === 'junction') return Boolean(this.wireJunctions()[endpoint.junctionId]);
     return this.placements()[endpoint.deviceId]?.visible ?? false;
   }
@@ -2793,10 +3131,6 @@ export class VirtualDevicePage {
     return distance > 0
       ? { x: (to.x - from.x) / distance, y: (to.y - from.y) / distance }
       : { x: 0, y: 0 };
-  }
-
-  private boardPinById(id: string): BoardPin | undefined {
-    return this.boardPins.find((pin) => pin.id === id);
   }
 
   private svgPoint(event: MouseEvent): Point | null {

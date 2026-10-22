@@ -15,9 +15,10 @@
  * circuit instead of merely copying a level across a gap.
  */
 
-import type { BoardPin, VirtualDevice, WireConnection } from '../models/virtual-device.model';
+import type { VirtualDevice, WireConnection } from '../models/virtual-device.model';
 import {
   FLOATING_NODE,
+  type BusMessage,
   type DeviceBehavior,
   type DeviceSimulationContext,
   type DriveStrength,
@@ -33,7 +34,6 @@ export interface SimulatedDevice {
 export interface SimulationInput {
   readonly devices: readonly SimulatedDevice[];
   readonly connections: readonly WireConnection[];
-  readonly boardPins: readonly BoardPin[];
   readonly deltaMs: number;
 }
 
@@ -52,12 +52,6 @@ const EMPTY_RESULT: SimulationResult = {
   shorts: [],
 };
 
-/** Supply voltages the ESP32 development board presents to the circuit. */
-const BOARD_RAILS: Readonly<Record<string, number>> = {
-  '3v3': 3.3,
-  vin: 5,
-};
-
 /** Drive/resolve iterations per tick. See the relaxation loop for why. */
 const RELAXATION_PASSES = 3;
 
@@ -65,16 +59,11 @@ export function devicePinKey(instanceId: string, pinName: string): string {
   return `device:${instanceId}:${pinName}`;
 }
 
-export function boardPinKey(pinId: string): string {
-  return `board:${pinId}`;
-}
-
 function junctionKey(junctionId: string): string {
   return `junction:${junctionId}`;
 }
 
 export function endpointKey(endpoint: WireConnection['start']): string {
-  if (endpoint.type === 'board') return boardPinKey(endpoint.pinId);
   if (endpoint.type === 'junction') return junctionKey(endpoint.junctionId);
   return devicePinKey(endpoint.deviceId, endpoint.pinId);
 }
@@ -105,6 +94,30 @@ export class NetBuilder {
 interface Driver {
   readonly voltage: number;
   readonly strength: DriveStrength;
+  /** PWM duty, 0–1, when this driver is pulsing rather than holding a level. */
+  readonly duty?: number;
+  /** The supply this level comes from, when the driver is a supply at all. */
+  readonly source?: string;
+  /**
+   * Conductance of a weak driver, in siemens: 1 / its resistance. Weak drivers on a
+   * node without a strong one share it in proportion, which is what makes a
+   * two-resistor divider sit between its rails instead of at the higher one.
+   */
+  readonly weight?: number;
+}
+
+/** A weak driver that states no resistance counts as a 10 kΩ pull. */
+const DEFAULT_WEAK_WEIGHT = 1 / 10_000;
+
+/**
+ * Which supply a power-source part counts as.
+ *
+ * Every schematic VCC and GND symbol shares one group, so they close a loop with
+ * each other; a board or a battery is its own supply.
+ */
+function supplyIdOf(device: SimulatedDevice): string | undefined {
+  if (!device.definition.powerSource) return undefined;
+  return device.definition.supplyGroup ?? device.instanceId;
 }
 
 /**
@@ -122,6 +135,7 @@ export function simulateTick(
   const nets = new NetBuilder();
   const runtime: Record<string, Record<string, string | number | boolean>> = {};
   const drivers = new Map<string, Driver[]>();
+  const messages = new Map<string, BusMessage[]>();
 
   // Seed every pin as its own net so unconnected pins still resolve.
   for (const device of input.devices) {
@@ -129,7 +143,6 @@ export function simulateTick(
       nets.find(devicePinKey(device.instanceId, devicePin.name));
     }
   }
-  for (const boardPin of input.boardPins) nets.find(boardPinKey(boardPin.id));
 
   // --- pass 1: wires and internal bonds -----------------------------------
   for (const wire of input.connections) {
@@ -163,16 +176,24 @@ export function simulateTick(
 
   for (let iteration = 0; iteration < RELAXATION_PASSES; iteration++) {
     drivers.clear();
+    messages.clear();
 
-    for (const boardPin of input.boardPins) {
-      const rail = BOARD_RAILS[boardPin.id];
-      if (rail !== undefined) {
-        addDriver(drivers, nets.find(boardPinKey(boardPin.id)), rail, 'strong');
-      } else if (boardPin.kind === 'ground') {
-        addDriver(drivers, nets.find(boardPinKey(boardPin.id)), 0, 'strong');
+    // Supply rails come from the parts that actually source power — a board, a
+    // battery holder. A peripheral's VCC pin declares what it *expects*, so
+    // driving from it would energise a circuit that reaches no supply at all.
+    for (const device of input.devices) {
+      const source = supplyIdOf(device);
+      if (!source) continue;
+      for (const devicePin of device.definition.pins) {
+        const key = nets.find(devicePinKey(device.instanceId, devicePin.name));
+        if (devicePin.type === 'gnd' || devicePin.kind === 'ground') {
+          addDriver(drivers, key, 0, 'strong', undefined, source);
+        } else if (devicePin.type === 'vcc' && devicePin.voltage !== undefined) {
+          addDriver(drivers, key, devicePin.voltage, 'strong', undefined, source);
+        }
+        // Signal pins stay floating: without executing firmware there is
+        // nothing to say what a GPIO is doing, and inventing a level is a lie.
       }
-      // Signal pins stay floating: without executing firmware there is nothing
-      // to say what a GPIO is doing, and inventing a level would be a lie.
     }
 
     // Behaviours read the previous iteration's resolution, which is what makes
@@ -182,7 +203,7 @@ export function simulateTick(
       const behavior = behaviors.get(device.instanceId);
       if (!behavior?.drive) continue;
       behavior.drive(
-        makeContext(device, input.deltaMs, nets, drivers, runtime, true, previous),
+        makeContext(device, input.deltaMs, nets, drivers, runtime, true, previous, messages),
       );
     }
 
@@ -193,11 +214,41 @@ export function simulateTick(
       const effective = strong.length ? strong : nodeDrivers;
       const highest = Math.max(...effective.map((driver) => driver.voltage));
       const lowest = Math.min(...effective.map((driver) => driver.voltage));
+      // With no strong driver the weak ones divide the node between them.
+      const weightOf = (driver: Driver) => driver.weight ?? DEFAULT_WEAK_WEIGHT;
+      const level = strong.length
+        ? highest
+        : effective.reduce((sum, driver) => sum + driver.voltage * weightOf(driver), 0) /
+          effective.reduce((sum, driver) => sum + weightOf(driver), 0);
       // Two strong drivers more than a diode drop apart is a short, not a
       // compromise — report it rather than averaging the difference away.
       const conflict = strong.length > 1 && highest - lowest > 0.7;
       if (conflict) shorts.push(root);
-      resolved.set(root, { voltage: highest, floating: false, conflict });
+      // The node carries the pulse of whichever driver set its level, so an LED
+      // on a PWM pin can tell a dimmed rail from a genuinely low voltage.
+      const winner = strong.length
+        ? effective.find((driver) => driver.voltage === highest)
+        : effective.reduce((best, driver) => (weightOf(driver) > weightOf(best) ? driver : best));
+      const duty =
+        winner?.duty !== undefined && winner.duty > 0 && winner.duty < 1 ? winner.duty : undefined;
+      // Every supply on the net, not just the winner: two grounds wired together
+      // are a common ground, and either supply's loop can return through it.
+      const sources = [
+        ...new Set(effective.flatMap((driver) => (driver.source ? [driver.source] : []))),
+      ];
+      resolved.set(root, {
+        voltage: level,
+        floating: false,
+        conflict,
+        ...(duty !== undefined ? { duty } : {}),
+        ...(sources.length ? { sources } : {}),
+        ...(messages.has(root) ? { messages: messages.get(root) } : {}),
+      });
+    }
+    // A node can carry data without anything holding its level, e.g. a data line
+    // between two parts that only talk.
+    for (const [root, published] of messages) {
+      if (!resolved.has(root)) resolved.set(root, { ...FLOATING_NODE, messages: published });
     }
     nodeStates = resolved;
   }
@@ -206,9 +257,7 @@ export function simulateTick(
   for (const device of input.devices) {
     const behavior = behaviors.get(device.instanceId);
     if (!behavior?.update) continue;
-    behavior.update(
-      makeContext(device, input.deltaMs, nets, drivers, runtime, true, nodeStates),
-    );
+    behavior.update(makeContext(device, input.deltaMs, nets, drivers, runtime, true, nodeStates));
   }
 
   // --- expose per-pin state for badges and warnings ------------------------
@@ -219,11 +268,6 @@ export function simulateTick(
       pinStates.set(key, nodeStates.get(nets.find(key)) ?? FLOATING_NODE);
     }
   }
-  for (const boardPin of input.boardPins) {
-    const key = boardPinKey(boardPin.id);
-    pinStates.set(key, nodeStates.get(nets.find(key)) ?? FLOATING_NODE);
-  }
-
   return { runtime, pinStates, shorts };
 }
 
@@ -232,10 +276,20 @@ function addDriver(
   root: string,
   voltage: number,
   strength: DriveStrength,
+  duty?: number,
+  source?: string,
+  weight?: number,
 ): void {
+  const driver: Driver = {
+    voltage,
+    strength,
+    ...(duty !== undefined ? { duty } : {}),
+    ...(source !== undefined ? { source } : {}),
+    ...(weight !== undefined ? { weight } : {}),
+  };
   const existing = drivers.get(root);
-  if (existing) existing.push({ voltage, strength });
-  else drivers.set(root, [{ voltage, strength }]);
+  if (existing) existing.push(driver);
+  else drivers.set(root, [driver]);
 }
 
 function makeContext(
@@ -246,8 +300,12 @@ function makeContext(
   runtime: Record<string, Record<string, string | number | boolean>>,
   allowRead: boolean,
   nodeStates?: ReadonlyMap<string, NodeState>,
+  messages?: Map<string, BusMessage[]>,
 ): DeviceSimulationContext {
   const keyFor = (pinName: string) => devicePinKey(device.instanceId, pinName);
+  // A board's GPIO is fed from the board's own supply, so a module powered from
+  // a pin still has to return to that board's ground.
+  const source = supplyIdOf(device);
 
   return {
     deltaMs,
@@ -256,10 +314,19 @@ function makeContext(
       if (!allowRead || !nodeStates) return FLOATING_NODE;
       return nodeStates.get(nets.find(keyFor(pinName))) ?? FLOATING_NODE;
     },
-    drive: (pinName, voltage, strength = 'strong') => {
-      addDriver(drivers, nets.find(keyFor(pinName)), voltage, strength);
+    drive: (pinName, voltage, strength = 'strong', duty, weight) => {
+      addDriver(drivers, nets.find(keyFor(pinName)), voltage, strength, duty, source, weight);
     },
     bond: (pinA, pinB) => nets.union(keyFor(pinA), keyFor(pinB)),
+    publish: (pinName, protocol, data) => {
+      // Outside the drive pass there is nowhere for a message to go.
+      if (!messages) return;
+      const root = nets.find(keyFor(pinName));
+      const message: BusMessage = { protocol, from: device.instanceId, data };
+      const existing = messages.get(root);
+      if (existing) existing.push(message);
+      else messages.set(root, [message]);
+    },
     emit: (key, value) => {
       const bucket = runtime[device.instanceId] ?? (runtime[device.instanceId] = {});
       bucket[key] = value;

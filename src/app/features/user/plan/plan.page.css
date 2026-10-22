@@ -1,0 +1,344 @@
+:host {
+  display: block;
+  min-height: 100%;
+  color: #2b2b2b;
+  background: #f7f7f7;
+}
+.plan-container {
+  width: min(100%, 72rem);
+  margin-inline: auto;
+  padding: 2.5rem 2rem 5rem;
+}
+.page-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1.5rem;
+}
+.eyebrow {
+  color: #808080;
+  font-size: 0.81rem;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+.page-heading h1 {
+  margin: 0.2rem 0 0;
+  font-size: clamp(1.85rem, 3vw, 2.35rem);
+  font-weight: 650;
+  letter-spacing: -0.045em;
+}
+.page-heading p {
+  max-width: 38rem;
+  margin: 0.45rem 0 0;
+  color: #808080;
+  font-size: 0.97rem;
+  line-height: 1.6;
+}
+.billing-button {
+  min-height: 2.45rem;
+  flex: none;
+  padding: 0 0.8rem;
+  border: 1px solid #d7d7d7;
+  border-radius: 0.65rem;
+  color: #545454;
+  background: #fff;
+  font-size: 0.87rem;
+  font-weight: 600;
+}
+.billing-button:hover {
+  border-color: #2b2b2b;
+  color: #2b2b2b;
+}
+.current-plan {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 2rem;
+  margin-top: 2rem;
+  padding: 1.3rem;
+  border: 1px solid #d7d7d7;
+  border-radius: 0.95rem;
+  color: #fff;
+  background: #2b2b2b;
+  box-shadow: 0 12px 35px rgb(43 43 43 / 0.12);
+}
+.plan-summary {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.85rem;
+}
+.plan-mark {
+  display: grid;
+  width: 3rem;
+  height: 3rem;
+  flex: none;
+  place-items: center;
+  border: 1px solid rgb(255 255 255 / 0.16);
+  border-radius: 0.8rem;
+  color: #fff;
+  background: rgb(255 255 255 / 0.08);
+}
+.plan-mark svg {
+  width: 1.35rem;
+  height: 1.35rem;
+}
+.current-plan .eyebrow {
+  color: #bdbdbd;
+}
+.plan-summary h2 {
+  margin: 0.18rem 0 0;
+  font-size: 1.3rem;
+  font-weight: 650;
+}
+.plan-summary p {
+  margin: 0.25rem 0 0;
+  color: #bdbdbd;
+  font-size: 0.81rem;
+}
+.plan-price {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding-inline: 1.5rem;
+  border-inline: 1px solid rgb(255 255 255 / 0.12);
+}
+.plan-price strong {
+  font-size: 1.79rem;
+  font-weight: 650;
+  letter-spacing: -0.04em;
+}
+.plan-price span {
+  color: #afafaf;
+  font-size: 0.7rem;
+  line-height: 1.4;
+}
+.upgrade-button {
+  min-height: 2.55rem;
+  padding: 0 0.9rem;
+  border-radius: 0.65rem;
+  color: #2b2b2b;
+  background: #fff;
+  font-size: 0.87rem;
+  font-weight: 650;
+}
+.upgrade-button:hover {
+  background: #e8e8e8;
+}
+.usage-section {
+  margin-top: 2rem;
+}
+.section-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.section-heading h2 {
+  margin: 0.18rem 0 0;
+  font-size: 1.24rem;
+  font-weight: 650;
+}
+.section-heading > span {
+  color: #afafaf;
+  font-size: 0.78rem;
+}
+.usage-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin-top: 0.85rem;
+}
+.usage-card {
+  padding: 0.9rem;
+  border: 1px solid #e1e1e1;
+  border-radius: 0.8rem;
+  background: #fff;
+}
+.usage-title span,
+.usage-title strong {
+  display: block;
+}
+.usage-title span {
+  color: #808080;
+  font-size: 0.8rem;
+}
+.usage-title strong {
+  margin-top: 0.45rem;
+  font-size: 1.07rem;
+  font-weight: 650;
+}
+.usage-track {
+  height: 0.3rem;
+  margin-top: 0.75rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e8e8e8;
+}
+.usage-track i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #545454;
+}
+.usage-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.45rem;
+  color: #afafaf;
+  font-size: 0.7rem;
+}
+.usage-footer span:last-child {
+  text-align: right;
+}
+.plan-lower-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(16rem, 0.65fr);
+  gap: 0.65rem;
+  margin-top: 0.65rem;
+}
+.included-card,
+.pro-card {
+  padding: 1.2rem;
+  border: 1px solid #e1e1e1;
+  border-radius: 0.85rem;
+  background: #fff;
+}
+.included-card h2,
+.pro-card h2 {
+  margin: 0.2rem 0 0;
+  font-size: 1.11rem;
+  font-weight: 650;
+}
+.included-card ul {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.8rem;
+  margin: 1.1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.included-card li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+}
+.included-card li > span {
+  display: grid;
+  width: 1.35rem;
+  height: 1.35rem;
+  flex: none;
+  place-items: center;
+  border-radius: 999px;
+  color: #fff;
+  background: #545454;
+  font-size: 0.77rem;
+}
+.included-card strong,
+.included-card small {
+  display: block;
+}
+.included-card strong {
+  font-size: 0.86rem;
+  font-weight: 650;
+}
+.included-card small {
+  margin-top: 0.18rem;
+  color: #808080;
+  font-size: 0.73rem;
+  line-height: 1.5;
+}
+.pro-card {
+  color: #fff;
+  background: #545454;
+}
+.pro-label {
+  color: #cfcfcf;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.pro-card p {
+  margin: 0.5rem 0 0;
+  color: #d7d7d7;
+  font-size: 0.8rem;
+  line-height: 1.6;
+}
+.pro-card > div {
+  display: flex;
+  align-items: baseline;
+  gap: 0.25rem;
+  margin-top: 1rem;
+}
+.pro-card > div strong {
+  font-size: 1.51rem;
+  font-weight: 650;
+}
+.pro-card > div span {
+  color: #cfcfcf;
+  font-size: 0.73rem;
+}
+.pro-card button {
+  display: flex;
+  width: 100%;
+  min-height: 2.35rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  margin-top: 0.8rem;
+  border-radius: 0.6rem;
+  color: #2b2b2b;
+  background: #fff;
+  font-size: 0.81rem;
+  font-weight: 650;
+}
+.pro-card button:hover {
+  background: #e8e8e8;
+}
+.pro-card button svg {
+  width: 0.85rem;
+  height: 0.85rem;
+}
+button:focus-visible {
+  outline: 2px solid #808080;
+  outline-offset: 2px;
+}
+@media (max-width: 1000px) {
+  .usage-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .plan-lower-grid {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 700px) {
+  .plan-container {
+    padding: 2rem 1rem 4rem;
+  }
+  .page-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .current-plan {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  .plan-price {
+    padding: 0;
+    border: 0;
+  }
+  .upgrade-button {
+    width: 100%;
+  }
+  .included-card ul {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 460px) {
+  .usage-grid {
+    grid-template-columns: 1fr;
+  }
+}

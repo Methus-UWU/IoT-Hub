@@ -1,0 +1,299 @@
+<ng-template #limitInputs let-form="form" let-fields="fields" let-allowDefault="allowDefault">
+  <div class="grid gap-2">
+    @for (period of periods; track period.key) {
+      <fieldset class="min-w-0 rounded-xl border border-border p-3">
+        <legend class="sr-only">{{ period.label }}</legend>
+        <div class="grid items-center gap-3 sm:grid-cols-[7rem_minmax(0,1fr)_minmax(0,1fr)]">
+          <span aria-hidden="true" class="text-xs font-medium text-ink">{{ period.label }}</span>
+          <div class="flex gap-1 rounded-xl bg-surface-muted p-1 text-xs">
+            @if (allowDefault) {
+              <label class="limit-mode">
+                <input
+                  type="radio"
+                  class="limit-radio"
+                  [name]="form + '-' + period.key"
+                  [checked]="fields[period.key].mode === 'default'"
+                  (change)="setMode(form, period.key, 'default')"
+                />
+                ค่าเริ่มต้น
+              </label>
+            }
+            <label class="limit-mode">
+              <input
+                type="radio"
+                class="limit-radio"
+                [name]="form + '-' + period.key"
+                [checked]="fields[period.key].mode === 'unlimited'"
+                (change)="setMode(form, period.key, 'unlimited')"
+              />
+              ไม่จำกัด
+            </label>
+            <label class="limit-mode">
+              <input
+                type="radio"
+                class="limit-radio"
+                [name]="form + '-' + period.key"
+                [checked]="fields[period.key].mode === 'limit'"
+                (change)="setMode(form, period.key, 'limit')"
+              />
+              จำกัด
+            </label>
+          </div>
+          <label class="relative block text-xs">
+            <input
+              type="number"
+              min="0"
+              max="1000000"
+              step="1"
+              inputmode="numeric"
+              class="credit-input min-h-9 w-full rounded-lg border border-border bg-surface px-3 py-2 pr-16 font-normal tabular-nums text-ink outline-none focus:border-primary focus:ring-2 focus:ring-border-strong disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-ink-muted"
+              [attr.aria-label]="'credit ' + period.label"
+              [attr.aria-invalid]="invalidLimit(fields[period.key])"
+              [attr.aria-describedby]="
+                invalidLimit(fields[period.key]) ? form + '-' + period.key + '-error' : null
+              "
+              [disabled]="fields[period.key].mode !== 'limit'"
+              [value]="fields[period.key].value"
+              (input)="setValue(form, period.key, $any($event.target).value)"
+            />
+            <span
+              class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-ink-muted"
+              >credit</span
+            >
+          </label>
+        </div>
+        @if (invalidLimit(fields[period.key])) {
+          <p [id]="form + '-' + period.key + '-error'" class="mt-2 text-xs text-error">
+            กรอกจำนวนเต็ม 0–1,000,000
+          </p>
+        }
+      </fieldset>
+    }
+  </div>
+</ng-template>
+
+<section
+  class="rounded-2xl border border-border bg-surface p-5 sm:p-6"
+  aria-labelledby="ai-credits-title"
+>
+  <header class="mb-6">
+    <h2 id="ai-credits-title" class="text-sm font-medium text-gray-900">Credit AI ต่อคน</h2>
+    <p class="mt-1 text-xs leading-relaxed text-ink-muted">
+      1 credit = 2,000 token ถ่วงน้ำหนัก · ขั้นต่ำ 1 credit ต่อคำตอบ
+    </p>
+    <p class="mt-2 text-xs leading-relaxed text-ink-muted">
+      ครบ limit ต้องรอรอบใหม่ · คำตอบสุดท้ายอาจใช้เกิน limit ได้
+    </p>
+    <details class="mt-3 text-xs leading-relaxed text-ink-muted">
+      <summary
+        class="w-fit cursor-pointer rounded focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
+      >
+        วิธีคิด credit
+      </summary>
+      <p class="mt-2">
+        รวม token ทุกรอบที่ AI อ่านไฟล์ ต่อสาย และเขียนโค้ด โดยนับ token ขาออก 4 เท่า หารด้วย 2,000
+        แล้วปัดขึ้น
+      </p>
+      <p class="mt-1">
+        ตัวอย่างโดยประมาณ: คำถามสั้น 2–3 credit · สร้างโปรเจกต์ 30–40 credit ขึ้นกับงานจริง
+      </p>
+    </details>
+  </header>
+
+  @if (error(); as message) {
+    <p role="alert" class="mb-4 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
+      {{ message }}
+    </p>
+  }
+
+  <h3 class="mb-2 text-sm font-medium text-gray-800">ค่าเริ่มต้นสำหรับทุกคน</h3>
+  <ng-container
+    *ngTemplateOutlet="
+      limitInputs;
+      context: { form: 'default', fields: defaultForm(), allowDefault: false }
+    "
+  />
+  <div class="mt-3 flex flex-wrap items-center justify-end gap-3">
+    <button
+      type="button"
+      class="rounded-lg bg-gray-900 px-4 py-2 text-xs font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+      [disabled]="savingDefaults() || defaultsInvalid()"
+      (click)="saveDefaults()"
+    >
+      {{ savingDefaults() ? 'กำลังบันทึก…' : 'บันทึก limit ค่าเริ่มต้น' }}
+    </button>
+  </div>
+
+  <app-credit-reset-settings
+    [schedule]="resets()"
+    (saved)="onResetsSaved($event)"
+    (failed)="failed.emit($event)"
+  />
+
+  <h3 class="mt-6 mb-2 text-sm font-medium text-gray-800">การใช้งานทั้งระบบในรอบปัจจุบัน</h3>
+  @if (loading() && !usage()) {
+    <p role="status" class="sr-only">กำลังโหลดการใช้งาน credit</p>
+    <app-integrations-skeleton section="usage" />
+  } @else if (usage(); as summary) {
+    <dl class="divide-y divide-border rounded-xl bg-surface-soft px-3">
+      <div class="flex items-center justify-between gap-3 py-3">
+        <dt class="text-xs text-gray-500">รอบวัน</dt>
+        <dd class="text-xs font-medium tabular-nums text-ink">
+          {{ summary.totals.daily }} <span class="text-xs font-normal text-ink-muted">credit</span>
+        </dd>
+      </div>
+      <div class="flex items-center justify-between gap-3 py-3">
+        <dt class="text-xs text-gray-500">รอบสัปดาห์</dt>
+        <dd class="text-xs font-medium tabular-nums text-ink">
+          {{ summary.totals.weekly }} <span class="text-xs font-normal text-ink-muted">credit</span>
+        </dd>
+      </div>
+      <div class="flex items-center justify-between gap-3 py-3">
+        <dt class="text-xs text-gray-500">รอบเดือน</dt>
+        <dd class="text-xs font-medium tabular-nums text-ink">
+          {{ summary.totals.monthly }}
+          <span class="text-xs font-normal text-ink-muted">credit</span>
+        </dd>
+      </div>
+    </dl>
+    @if (summary.topUsers.length) {
+      <table class="mt-3 w-full text-left text-xs">
+        <caption class="mb-1 text-left text-xs text-gray-500">
+          ใช้มากที่สุดในรอบเดือน
+        </caption>
+        <thead>
+          <tr class="text-xs text-gray-500">
+            <th scope="col" class="py-1">ผู้ใช้</th>
+            <th scope="col" class="py-1 text-right">credit</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (user of summary.topUsers; track user.userId) {
+            <tr class="border-t border-gray-100">
+              <td class="py-1">{{ user.username }}</td>
+              <td class="py-1 text-right">{{ user.credits }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
+  }
+
+  <h3 class="mt-8 mb-3 border-t border-border pt-6 text-sm font-medium text-gray-800">
+    กำหนดเฉพาะผู้ใช้
+  </h3>
+  @if (overrides().length) {
+    <ul class="mb-3 space-y-2">
+      @for (override of overrides(); track override.userId) {
+        <li
+          class="flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-xs"
+        >
+          <div class="min-w-0 flex-1">
+            <strong class="text-gray-900">{{ override.username }}</strong>
+            <span class="text-gray-500"> · {{ override.email }}</span>
+            <p class="text-xs text-gray-600">
+              วัน {{ limitText(override.daily, defaults().daily) }} · สัปดาห์
+              {{ limitText(override.weekly, defaults().weekly) }} · เดือน
+              {{ limitText(override.monthly, defaults().monthly) }}
+              @if (override.note) {
+                · {{ override.note }}
+              }
+            </p>
+          </div>
+          @if (confirmingRemove() === override.userId) {
+            <button
+              type="button"
+              class="rounded-md bg-red-700 px-2 py-1 text-xs text-white"
+              (click)="removeOverride(override.userId)"
+            >
+              ยืนยันลบ
+            </button>
+            <button
+              type="button"
+              class="rounded-md px-2 py-1 text-xs"
+              (click)="confirmingRemove.set(null)"
+            >
+              ยกเลิก
+            </button>
+          } @else {
+            <button
+              type="button"
+              class="rounded-md border border-gray-300 px-2 py-1 text-xs"
+              (click)="editOverride(override)"
+            >
+              แก้ไข
+            </button>
+            <button
+              type="button"
+              class="rounded-md px-2 py-1 text-xs text-red-700 hover:bg-red-50"
+              (click)="confirmingRemove.set(override.userId)"
+            >
+              ลบ
+            </button>
+          }
+        </li>
+      }
+    </ul>
+  } @else if (!loading() && !error()) {
+    <p class="mb-3 text-xs text-gray-500">ยังไม่มีผู้ใช้ที่ตั้ง limit เฉพาะ</p>
+  }
+
+  @if (loading() && !users().length) {
+    <p role="status" class="sr-only">กำลังโหลดผู้ใช้</p>
+    <app-integrations-skeleton section="users" />
+  } @else {
+    <div class="grid gap-2 text-xs">
+      <span class="font-medium text-gray-700">ผู้ใช้</span>
+      <app-custom-select
+        textWeight="normal"
+        [compact]="true"
+        ariaLabel="ผู้ใช้"
+        [searchable]="true"
+        [disabled]="loading()"
+        placeholder="พิมพ์ชื่อผู้ใช้หรืออีเมล…"
+        [options]="userOptions()"
+        [value]="editingUserId()"
+        (valueChange)="startOverride($event)"
+      />
+    </div>
+  }
+
+  @if (editingUserId()) {
+    <div class="mt-3">
+      <ng-container
+        *ngTemplateOutlet="
+          limitInputs;
+          context: { form: 'override', fields: overrideForm(), allowDefault: true }
+        "
+      />
+      <label class="mt-3 grid gap-1 text-xs">
+        <span class="font-medium text-gray-700">หมายเหตุ (ไม่บังคับ)</span>
+        <input
+          type="text"
+          maxlength="200"
+          class="rounded-lg border border-gray-300 px-3 py-2"
+          placeholder="เช่น ผู้สอน ให้ใช้มากกว่าปกติ"
+          [value]="overrideNote()"
+          (input)="overrideNote.set($any($event.target).value)"
+        />
+      </label>
+      <div class="mt-3 flex justify-end gap-2">
+        <button
+          type="button"
+          class="rounded-lg px-3 py-2 text-xs text-gray-600"
+          (click)="editingUserId.set('')"
+        >
+          ยกเลิก
+        </button>
+        <button
+          type="button"
+          class="rounded-lg bg-gray-900 px-4 py-2 text-xs font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+          [disabled]="savingOverride() || overrideInvalid()"
+          (click)="saveOverride()"
+        >
+          {{ savingOverride() ? 'กำลังบันทึก…' : 'บันทึก limit ของผู้ใช้นี้' }}
+        </button>
+      </div>
+    </div>
+  }
+</section>

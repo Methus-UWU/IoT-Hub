@@ -21,6 +21,9 @@ interface PinOptions {
   readonly description?: string;
   readonly aliases?: readonly string[];
   readonly voltage?: number;
+  readonly maxInputVoltage?: number;
+  readonly maxCurrentMa?: number;
+  readonly requiresBias?: 'up' | 'down';
   readonly multipleConnections?: boolean;
 }
 
@@ -62,6 +65,11 @@ export function pin(
     ...(options.description ? { description: options.description } : {}),
     ...(options.aliases ? { aliases: options.aliases } : {}),
     ...(options.voltage !== undefined ? { voltage: options.voltage } : {}),
+    ...(options.maxInputVoltage !== undefined
+      ? { maxInputVoltage: options.maxInputVoltage }
+      : {}),
+    ...(options.maxCurrentMa !== undefined ? { maxCurrentMa: options.maxCurrentMa } : {}),
+    ...(options.requiresBias ? { requiresBias: options.requiresBias } : {}),
     ...(options.multipleConnections !== undefined
       ? { multipleConnections: options.multipleConnections }
       : {}),

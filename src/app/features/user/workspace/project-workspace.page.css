@@ -1,4 +1,5 @@
 :host {
+  position: relative;
   display: block;
   width: 100%;
   height: 100%;
@@ -18,7 +19,8 @@
 
 .workspace-toolbar {
   position: relative;
-  z-index: 20;
+  /* Keep fixed toolbar dropdowns above the AI panel resize handle. */
+  z-index: 40;
   display: flex;
   min-width: 0;
   align-items: center;
@@ -30,25 +32,19 @@
   box-shadow: 0 4px 18px rgb(31 41 55 / 0.025);
 }
 
+.toolbar-context {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.8rem;
+}
 .toolbar-project {
   display: flex;
   min-width: 0;
   align-items: center;
   gap: 0.65rem;
-}
-.toolbar-device {
-  display: grid;
-  width: 2rem;
-  height: 2rem;
-  flex: none;
-  place-items: center;
-  border-radius: 0.65rem;
-  color: #2b2b2b;
-  background: #f1f1f1;
-}
-.toolbar-device svg {
-  width: 1.1rem;
-  height: 1.1rem;
+  padding-left: 0.8rem;
+  border-left: 1px solid #e5e5e5;
 }
 .toolbar-project > span:last-child {
   min-width: 0;
@@ -89,6 +85,66 @@
 }
 .device-select {
   width: 7.75rem;
+}
+.execution-target-switch {
+  order: -1;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 0.14rem;
+  padding: 0.18rem;
+  border: 1px solid #dedede;
+  border-radius: 0.78rem;
+  background: #f3f3f4;
+}
+.execution-target-option {
+  display: inline-flex;
+  min-height: 1.88rem;
+  align-items: center;
+  gap: 0.34rem;
+  padding: 0 0.56rem;
+  border: 1px solid transparent;
+  border-radius: 0.58rem;
+  color: #737373;
+  background: transparent;
+  font-size: 0.64rem;
+  font-weight: 650;
+  white-space: nowrap;
+  transition:
+    color 130ms ease,
+    border-color 130ms ease,
+    background 130ms ease,
+    box-shadow 130ms ease;
+}
+.execution-target-option svg {
+  width: 0.9rem;
+  height: 0.9rem;
+}
+.execution-target-option:hover:not(:disabled) {
+  color: #2b2b2b;
+  background: #e8e8e9;
+}
+.execution-target-option:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+.execution-target-option.execution-target-active {
+  color: #2b2b2b;
+  border-color: #d0d0d0;
+  background: #fff;
+  box-shadow:
+    0 1px 3px rgb(43 43 43 / 0.1),
+    0 0 0 1px rgb(255 255 255 / 0.7) inset;
+}
+.tool-button.simulator-tool {
+  color: #3f3f46;
+  border-color: #d7d7d7;
+  background: #fafafa;
+}
+.tool-button.simulator-tool:hover {
+  color: #222;
+  border-color: #bfbfbf;
+  background: #f0f0f0;
 }
 .tool-button,
 .deploy-button {
@@ -344,9 +400,44 @@
   overflow: hidden;
   background: #fff;
 }
-.editor-content app-monaco-code-editor {
+.editor-content app-monaco-code-editor,
+.editor-content .editor-skeleton {
   position: absolute;
   inset: 0;
+}
+.editor-content .editor-skeleton {
+  z-index: 3;
+}
+/* Applying an AI plan: the code stays readable, a strip says the file is being written. */
+.editor-applying {
+  position: absolute;
+  z-index: 4;
+  top: 0.6rem;
+  right: 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  overflow: hidden;
+  padding: 0.4rem 0.75rem;
+  border: 1px solid #e3e7ee;
+  border-radius: 0.5rem;
+  background: #fff;
+  color: #4b5563;
+  font-size: 0.68rem;
+  font-weight: 600;
+  box-shadow: 0 4px 14px rgb(15 23 42 / 8%);
+}
+.editor-applying-bar {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: #635bff;
+  animation: build-pulse 0.8s ease-in-out infinite alternate;
+}
+@media (prefers-reduced-motion: reduce) {
+  .editor-applying-bar {
+    animation: none;
+  }
 }
 
 .console-panel {
@@ -510,6 +601,13 @@
   border-radius: 999px;
   background: #10b981;
 }
+.editor-statusbar .simulation-status {
+  color: #0f766e;
+}
+.editor-statusbar .simulation-status i {
+  background: #14b8a6;
+  box-shadow: 0 0 0 3px rgb(20 184 166 / 0.12);
+}
 .editor-statusbar .backend-status {
   color: #18835b;
 }
@@ -541,20 +639,16 @@
 }
 
 .ai-panel {
-  --ai-visible-cursor:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20'%3E%3Cpath d='M2 1v15l4-4 3 7 3-1-3-7h6Z' fill='white' stroke='%23111827'/%3E%3C/svg%3E")
-      2 1,
-    default;
   position: relative;
   display: grid;
   min-width: 0;
   min-height: 0;
-  grid-template-rows: 4rem minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   overflow: visible;
   color: #111827;
   background:
     radial-gradient(circle at 55% 36%, rgb(99 102 241 / 0.045), transparent 17rem), #f8fafc;
-  cursor: var(--ai-visible-cursor);
+  cursor: auto;
 }
 .ai-resize-handle {
   position: absolute;
@@ -604,34 +698,6 @@
 .ai-resize-handle:focus-visible {
   outline: none;
 }
-.ai-panel-header {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 0.7rem;
-  padding: 0 0.9rem;
-  border-bottom: 1px solid #e2e8f0;
-  background: rgb(255 255 255 / 0.9);
-}
-.ai-close-button {
-  display: grid;
-  width: 2rem;
-  height: 2rem;
-  flex: none;
-  place-items: center;
-  border-radius: 0.65rem;
-  color: #64748b;
-  cursor: var(--ai-visible-cursor);
-}
-.ai-close-button:hover {
-  color: #0f172a;
-  background: #f1f5f9;
-}
-.ai-close-button svg {
-  width: 0.9rem;
-  height: 0.9rem;
-}
-
 .chat-messages {
   min-height: 0;
   overflow-y: auto;
@@ -650,7 +716,7 @@
   border-radius: 0.72rem;
   color: #64748b;
   background: rgb(255 255 255 / 0.78);
-  font-size: 0.58rem;
+  font-size: 0.75rem;
 }
 .chat-context strong {
   min-width: 0;
@@ -658,7 +724,7 @@
   overflow: hidden;
   color: #334155;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.55rem;
+  font-size: 0.72rem;
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -749,7 +815,7 @@
   height: 1rem;
 }
 .message-avatar > span {
-  font-size: 0.62rem;
+  font-size: 0.75rem;
   font-weight: 700;
 }
 .message-content {
@@ -759,13 +825,13 @@
   display: block;
   margin-bottom: 0.28rem;
   color: #475569;
-  font-size: 0.65rem;
+  font-size: 0.75rem;
   font-weight: 650;
 }
 .chat-message p {
   margin: 0;
   color: #334155;
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   line-height: 1.7;
   white-space: pre-wrap;
 }
@@ -796,8 +862,9 @@
   border-radius: 999px;
   color: #475569;
   background: rgb(255 255 255 / 0.86);
-  font-size: 0.54rem;
-  cursor: var(--ai-visible-cursor);
+  font-size: 0.75rem;
+  line-height: 1.35;
+  cursor: pointer;
 }
 .suggestions button:hover {
   color: #3730a3;
@@ -810,6 +877,11 @@
   gap: 0.22rem;
   height: 1.5rem;
   margin: 0 0 0.5rem 2.65rem;
+}
+.ai-wait-status {
+  margin: 0 0 0.75rem 2.65rem;
+  color: #475569;
+  font-size: 0.8rem;
 }
 .typing-status span {
   width: 0.32rem;
@@ -857,6 +929,10 @@
 .chat-composer-area {
   padding: 0.6rem 0.75rem 0.7rem;
 }
+.chat-composer-area > .suggestions {
+  margin-top: 0;
+  margin-bottom: 0.7rem;
+}
 .chat-composer {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 2.25rem;
@@ -885,8 +961,8 @@
   cursor: text;
   field-sizing: content;
   font: inherit;
-  font-size: 0.75rem;
-  line-height: 1.5;
+  font-size: 0.875rem;
+  line-height: 1.55;
   resize: none;
 }
 .chat-composer textarea::placeholder {
@@ -895,7 +971,7 @@
 .chat-composer-area > p {
   margin: 0.4rem 0 0;
   color: #94a3b8;
-  font-size: 0.52rem;
+  font-size: 0.65rem;
   text-align: center;
 }
 .chat-composer button {
@@ -906,7 +982,7 @@
   border-radius: 0.7rem;
   color: #fff;
   background: #111827;
-  cursor: var(--ai-visible-cursor);
+  cursor: pointer;
   transition: 150ms ease;
 }
 .chat-composer button:hover:not(:disabled) {
@@ -1287,11 +1363,17 @@ textarea:focus-visible {
     display: none;
   }
   .toolbar-actions {
-    width: 100%;
+    width: auto;
+    flex: 1;
     justify-content: flex-start;
   }
   .device-select {
     min-width: 7.75rem;
+  }
+  .execution-target-option {
+    gap: 0.25rem;
+    padding: 0 0.42rem;
+    font-size: 0.59rem;
   }
   .tool-button span {
     display: none;
@@ -1345,4 +1427,118 @@ textarea:focus-visible {
   .welcome-orb {
     transform: none;
   }
+}
+
+/* --------------------------------------------------------------- AI proposals
+ * The change the assistant wants to make, shown before anything is written.
+ * Styled as a quiet card inside the message rather than a modal: the user reads
+ * it in the flow of the answer that explains it, and the decision stays theirs.
+ */
+.ai-plan {
+  margin-top: 0.6rem;
+  padding: 0.66rem 0.7rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.72rem;
+  background: rgb(255 255 255 / 0.86);
+}
+.ai-plan h3 {
+  margin: 0 0 0.45rem;
+  color: #475569;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.ai-plan-group + .ai-plan-group {
+  margin-top: 0.5rem;
+}
+.ai-plan-group strong {
+  display: block;
+  margin-bottom: 0.16rem;
+  color: #4f46e5;
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+.ai-plan-group ul {
+  margin: 0;
+  padding-left: 0.85rem;
+  list-style: disc;
+}
+.ai-plan-group li {
+  color: #334155;
+  font-size: 0.8rem;
+  line-height: 1.6;
+}
+.ai-plan-warnings {
+  margin-top: 0.5rem;
+  padding: 0.42rem 0.5rem;
+  border-radius: 0.5rem;
+  background: #fffbeb;
+}
+.ai-plan-warnings p {
+  margin: 0;
+  color: #92400e;
+  font-size: 0.75rem;
+  line-height: 1.55;
+}
+.ai-plan-status {
+  margin: 0.5rem 0 0;
+  color: #64748b;
+  font-size: 0.75rem;
+}
+.ai-plan-status-done {
+  color: #15803d;
+}
+.ai-plan-status-error {
+  color: #b91c1c;
+}
+.ai-plan-actions {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+}
+.ai-plan-actions button {
+  padding: 0.4rem 0.72rem;
+  border: 1px solid #4f46e5;
+  border-radius: 0.55rem;
+  color: #fff;
+  background: #4f46e5;
+  font-size: 0.75rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+.ai-plan-actions button:hover {
+  background: #4338ca;
+}
+.ai-plan-actions .ai-plan-dismiss {
+  color: #475569;
+  border-color: #dbe2ea;
+  background: rgb(255 255 255 / 0.86);
+}
+.ai-plan-actions .ai-plan-dismiss:hover {
+  color: #3730a3;
+  border-color: #a5b4fc;
+  background: #eef2ff;
+}
+
+/* Library Manager: a side sheet over the IDE, full width on phones. */
+.library-panel {
+  position: fixed;
+  z-index: 70;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(100%, 30rem);
+  border-left: 1px solid #e5e7eb;
+  background: #fff;
+  box-shadow: -12px 0 32px rgb(15 23 42 / 10%);
+}
+
+.library-backdrop {
+  position: fixed;
+  z-index: 69;
+  inset: 0;
+  border: 0;
+  background: rgb(15 23 42 / 18%);
+  cursor: default;
 }

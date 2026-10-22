@@ -6,13 +6,14 @@ import {
   type DevicePropertyDefinition,
 } from '../core/device-definition';
 import { bodyFromMm, HEADER_PITCH, u } from '../core/device-metrics';
-import { OUTLINE, PART, PCB, SILK } from '../core/device-palette';
-import { board, maleHeader, silkLabel } from '../core/device-parts';
+import { FLAT, OUTLINE, SILK } from '../core/device-palette';
+import { flatBoard, flatHeader, silkLabel } from '../core/device-parts';
 import { pin } from '../core/device-pin';
 import { circle, path, repeat, text, type Shape } from '../core/device-shape';
 import {
   propertyBoolean,
   propertyNumber,
+  requiresSupply,
   type DeviceBehavior,
 } from '../core/device-simulation';
 
@@ -21,7 +22,7 @@ import {
  *
  * A 32 × 24 mm board almost entirely covered by a 23 mm Fresnel dome — which is
  * exactly what the real module looks like from above, and why only the corners
- * of green solder mask and the two trimmers show. Drawing it any other way would
+ * of solder mask and the two trimmers show. Drawing it any other way would
  * make the dome look like a decoration rather than the sensor itself.
  */
 
@@ -84,74 +85,65 @@ const PROPERTIES: readonly DevicePropertyDefinition[] = [
 function draw(context: DeviceDrawContext): readonly Shape[] {
   // `triggered` is the simulated output and outlives the motion input by the
   // configured delay; `motion` is only the raw stimulus. Drawing the input
-  // would hide the hold behaviour that makes this sensor what it is.
-  const triggered = context.state['triggered'];
+  // would hide the hold behaviour that makes this sensor what it is — and an
+  // unpowered module reports nothing at all, whatever the motion setting says.
   const motion =
-    typeof triggered === 'boolean'
-      ? triggered
-      : booleanState(context, 'motion') && context.running;
+    context.running && booleanState(context, 'powered') && booleanState(context, 'triggered');
   const sensitivity = numberState(context, 'sensitivity', 60);
 
   return [
-    ...board(0, 0, WIDTH, HEIGHT, PCB.green, { rx: u(0.8), edge: PCB.greenDark }),
+    ...flatBoard(WIDTH, HEIGHT),
 
     // Sensitivity and delay trimmers, on the strips of board the dome leaves
     // visible. On the real module they are on the back; here they have to be
     // reachable, and this is the only place they fit.
-    ...[u(3.4), WIDTH - u(3.4)].map((cx, index) => [
-      circle(cx, u(20.4), u(2.4), {
-        fill: index === 0 ? '#e0b544' : '#2f6fbf',
-        stroke: OUTLINE,
-        strokeWidth: u(0.12),
-        detail: 'normal',
-      }),
-      circle(cx, u(20.4), u(1.4), { fill: PART.metalLight, detail: 'normal' }),
-    ]).flat(),
+    ...[u(3.4), WIDTH - u(3.4)]
+      .map((cx, index) => [
+        circle(cx, u(20.4), u(2.4), {
+          fill: index === 0 ? FLAT.gold : FLAT.blue,
+          stroke: OUTLINE,
+          strokeWidth: u(0.12),
+          detail: 'normal',
+        }),
+        circle(cx, u(20.4), u(1.4), { fill: FLAT.metalLight, detail: 'normal' }),
+      ])
+      .flat(),
     silkLabel(u(3.4), u(23.6), 'Sx', { size: u(1), fill: SILK.soft, detail: 'high' }),
     silkLabel(WIDTH - u(3.4), u(23.6), 'Tx', { size: u(1), fill: SILK.soft, detail: 'high' }),
 
-    // Fresnel dome: faceted white plastic, the part's defining feature.
     circle(LENS_CX, LENS_CY, LENS_R, {
-      fill: '#f4f5f7',
-      stroke: '#b7bcc4',
-      strokeWidth: u(0.25),
+      fill: FLAT.white,
+      stroke: FLAT.metalDark,
+      strokeWidth: u(0.3),
     }),
     circle(LENS_CX, LENS_CY, LENS_R - u(1), {
-      fill: '#eceef1',
-      stroke: '#c9ced6',
-      strokeWidth: u(0.12),
+      fill: 'none',
+      stroke: FLAT.metal,
+      strokeWidth: u(0.14),
       detail: 'normal',
     }),
     // Radial facet lines.
-    ...repeat(8, {}, (index) => {
-      const angle = (index * Math.PI) / 8;
+    ...repeat(4, {}, (index) => {
+      const angle = (index * Math.PI) / 4;
       const dx = Math.cos(angle) * (LENS_R - u(0.8));
       const dy = Math.sin(angle) * (LENS_R - u(0.8));
       return path(`M ${LENS_CX - dx} ${LENS_CY - dy} L ${LENS_CX + dx} ${LENS_CY + dy}`, {
-        stroke: '#d3d8de',
+        stroke: FLAT.metal,
         strokeWidth: u(0.15),
         detail: 'normal',
       });
     }),
-    // Concentric facet rings.
-    ...[0.62, 0.3].map((fraction) =>
+    // Concentric facet rings. A real fresnel lens is a stack of them, so the
+    // ring count is what makes the dome read as an optic rather than a lid.
+    ...[0.75, 0.5, 0.25].map((fraction) =>
       circle(LENS_CX, LENS_CY, LENS_R * fraction, {
         fill: 'none',
-        stroke: '#d3d8de',
-        strokeWidth: u(0.15),
+        stroke: FLAT.metal,
+        strokeWidth: u(0.16),
         detail: 'normal',
       }),
     ),
-
-    // Detection indicator. Only lit while triggered, never a permanent glow.
-    ...(motion
-      ? [
-          circle(LENS_CX, LENS_CY, LENS_R + u(1.2), { fill: '#22c55e', opacity: 0.22 }),
-          circle(LENS_CX, LENS_CY, u(1.8), { fill: '#22c55e', opacity: 0.55 }),
-        ]
-      : []),
-
-    ...maleHeader(PIN_START_X, PIN_Y, 3, 'horizontal'),
+    ...flatHeader(PIN_START_X, PIN_Y, 3),
     ...['VCC', 'OUT', 'GND'].map((name, index) =>
       text(PIN_START_X + index * HEADER_PITCH, PIN_Y - u(1.9), name, {
         size: u(0.9),
@@ -175,7 +167,7 @@ function draw(context: DeviceDrawContext): readonly Shape[] {
     }),
     text(WIDTH - u(1.4), HEIGHT / 2, motion ? 'MOTION' : `${Math.round(sensitivity)}%`, {
       size: u(1.1),
-      fill: motion ? '#4ade80' : SILK.dim,
+      fill: motion ? FLAT.gold : SILK.dim,
       anchor: 'middle',
       mono: true,
       weight: 700,
@@ -263,4 +255,5 @@ function createPirBehavior(): DeviceBehavior {
   };
 }
 
-PIR_HC_SR501.simulation = createPirBehavior;
+// The module's own regulator drops out below 4.5 V, so a 3.3 V rail leaves it dead.
+PIR_HC_SR501.simulation = requiresSupply(createPirBehavior, { minimumVolts: 4.5 });

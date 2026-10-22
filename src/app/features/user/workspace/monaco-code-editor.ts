@@ -4,12 +4,15 @@ import {
   ElementRef,
   OnDestroy,
   effect,
+  inject,
   input,
   output,
   signal,
   viewChild,
 } from '@angular/core';
 import * as monaco from 'monaco-editor';
+
+import { MonacoModelCache } from './monaco-model.cache';
 
 export interface EditorCursorPosition {
   line: number;
@@ -23,6 +26,38 @@ interface MonacoWorkerGlobal {
 }
 
 let editorLanguageFeaturesConfigured = false;
+let monacoStylesPromise: Promise<void> | null = null;
+/** Set once the stylesheet has loaded; later editors are created without waiting a tick. */
+let monacoStylesLoaded = false;
+
+function ensureMonacoStyles(): Promise<void> {
+  if (monacoStylesPromise) return monacoStylesPromise;
+  const existing = document.querySelector<HTMLLinkElement>('link[data-monaco-styles]');
+  if (existing?.sheet) {
+    monacoStylesLoaded = true;
+    return Promise.resolve();
+  }
+
+  monacoStylesPromise = new Promise<void>((resolve, reject) => {
+    const link = existing ?? document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = new URL('assets/monaco/editor.main.css', document.baseURI).href;
+    link.dataset['monacoStyles'] = '';
+    link.addEventListener(
+      'load',
+      () => {
+        monacoStylesLoaded = true;
+        resolve();
+      },
+      { once: true },
+    );
+    link.addEventListener('error', () => reject(new Error('Could not load Monaco styles')), {
+      once: true,
+    });
+    if (!existing) document.head.append(link);
+  });
+  return monacoStylesPromise;
+}
 
 @Component({
   selector: 'app-monaco-code-editor',
@@ -38,6 +73,7 @@ let editorLanguageFeaturesConfigured = false;
   styleUrl: './monaco-code-editor.css',
   host: {
     '[class.editor-ready]': 'ready()',
+    '[class.editor-warm]': 'warmStart',
   },
 })
 export class MonacoCodeEditor implements AfterViewInit, OnDestroy {
@@ -45,19 +81,31 @@ export class MonacoCodeEditor implements AfterViewInit, OnDestroy {
   readonly value = input.required<string>();
   readonly language = input.required<string>();
   readonly ariaLabel = input('Source code editor');
+  /** Blocks typing while something else is writing the file, e.g. an AI plan being applied. */
+  readonly readOnly = input(false);
 
   readonly valueChange = output<string>();
   readonly cursorChange = output<EditorCursorPosition>();
   readonly saveRequested = output<void>();
+  /** The editor finished starting, or failed to; either way its loading state is over. */
+  readonly settled = output<void>();
 
   private readonly editorHost = viewChild.required<ElementRef<HTMLElement>>('editorHost');
-  private readonly models = new Map<string, monaco.editor.ITextModel>();
-  private readonly viewStates = new Map<string, monaco.editor.ICodeEditorViewState | null>();
+  // Models and view states outlive this component, so returning to the IDE restores the
+  // document, its undo history, and the cursor and scroll position.
+  private readonly cache = inject(MonacoModelCache);
   private readonly disposables: monaco.IDisposable[] = [];
   private editor: monaco.editor.IStandaloneCodeEditor | null = null;
+  private resizeObserver: ResizeObserver | null = null;
+  private destroyed = false;
   private activePath = '';
   private syncingModel = false;
 
+  /**
+   * The stylesheet is already loaded (the user has opened the IDE before), so the editor is
+   * created synchronously and shown without the fade-in that would read as a flicker.
+   */
+  protected readonly warmStart = monacoStylesLoaded;
   protected readonly ready = signal(false);
   protected readonly loadError = signal('');
 
@@ -71,8 +119,19 @@ export class MonacoCodeEditor implements AfterViewInit, OnDestroy {
     this.activateFile(path, value, language);
   });
 
+  private readonly syncReadOnly = effect(() => {
+    const readOnly = this.readOnly();
+    if (this.ready()) this.editor?.updateOptions({ readOnly });
+  });
+
   ngAfterViewInit(): void {
+    void this.initialize();
+  }
+
+  private async initialize(): Promise<void> {
     try {
+      if (!this.warmStart) await ensureMonacoStyles();
+      if (this.destroyed) return;
       this.configureWorker();
       this.configureLanguageFeatures();
       this.createEditor();
@@ -80,13 +139,19 @@ export class MonacoCodeEditor implements AfterViewInit, OnDestroy {
     } catch (error: unknown) {
       this.loadError.set(error instanceof Error ? error.message : 'Editor could not be loaded');
     }
+    if (!this.destroyed) this.settled.emit();
   }
 
   ngOnDestroy(): void {
+    this.destroyed = true;
+    this.resizeObserver?.disconnect();
     this.disposables.forEach((disposable) => disposable.dispose());
+    if (this.editor && this.activePath) {
+      this.cache.storeViewState(this.activePath, this.editor.saveViewState());
+    }
+    // Detach first: disposing an editor that still holds a model would dispose the model too.
+    this.editor?.setModel(null);
     this.editor?.dispose();
-    this.models.forEach((model) => model.dispose());
-    this.models.clear();
   }
 
   private createEditor(): void {
@@ -122,9 +187,10 @@ export class MonacoCodeEditor implements AfterViewInit, OnDestroy {
 
     this.editor = monaco.editor.create(this.editorHost().nativeElement, {
       model: null,
+      readOnly: this.readOnly(),
       theme: 'iot-hub-light',
       ariaLabel: this.ariaLabel(),
-      automaticLayout: true,
+      automaticLayout: false,
       fontFamily: "'Cascadia Code', 'SFMono-Regular', Consolas, 'Liberation Mono', monospace",
       fontLigatures: false,
       fontSize: 12,
@@ -166,6 +232,17 @@ export class MonacoCodeEditor implements AfterViewInit, OnDestroy {
       contextmenu: true,
     });
 
+    // Automatic layout clears the minimap canvas, then renders on a later frame.
+    // Resize and render together before paint so dragging the splitter cannot flash it blank.
+    this.resizeObserver = new ResizeObserver(([entry]) => {
+      if (!entry || entry.contentRect.width <= 0 || entry.contentRect.height <= 0) return;
+      this.editor?.layout({
+        width: entry.contentRect.width,
+        height: entry.contentRect.height,
+      });
+    });
+    this.resizeObserver.observe(this.editorHost().nativeElement);
+
     this.disposables.push(
       this.editor.onDidChangeModelContent(() => {
         if (this.syncingModel || !this.editor?.getModel()) return;
@@ -189,26 +266,33 @@ export class MonacoCodeEditor implements AfterViewInit, OnDestroy {
     if (!this.editor) return;
 
     if (this.activePath && this.activePath !== path) {
-      this.viewStates.set(this.activePath, this.editor.saveViewState());
+      this.cache.storeViewState(this.activePath, this.editor.saveViewState());
     }
 
-    let model = this.models.get(path);
+    let model = this.cache.model(path);
     if (!model) {
       const uri = monaco.Uri.from({ scheme: 'file', path: `/iot-hub/${path}` });
+      // A model can survive in Monaco's registry after its cache entry was dropped.
+      monaco.editor.getModel(uri)?.dispose();
       model = monaco.editor.createModel(value, language, uri);
-      this.models.set(path, model);
+      this.cache.storeModel(path, model);
     } else {
       if (model.getLanguageId() !== language) monaco.editor.setModelLanguage(model, language);
       if (model.getValue() !== value) {
+        // pushEditOperations keeps the change undoable, unlike setValue.
         this.syncingModel = true;
-        model.setValue(value);
+        model.pushEditOperations(
+          [],
+          [{ range: model.getFullModelRange(), text: value }],
+          () => null,
+        );
         this.syncingModel = false;
       }
     }
 
     if (this.editor.getModel() !== model) {
       this.editor.setModel(model);
-      const viewState = this.viewStates.get(path);
+      const viewState = this.cache.viewState(path);
       if (viewState) this.editor.restoreViewState(viewState);
     }
 

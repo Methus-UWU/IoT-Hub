@@ -1,11 +1,24 @@
-import { Component, computed, output, signal } from '@angular/core';
-import { FormField, form, required, submit } from '@angular/forms/signals';
+import {
+  Component,
+  ElementRef,
+  afterNextRender,
+  computed,
+  effect,
+  inject,
+  input,
+  output,
+  signal,
+  viewChild,
+} from '@angular/core';
+import { FormField, form, maxLength, pattern, required } from '@angular/forms/signals';
 
 import {
   CustomSelect,
   CustomSelectOption,
 } from '../../../shared/components/custom-select/custom-select';
 import { NewProjectValue, ProjectSetupMode } from './project.store';
+import { ProjectSetupStore } from './project-setup.store';
+import { FieldError } from '../../../shared/components/field-error/field-error';
 
 export type { NewProjectValue } from './project.store';
 
@@ -13,110 +26,70 @@ const EMPTY_PROJECT: NewProjectValue = {
   name: '',
   setupMode: 'ai',
   description: '',
-  boardId: 'esp32-devkit-v1',
-  framework: 'Arduino C++',
+  boardId: '',
+  framework: '',
   devices: [],
 };
 
-const BOARD_OPTIONS: readonly CustomSelectOption[] = [
-  {
-    value: 'esp32-devkit-v1',
-    label: 'ESP32 DevKit V1',
-    description: 'เหมาะสำหรับเริ่มต้นและงานต้นแบบ',
-  },
-  { value: 'esp32-s3-devkitc-1', label: 'ESP32-S3', description: 'รองรับ AI และ USB ในตัว' },
-  { value: 'esp8266-nodemcu', label: 'ESP8266 NodeMCU', description: 'Wi-Fi ในตัว ราคาประหยัด' },
-  { value: 'arduino-uno-r3', label: 'Arduino Uno', description: 'บอร์ดสำหรับเริ่มต้น' },
-  { value: 'arduino-nano', label: 'Arduino Nano', description: 'ขนาดกะทัดรัด' },
-  { value: 'pico-w', label: 'Raspberry Pi Pico W', description: 'RP2040 พร้อม Wi-Fi' },
-];
-
-const FRAMEWORK_OPTIONS: readonly CustomSelectOption[] = [
-  { value: 'Arduino C++', label: 'Arduino C++', description: 'ใช้งานง่ายและมีไลบรารีจำนวนมาก' },
-  { value: 'PlatformIO', label: 'PlatformIO', description: 'เหมาะกับโปรเจกต์ที่มีโครงสร้างซับซ้อน' },
-  { value: 'MicroPython', label: 'MicroPython', description: 'พัฒนาและทดลองได้อย่างรวดเร็ว' },
-];
-
-interface SelectableDevice {
-  id: string;
-  name: string;
-  detail: string;
-  type: 'board' | 'sensor' | 'module';
-}
-
-const MANUAL_DEVICES: readonly SelectableDevice[] = [
-  { id: 'esp32-dev-board', name: 'ESP32 Dev Board', detail: 'Wi-Fi + Bluetooth', type: 'board' },
-  { id: 'esp8266-nodemcu', name: 'ESP8266 NodeMCU', detail: 'Wi-Fi ในตัว', type: 'board' },
-  { id: 'esp32-cam', name: 'ESP32-CAM Module', detail: 'กล้องและ Wi-Fi ในตัว', type: 'module' },
-  { id: 'arduino-uno-r3', name: 'Arduino UNO R3', detail: 'บอร์ดสำหรับเริ่มต้น', type: 'board' },
-  { id: 'arduino-mega-2560', name: 'Arduino Mega 2560', detail: 'พอร์ต I/O จำนวนมาก', type: 'board' },
-  { id: 'pico-w', name: 'Raspberry Pi Pico W', detail: 'RP2040 พร้อม Wi-Fi', type: 'board' },
-  { id: 'dht22', name: 'DHT22', detail: 'เซนเซอร์อุณหภูมิและความชื้น', type: 'sensor' },
-  { id: 'soil-moisture', name: 'Soil Moisture Sensor', detail: 'เซนเซอร์ความชื้นในดิน', type: 'sensor' },
-  { id: 'relay-module', name: 'Relay Module', detail: 'ควบคุมปั๊ม วาล์ว หรืออุปกรณ์ไฟฟ้า', type: 'module' },
-];
-
 @Component({
   selector: 'app-create-project-dialog',
-  imports: [CustomSelect, FormField],
+  imports: [CustomSelect, FormField, FieldError],
   templateUrl: './create-project-dialog.html',
   styleUrl: './create-project-dialog.css',
-  host: {
-    '(document:keydown.escape)': 'close()',
-  },
+  providers: [ProjectSetupStore],
 })
 export class CreateProjectDialog {
   readonly created = output<NewProjectValue>();
   readonly closed = output<void>();
+  readonly creating = input(false);
+  readonly error = input<string | null>(null);
+  protected readonly setup = inject(ProjectSetupStore);
+  private readonly dialog = viewChild.required<ElementRef<HTMLDialogElement>>('dialog');
 
   private readonly model = signal<NewProjectValue>({ ...EMPTY_PROJECT });
-  private readonly dragStartX = signal<number | null>(null);
-  private readonly dragStartMode = signal<ProjectSetupMode>('ai');
-  private readonly dragTrackWidth = signal(1);
-  private readonly dragPercent = signal(0);
-  private suppressSetupClick = false;
 
-  protected readonly creating = signal(false);
   protected readonly submitAttempted = signal(false);
-  protected readonly boardOptions = BOARD_OPTIONS;
-  protected readonly frameworkOptions = FRAMEWORK_OPTIONS;
+  protected readonly maxInitialDevices = 49;
+  protected readonly boardOptions = this.setup.boardOptions;
+  protected readonly frameworkOptions = computed<readonly CustomSelectOption[]>(() => {
+    const board = this.setup.boards().find((board) => board.id === this.model().boardId);
+    return (board?.frameworks ?? []).map((framework) => ({ value: framework, label: framework }));
+  });
   protected readonly deviceQuery = signal('');
-  protected readonly setupDragging = signal(false);
   protected readonly filteredDevices = computed(() => {
     const query = this.deviceQuery().trim().toLocaleLowerCase();
-    return MANUAL_DEVICES.filter(
-      (device) =>
-        !query ||
-        device.name.toLocaleLowerCase().includes(query) ||
-        device.detail.toLocaleLowerCase().includes(query),
-    );
+    return this.setup
+      .devices()
+      .filter(
+        (device) =>
+          !query ||
+          device.name.toLocaleLowerCase().includes(query) ||
+          device.description.toLocaleLowerCase().includes(query),
+      );
   });
   protected readonly selectedDeviceCount = computed(() => this.model().devices.length);
-  protected readonly setupSlidePercent = computed(() => {
-    if (this.setupDragging()) {
-      const base = this.dragStartMode() === 'ai' ? 0 : 100;
-      return Math.min(100, Math.max(0, base + this.dragPercent()));
-    }
-    return this.model().setupMode === 'ai' ? 0 : 100;
-  });
-  protected readonly setupThumbTransform = computed(() => {
-    if (this.setupDragging()) {
-      const offset = (this.setupSlidePercent() / 100) * this.dragTrackWidth();
-      return `translateX(${offset}px)`;
-    }
-    return this.model().setupMode === 'manual'
-      ? 'translateX(calc(100% + 0.3rem))'
-      : 'translateX(0)';
-  });
+  protected readonly previewName = computed(() => this.model().name.trim() || 'Your next big idea');
+  protected readonly previewBoard = computed(
+    () =>
+      this.boardOptions().find((board) => board.value === this.model().boardId)?.label ||
+      'เลือกบอร์ดของคุณ',
+  );
+  protected readonly isAiMode = computed(() => this.model().setupMode === 'ai');
+  protected readonly previewDescription = computed(
+    () => this.model().description.trim() || 'จากไอเดียเล็ก ๆ สู่สิ่งที่เชื่อมต่อได้จริง',
+  );
   protected readonly projectForm = form(this.model, (path) => {
     required(path.name, { message: 'กรุณากรอกชื่อโปรเจกต์' });
+    pattern(path.name, /\S/, { message: 'กรุณากรอกชื่อโปรเจกต์' });
+    maxLength(path.name, 80, { message: 'ชื่อโปรเจกต์ต้องไม่เกิน 80 ตัวอักษร' });
+    maxLength(path.description, 500, { message: 'คำอธิบายต้องไม่เกิน 500 ตัวอักษร' });
     required(path.boardId, { message: 'กรุณาเลือกบอร์ดอุปกรณ์' });
     required(path.framework, { message: 'กรุณาเลือกเฟรมเวิร์ก' });
   });
 
   protected readonly showNameError = computed(
     () =>
-      this.model().name.trim().length === 0 &&
+      this.projectForm.name().invalid() &&
       (this.projectForm.name().dirty() || this.submitAttempted()),
   );
   protected readonly canCreate = computed(() => {
@@ -125,19 +98,40 @@ export class CreateProjectDialog {
       project.name.trim().length > 0 &&
       project.boardId.trim().length > 0 &&
       project.framework.trim().length > 0;
-    const hasManualDevice = project.setupMode !== 'manual' || project.devices.length > 0;
-
-    return hasRequiredFields && hasManualDevice && !this.creating();
+    return (
+      hasRequiredFields &&
+      !this.projectForm().invalid() &&
+      this.boardOptions().some((option) => option.value === project.boardId) &&
+      this.frameworkOptions().some((option) => option.value === project.framework) &&
+      !this.setup.loading() &&
+      !this.setup.error() &&
+      !this.creating()
+    );
   });
 
+  constructor() {
+    this.setup.load();
+    effect(() => {
+      const first = this.setup.boards()[0];
+      if (first && !this.model().boardId) this.updateBoard(first.id);
+    });
+    afterNextRender(() => this.dialog().nativeElement.showModal());
+  }
+
   protected setSetupMode(mode: ProjectSetupMode): void {
-    if (this.suppressSetupClick) return;
+    if (this.creating()) return;
     if (this.model().setupMode === mode) return;
     this.model.update((value) => ({ ...value, setupMode: mode }));
   }
 
   protected updateBoard(value: string): void {
-    this.model.update((project) => ({ ...project, boardId: value }));
+    const board = this.setup.boards().find((board) => board.id === value);
+    if (!board || this.creating()) return;
+    this.model.update((project) => ({
+      ...project,
+      boardId: board.id,
+      framework: board.defaultFramework,
+    }));
   }
 
   protected updateFramework(value: string): void {
@@ -149,10 +143,15 @@ export class CreateProjectDialog {
   }
 
   protected deviceSelected(deviceId: string): boolean {
-    return this.model().devices.includes(deviceId);
+    return this.deviceQuantity(deviceId) > 0;
+  }
+
+  protected deviceQuantity(deviceId: string): number {
+    return this.model().devices.reduce((quantity, id) => quantity + (id === deviceId ? 1 : 0), 0);
   }
 
   protected toggleDevice(deviceId: string): void {
+    if (this.creating()) return;
     this.model.update((project) => ({
       ...project,
       devices: project.devices.includes(deviceId)
@@ -161,73 +160,38 @@ export class CreateProjectDialog {
     }));
   }
 
-  protected startSetupDrag(event: PointerEvent): void {
-    const track = event.currentTarget as HTMLElement;
-    track.setPointerCapture(event.pointerId);
-    this.dragStartX.set(event.clientX);
-    this.dragStartMode.set(this.model().setupMode);
-    const options = track.querySelectorAll<HTMLElement>('button');
-    const travelDistance =
-      options.length > 1 ? options[1].offsetLeft - options[0].offsetLeft : track.clientWidth / 2;
-    this.dragTrackWidth.set(Math.max(travelDistance, 1));
-    this.dragPercent.set(0);
-    this.setupDragging.set(false);
-    this.suppressSetupClick = false;
+  protected increaseDeviceQuantity(deviceId: string): void {
+    if (this.creating() || this.selectedDeviceCount() >= this.maxInitialDevices) return;
+    this.model.update((project) => ({
+      ...project,
+      devices: [...project.devices, deviceId],
+    }));
   }
 
-  protected moveSetupDrag(event: PointerEvent): void {
-    const startX = this.dragStartX();
-    if (startX === null) return;
-
-    const delta = event.clientX - startX;
-    if (Math.abs(delta) <= 5 && !this.setupDragging()) return;
-
-    this.setupDragging.set(true);
-    this.dragPercent.set((delta / this.dragTrackWidth()) * 100);
-    this.suppressSetupClick = true;
-  }
-
-  protected endSetupDrag(event: PointerEvent): void {
-    if (this.dragStartX() === null) return;
-
-    const target = event.currentTarget as HTMLElement;
-    if (target.hasPointerCapture(event.pointerId)) target.releasePointerCapture(event.pointerId);
-    if (this.setupDragging()) {
-      const mode: ProjectSetupMode = this.setupSlidePercent() >= 50 ? 'manual' : 'ai';
-      this.model.update((value) => ({ ...value, setupMode: mode }));
-    } else {
-      const rect = target.getBoundingClientRect();
-      const mode: ProjectSetupMode = event.clientX - rect.left >= rect.width / 2 ? 'manual' : 'ai';
-      this.setSetupMode(mode);
-    }
-    this.dragStartX.set(null);
-    this.dragPercent.set(0);
-    this.setupDragging.set(false);
-    if (this.suppressSetupClick) {
-      setTimeout(() => (this.suppressSetupClick = false));
-    }
+  protected decreaseDeviceQuantity(deviceId: string): void {
+    if (this.creating() || this.deviceQuantity(deviceId) <= 1) return;
+    this.model.update((project) => {
+      const index = project.devices.lastIndexOf(deviceId);
+      return {
+        ...project,
+        devices: project.devices.filter((_, itemIndex) => itemIndex !== index),
+      };
+    });
   }
 
   protected close(): void {
     if (!this.creating()) this.closed.emit();
   }
 
-  protected async createProject(): Promise<void> {
+  protected cancel(event: Event): void {
+    event.preventDefault();
+    this.close();
+  }
+
+  protected createProject(): void {
     this.submitAttempted.set(true);
     if (!this.canCreate()) return;
 
-    this.creating.set(true);
-
-    try {
-      await submit(this.projectForm, async () => {
-        this.created.emit(this.model());
-        this.model.set({ ...EMPTY_PROJECT });
-        this.projectForm().reset();
-        this.submitAttempted.set(false);
-        return undefined;
-      });
-    } finally {
-      this.creating.set(false);
-    }
+    this.created.emit({ ...this.model(), devices: [...this.model().devices] });
   }
 }

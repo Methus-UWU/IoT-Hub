@@ -1,0 +1,80 @@
+@let current = example();
+<section aria-labelledby="wiring-example-title">
+  <div class="example-picker" role="group" aria-label="เลือกตัวอย่างวงจร">
+    @for (item of examples; track item.id; let index = $index) {
+      <button type="button" (click)="show(index)" [attr.aria-pressed]="exampleIndex() === index">
+        {{ index ? index + '. ' : '' }}{{ item.name }}
+      </button>
+    }
+  </div>
+  <div class="example-heading">
+    <h3 id="wiring-example-title">{{ current.title }}</h3>
+    <button type="button" (click)="enlarged.set(!enlarged())" [attr.aria-pressed]="enlarged()">
+      {{ enlarged() ? 'ย่อภาพ' : 'ขยายภาพ' }}
+    </button>
+  </div>
+  <p>เลือกหมายเลขสายด้านล่างเพื่อเน้นเส้นทางการเชื่อมต่อในภาพ</p>
+  <div class="diagram-scroll" tabindex="0" role="region" aria-label="ภาพวงจร เลื่อนดูได้เมื่อขยาย">
+    <svg
+      [attr.viewBox]="current.viewBox"
+      [class.enlarged]="enlarged()"
+      [style.--diagram-width]="current.size[0] + 'px'"
+      role="img"
+      aria-labelledby="wiring-title wiring-description"
+    >
+      <title id="wiring-title">{{ current.title }}</title>
+      <desc id="wiring-description">{{ current.description }}</desc>
+      @for (part of current.parts; track part.key) {
+        <g [attr.transform]="part.transform" aria-hidden="true">
+          <g appDeviceArt [device]="part.device" [state]="part.state" [showCaption]="false"></g>
+        </g>
+        <text [attr.x]="part.labelX" [attr.y]="part.labelY" class="part-label">
+          {{ part.label }}
+        </text>
+      }
+      @for (wire of current.wires; track wire.id) {
+        <g
+          [class.muted]="selected() !== null && selected() !== wire.id"
+          [class.selected]="selected() === wire.id"
+        >
+          <path class="wire-outline" [attr.d]="wire.path" />
+          <path class="wire" [attr.d]="wire.path" [attr.stroke]="wire.color" />
+          <circle
+            [attr.cx]="wire.start[0]"
+            [attr.cy]="wire.start[1]"
+            r="4"
+            [attr.fill]="wire.color"
+          />
+          <circle [attr.cx]="wire.end[0]" [attr.cy]="wire.end[1]" r="4" [attr.fill]="wire.color" />
+          <circle class="wire-badge" [attr.cx]="wire.badge[0]" [attr.cy]="wire.badge[1]" r="12" />
+          <text class="wire-number" [attr.x]="wire.badge[0]" [attr.y]="wire.badge[1] + 5">
+            {{ wire.id }}
+          </text>
+        </g>
+      }
+      @for (note of current.notes; track note.text) {
+        <text [attr.x]="note.at[0]" [attr.y]="note.at[1]" class="diagram-note">
+          {{ note.text }}
+        </text>
+      }
+    </svg>
+  </div>
+  <p class="diagram-note">
+    ภาพอ้างอิงบอร์ด 38 ขาและอุปกรณ์ในคลัง ตรวจชื่อขาบนรุ่นจริงก่อนต่อ สายที่ตัดกันไม่เชื่อมถึงกัน
+    เว้นแต่ต่อที่ขาเดียวกัน
+  </p>
+  <div class="connection-list" role="group" aria-label="เลือกสายเชื่อมต่อ">
+    @for (wire of current.wires; track wire.id) {
+      <button type="button" (click)="select(wire.id)" [attr.aria-pressed]="selected() === wire.id">
+        <span class="connection-number">{{ wire.id }}</span>
+        <span>{{ wire.label }}</span>
+      </button>
+    }
+  </div>
+  <p class="diagram-note">{{ current.materials }}</p>
+  <ul class="tips">
+    @for (tip of current.tips; track tip) {
+      <li>{{ tip }}</li>
+    }
+  </ul>
+</section>

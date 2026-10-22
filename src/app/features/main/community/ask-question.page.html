@@ -1,0 +1,156 @@
+<dialog
+  #dialog
+  class="post-dialog"
+  aria-labelledby="ask-heading"
+  aria-describedby="ask-intro"
+  (mousedown)="cancel()"
+  (cancel)="cancelDialog($event)"
+>
+  <section class="composer" (mousedown)="$event.stopPropagation()">
+    <header class="composer-header">
+      <h1 id="ask-heading">สร้างกระทู้</h1>
+      <button
+        type="button"
+        class="close-button"
+        aria-label="ปิดหน้าต่างสร้างกระทู้"
+        [disabled]="submitting()"
+        (click)="cancel()"
+      >
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path
+            d="m6 6 12 12M18 6 6 18"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+          />
+        </svg>
+      </button>
+    </header>
+
+    <form
+      class="composer-form"
+      novalidate
+      [attr.aria-busy]="submitting()"
+      (submit)="$event.preventDefault(); onSubmit()"
+    >
+      <div class="composer-body">
+        <div class="author-row">
+          <app-author-badge [username]="username()" [size]="2" />
+          <p id="ask-intro" class="composer-intro">แชร์คำถาม ปัญหา หรือผลงานของคุณกับชุมชน</p>
+        </div>
+
+        <fieldset class="kind-group">
+          <legend>ประเภทกระทู้</legend>
+          <div class="kind-options">
+            @for (option of kindOptions; track option.value) {
+              <button
+                type="button"
+                class="kind-option"
+                [class.kind-option-active]="askForm.kind().value() === option.value"
+                [attr.aria-pressed]="askForm.kind().value() === option.value"
+                [title]="option.hint"
+                (click)="setKind(option.value)"
+              >
+                {{ option.label }}
+              </button>
+            }
+          </div>
+        </fieldset>
+
+        <div class="field">
+          <div class="field-label-row">
+            <label for="ask-title">ชื่อกระทู้</label>
+            <span class="field-counter">{{ titleLength() }}/{{ titleMax }}</span>
+          </div>
+          <input
+            id="ask-title"
+            class="field-input"
+            type="text"
+            autocomplete="off"
+            autofocus
+            [formField]="askForm.title"
+            placeholder="หัวข้อที่คุณอยากพูดคุย"
+          />
+          @if (askForm.title().touched() && askForm.title().invalid()) {
+            <app-field-error [message]="askForm.title().errors()[0]?.message ?? ''" />
+          }
+        </div>
+
+        <div class="field">
+          <div class="field-label-row">
+            <label for="ask-body">รายละเอียด</label>
+            <span class="field-counter">{{ bodyLength() }}/{{ bodyMax }}</span>
+            <button type="button" class="preview-toggle" (click)="togglePreview()">
+              {{ showPreview() ? 'กลับไปแก้ไข' : 'ดูตัวอย่าง' }}
+            </button>
+          </div>
+
+          @if (showPreview()) {
+            <div class="markdown-preview" [innerHTML]="bodyPreview() | markdown"></div>
+          } @else {
+            <textarea
+              id="ask-body"
+              class="field-input field-textarea"
+              rows="8"
+              [formField]="askForm.body"
+              [placeholder]="'คุณอยากเล่าอะไรให้ชุมชนฟัง, ' + username() + '?'"
+            ></textarea>
+          }
+
+          @if (askForm.body().touched() && askForm.body().invalid()) {
+            <app-field-error [message]="askForm.body().errors()[0]?.message ?? ''" />
+          }
+        </div>
+
+        <section class="post-extras" aria-labelledby="ask-tags-label">
+          <div class="extras-heading">
+            <strong id="ask-tags-label">หัวข้อ</strong>
+            <small>เลือกได้สูงสุด {{ tagsMax }} หัวข้อ</small>
+            <span class="tag-count">{{ selectedTags().length }}/{{ tagsMax }}</span>
+          </div>
+
+          @if (tagsLoading()) {
+            <p class="tags-status" role="status">กำลังโหลดหัวข้อ…</p>
+          } @else if (tagsError(); as message) {
+            <div class="tags-error" role="alert">
+              <span>{{ message }}</span>
+              <button type="button" (click)="loadTags()">ลองอีกครั้ง</button>
+            </div>
+          } @else {
+            <div class="tag-picker" role="group" aria-labelledby="ask-tags-label">
+              @for (tag of tags(); track tag.slug) {
+                <button
+                  type="button"
+                  class="tag-chip"
+                  [class.tag-chip-active]="isSelected(tag.slug)"
+                  [attr.aria-pressed]="isSelected(tag.slug)"
+                  [title]="tag.description"
+                  (click)="toggleTag(tag.slug)"
+                >
+                  {{ tag.name }}
+                </button>
+              }
+            </div>
+          }
+
+          @if (askForm.tags().touched() && askForm.tags().invalid()) {
+            <app-field-error [message]="askForm.tags().errors()[0]?.message ?? ''" />
+          }
+        </section>
+
+        @if (submitError(); as message) {
+          <app-field-error class="submit-error" role="alert" [message]="message" />
+        }
+      </div>
+
+      <footer class="composer-footer">
+        <button type="button" class="cancel-button" [disabled]="submitting()" (click)="cancel()">
+          ยกเลิก
+        </button>
+        <button type="submit" class="post-button" [disabled]="!canSubmit()">
+          {{ submitting() ? 'กำลังโพสต์…' : 'โพสต์กระทู้' }}
+        </button>
+      </footer>
+    </form>
+  </section>
+</dialog>

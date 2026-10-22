@@ -1,3 +1,4 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { Component, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
@@ -28,11 +29,23 @@ import { LoggerService } from '../../../core/services/logger.service';
         @if (errorCode(); as code) {
           <p class="font-mono text-xs text-gray-400">{{ code }}</p>
         }
-        <a
-          routerLink="/auth/login"
-          class="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white"
-          >กลับไปหน้าเข้าสู่ระบบ</a
-        >
+        <div class="flex flex-wrap items-center justify-center gap-2">
+          @if (retryable()) {
+            <button
+              type="button"
+              class="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white"
+              [disabled]="retrying()"
+              (click)="retry()"
+            >
+              {{ retrying() ? 'กำลังลองใหม่…' : 'ลองอีกครั้ง' }}
+            </button>
+          }
+          <a
+            routerLink="/auth/login"
+            class="rounded-xl border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700"
+            >กลับไปหน้าเข้าสู่ระบบ</a
+          >
+        </div>
       } @else {
         <div
           class="h-8 w-8 animate-spin rounded-full border-3 border-gray-200 border-t-primary"
@@ -51,12 +64,25 @@ export class AuthCallback {
 
   protected readonly error = signal<string | null>(null);
   protected readonly errorCode = signal<string | null>(null);
+  protected readonly retryable = signal(false);
+  protected readonly retrying = signal(false);
 
   constructor() {
     void this.complete();
   }
 
+  protected async retry(): Promise<void> {
+    if (this.retrying()) return;
+    this.retrying.set(true);
+    await this.complete();
+    this.retrying.set(false);
+  }
+
   private async complete(): Promise<void> {
+    this.error.set(null);
+    this.errorCode.set(null);
+    this.retryable.set(false);
+
     const reported = readRedirectError();
     if (reported) {
       this.logger.error('OAuth callback returned an error', reported);
@@ -78,8 +104,40 @@ export class AuthCallback {
       await this.router.navigateByUrl(destination);
     } catch (error) {
       this.logger.error('OAuth callback failed', error);
-      this.error.set('เกิดข้อผิดพลาดระหว่างเข้าสู่ระบบ กรุณาลองใหม่อีกครั้ง');
+      this.reportProfileFailure(error);
     }
+  }
+
+  /**
+   * Separates a rejected identity from an unreachable API.
+   *
+   * Supabase has already stored a valid session by this point. If our own API
+   * refused it, that session is useless and is abandoned, or every later route
+   * guard repeats the same failing call. A gateway or network fault says nothing
+   * about the identity, so the session is kept and the call can simply be retried
+   * — signing the visitor out there would make them redo the whole OAuth trip for
+   * an outage on our side.
+   */
+  private reportProfileFailure(error: unknown): void {
+    const status = error instanceof HttpErrorResponse ? error.status : null;
+    const rejected = status === 401 || status === 403;
+
+    if (status !== null) {
+      this.errorCode.set(`HTTP ${status}`);
+    }
+
+    if (rejected) {
+      this.auth.logout().subscribe({ error: () => this.auth.clearSession() });
+      this.error.set('บัญชีนี้ยังไม่ได้รับสิทธิ์ใช้งาน กรุณาติดต่อผู้ดูแลระบบ');
+      return;
+    }
+
+    this.retryable.set(true);
+    this.error.set(
+      status === 0 || status === null
+        ? 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ กรุณาตรวจสอบอินเทอร์เน็ตแล้วลองอีกครั้ง'
+        : 'เซิร์ฟเวอร์ไม่พร้อมให้บริการชั่วคราว กรุณาลองอีกครั้งในอีกสักครู่',
+    );
   }
 }
 

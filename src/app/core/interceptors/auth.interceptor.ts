@@ -1,6 +1,7 @@
 import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { Router } from '@angular/router';
+import { isAuthRetryableFetchError } from '@supabase/supabase-js';
 import { catchError, switchMap, throwError } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
@@ -53,11 +54,33 @@ export const authInterceptor: HttpInterceptorFn = (request, next) => {
           ),
         ),
         catchError((refreshError: unknown) => {
+          // Supabase could not be reached, so nothing is known about the session.
+          // Signing the user out over a dropped connection is what made sessions
+          // appear to expire at random; the request fails and the session stays.
+          if (isAuthRetryableFetchError(refreshError)) {
+            return throwError(() => error);
+          }
           auth.clearSession();
-          void router.navigate(['/auth/login']);
+          // A route guard can be the caller. Starting a navigation from here
+          // cancels the one that issued the request, and because the target is
+          // /auth/login it would cancel itself on every retry — the link looks
+          // dead. Anywhere under /auth the page already handles a failed
+          // session, so leave the routing to it.
+          if (!headingToAuth(router)) {
+            void router.navigate(['/auth/login']);
+          }
           return throwError(() => refreshError);
         }),
       );
     }),
   );
 };
+
+/** Where the router is going, or where it already is when nothing is in flight. */
+function headingToAuth(router: Router): boolean {
+  const navigation = router.getCurrentNavigation();
+  const target = navigation
+    ? (navigation.finalUrl ?? navigation.extractedUrl).toString()
+    : router.url;
+  return target.startsWith('/auth');
+}

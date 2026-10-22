@@ -1,0 +1,14 @@
+{
+  "devices": [
+    { "instanceId": "board", "deviceId": "esp32-devkit-v1" },
+    { "instanceId": "reader", "deviceId": "rfid-rc522" },
+    { "instanceId": "matrix", "deviceId": "max7219-matrix" }
+  ],
+  "wires": [
+    ["board", "3V3", "reader", "VCC"], ["board", "GND-L", "reader", "GND"],
+    ["board", "GPIO5", "reader", "SDA"], ["board", "GPIO27", "reader", "RST"],
+    ["board", "GPIO18", "reader", "SCK"], ["board", "GPIO23", "reader", "MOSI"], ["board", "GPIO19", "reader", "MISO"],
+    ["board", "VIN", "matrix", "VCC"], ["board", "GND-L", "matrix", "GND"],
+    ["board", "GPIO25", "matrix", "DIN"], ["board", "GPIO26", "matrix", "CLK"], ["board", "GPIO32", "matrix", "CS"]
+  ]
+}

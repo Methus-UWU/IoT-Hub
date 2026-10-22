@@ -5,11 +5,12 @@ import {
   type DevicePropertyDefinition,
 } from '../core/device-definition';
 import { bodyFromMm, HEADER_PITCH, u } from '../core/device-metrics';
-import { OUTLINE, PART } from '../core/device-palette';
+import { PART } from '../core/device-palette';
 import { silkLabel } from '../core/device-parts';
 import { pin } from '../core/device-pin';
-import { circle, ellipse, line, path, type Shape } from '../core/device-shape';
+import { circle, ellipse, path, type Shape } from '../core/device-shape';
 import type { DeviceBehavior } from '../core/device-simulation';
+import { pulsedLedBrightness } from './led.device';
 
 /**
  * A 5 mm RGB package is the same T-1¾ body as a single-colour LED, but its four
@@ -22,10 +23,23 @@ const HEIGHT = BODY.height;
 const CENTER_X = WIDTH / 2;
 /** Dome: 5 mm across, shoulder where the straight sides begin. */
 const DOME_R = u(2.5);
-const DOME_CY = u(3.4);
 const FLANGE_Y = u(8.6);
+/**
+ * The epoxy is the same T-1¾ as the single-colour LED: 8.6 mm of package over a
+ * 5 mm dome, so the barrel is about twice the height of the hemisphere capping
+ * it. Deriving the shoulder from that height rather than fixing it is what keeps
+ * the part slender instead of reading as a squat blob.
+ */
+const BODY_HEIGHT = u(8.6);
+const DOME_SHOULDER_Y = FLANGE_Y - BODY_HEIGHT + DOME_R;
+/** The dies sit low in the package, a couple of millimetres above the flange —
+ * which is where the reflector cup around them is drawn. */
+const DIE_Y = FLANGE_Y - u(2.8);
 /** Four legs at 0.1 in; the second is the common pin on a real package. */
 const PIN_START_X = CENTER_X - HEADER_PITCH * 1.5;
+/** Leads emerge beneath the 5 mm body before spreading to 0.1-inch pitch. */
+const LEAD_EXIT_PITCH = u(1.45);
+const LEAD_EXIT_START_X = CENTER_X - LEAD_EXIT_PITCH * 1.5;
 /** Short legs stop above the common one, as the real lead frame is cut. */
 const SHORT_LEG_Y = HEIGHT - u(1.6);
 
@@ -65,20 +79,29 @@ const PROPERTIES: readonly DevicePropertyDefinition[] = [
   },
 ];
 
+/** Unlit epoxy: the package is water-clear, so it reads as grey glass. */
+const CLEAR_TONE = { color: '#c9ced6', edge: '#9aa2ad' };
+
 /**
  * Mixes the three dies into one emitted colour.
  *
  * Brightness is tracked separately from hue: at low duty the dome should dim
- * rather than drift toward black, which is what a naive rgb() would do.
+ * rather than drift toward black, which is what a naive rgb() would do. The
+ * edge tone is the same mix at 55%, so the outline and reflector cup shade with
+ * the colour instead of staying a fixed grey against a saturated body.
  */
-export function mixRgb(red: number, green: number, blue: number): { color: string; level: number } {
+export function mixRgb(
+  red: number,
+  green: number,
+  blue: number,
+): { color: string; edge: string; level: number } {
   const peak = Math.max(red, green, blue);
-  if (peak === 0) return { color: '#5b6068', level: 0 };
+  if (peak === 0) return { ...CLEAR_TONE, level: 0 };
   const scale = 255 / peak;
+  const [r, g, b] = [red, green, blue].map((channel) => Math.round(channel * scale));
   return {
-    color: `rgb(${Math.round(red * scale)}, ${Math.round(green * scale)}, ${Math.round(
-      blue * scale,
-    )})`,
+    color: `rgb(${r}, ${g}, ${b})`,
+    edge: `rgb(${Math.round(r * 0.55)}, ${Math.round(g * 0.55)}, ${Math.round(b * 0.55)})`,
     level: peak / 255,
   };
 }
@@ -91,58 +114,77 @@ function createRgbLed(polarity: Polarity): VirtualDevice {
     const red = numberState(context, 'red', 0);
     const green = numberState(context, 'green', 0);
     const blue = numberState(context, 'blue', 0);
-    const { color, level } = mixRgb(red, green, blue);
+    const { color, edge, level } = mixRgb(red, green, blue);
     const lit = level > 0.02 && context.running;
 
     return [
       // Legs — the common one is drawn longer, as on the real part.
-      ...[0, 1, 2, 3].map((index) =>
-        line(
-          PIN_START_X + index * HEADER_PITCH,
-          FLANGE_Y,
-          PIN_START_X + index * HEADER_PITCH,
-          index === 1 ? HEIGHT : SHORT_LEG_Y,
-          { stroke: PART.metal, strokeWidth: u(0.45), strokeLinecap: 'round' },
-        ),
-      ),
+      ...[0, 1, 2, 3].map((index) => {
+        const exitX = LEAD_EXIT_START_X + index * LEAD_EXIT_PITCH;
+        const pinX = PIN_START_X + index * HEADER_PITCH;
+        const endY = index === 1 ? HEIGHT : SHORT_LEG_Y;
+        return path(
+          `M ${exitX} ${FLANGE_Y - u(0.2)}` +
+            ` C ${exitX} ${FLANGE_Y + u(0.7)}, ${pinX} ${FLANGE_Y + u(0.9)}, ${pinX} ${FLANGE_Y + u(1.8)}` +
+            ` V ${endY}`,
+          {
+            fill: 'none',
+            stroke: PART.metal,
+            strokeWidth: u(0.45),
+            strokeLinecap: 'round',
+          },
+        );
+      }),
 
       // Soft halo, only while lit and never strong enough to wash out wires.
       ...(lit
-        ? [circle(CENTER_X, DOME_CY, DOME_R + u(2.6), { fill: color, opacity: 0.16 * level })]
+        ? [
+            circle(CENTER_X, DOME_SHOULDER_Y, DOME_R + u(2.6), {
+              fill: color,
+              opacity: 0.16 * level,
+            }),
+          ]
         : []),
 
-      // Water-clear dome.
+      // Epoxy dome, tinted by the mixed colour so the package reads as one
+      // coloured lamp instead of three dots behind clear plastic.
       path(
         `M ${CENTER_X - DOME_R} ${FLANGE_Y}` +
-          ` V ${DOME_CY} a ${DOME_R} ${DOME_R} 0 0 1 ${DOME_R * 2} 0` +
+          ` V ${DOME_SHOULDER_Y} a ${DOME_R} ${DOME_R} 0 0 1 ${DOME_R * 2} 0` +
           ` V ${FLANGE_Y} z`,
         {
-          fill: lit ? color : '#c9ced6',
-          opacity: lit ? Math.max(0.45, level) : 0.75,
-          stroke: OUTLINE,
+          fill: color,
+          opacity: lit ? 0.88 + level * 0.12 : 0.75,
+          stroke: edge,
           strokeWidth: u(0.15),
         },
       ),
 
       // Flange that marks the flat side of the package.
       ellipse(CENTER_X, FLANGE_Y, DOME_R + u(0.4), u(0.45), {
-        fill: lit ? color : '#b9c0c9',
-        opacity: lit ? 0.6 : 0.9,
-        stroke: OUTLINE,
+        fill: color,
+        opacity: lit ? 1 : 0.88,
+        stroke: edge,
         strokeWidth: u(0.13),
       }),
 
-      // The three dies, visible through the clear body.
-      circle(CENTER_X - u(1.1), DOME_CY + u(0.5), u(0.55), {
-        fill: red > 0 ? '#ff4d4d' : '#8a3a3a',
-        detail: 'normal',
-      }),
-      circle(CENTER_X, DOME_CY - u(0.7), u(0.55), {
-        fill: green > 0 ? '#4dff88' : '#356b45',
-        detail: 'normal',
-      }),
-      circle(CENTER_X + u(1.1), DOME_CY + u(0.5), u(0.55), {
-        fill: blue > 0 ? '#5599ff' : '#33507f',
+      // Reflector cup and a highlight down the near face — the same pair of
+      // marks that gives the single-colour LED its moulded look.
+      path(
+        `M ${CENTER_X + u(0.2)} ${DIE_Y - u(1.6)} l ${u(1)} ${u(0.9)}` +
+          ` v ${u(2.6)} l ${-u(1)} ${u(0.6)} z`,
+        {
+          fill: edge,
+          opacity: lit ? 0.3 : 0.42,
+          detail: 'normal',
+        },
+      ),
+      path(`M ${CENTER_X - u(0.8)} ${DOME_SHOULDER_Y} V ${FLANGE_Y - u(1.2)}`, {
+        fill: 'none',
+        stroke: '#ffffff',
+        strokeWidth: u(0.22),
+        strokeLinecap: 'round',
+        opacity: lit ? 0.72 : 0.48,
         detail: 'normal',
       }),
 
@@ -185,7 +227,14 @@ function createRgbLed(polarity: Polarity): VirtualDevice {
       }),
     ],
     properties: PROPERTIES,
-    render: { draw, bleed: { left: u(2), right: u(2), top: u(1.5) } },
+    variants: {
+      label: 'ขาร่วม',
+      options: [
+        { deviceId: 'rgb-led-common-cathode', label: 'แคโทดร่วม (−)' },
+        { deviceId: 'rgb-led-common-anode', label: 'แอโนดร่วม (+)' },
+      ],
+    },
+    render: { draw, bleed: { left: u(2), right: u(2), top: u(3) } },
     requiresSeriesResistor: true,
     catalog: {
       categoryId: 'leds',
@@ -223,9 +272,12 @@ function createRgbBehavior(polarity: Polarity): DeviceBehavior {
           context.emit(channelKey(channel), 0);
           continue;
         }
-        const across =
-          polarity === 'cathode' ? node.voltage - common.voltage : common.voltage - node.voltage;
-        const level = across <= forward ? 0 : Math.min((across - forward) / 1.2, 1);
+        // Same physics as a single LED, PWM included: a common-cathode die is fed
+        // by its channel pin, a common-anode die is sunk by it.
+        const level =
+          polarity === 'cathode'
+            ? pulsedLedBrightness(node, common, forward)
+            : pulsedLedBrightness(common, node, forward);
         context.emit(channelKey(channel), Math.round(level * 255));
       }
     },

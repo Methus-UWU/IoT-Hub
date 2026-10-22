@@ -6,7 +6,7 @@
   },
   "newProjectRoot": "projects",
   "projects": {
-    "iot-hub-fe": {
+    "frontend": {
       "projectType": "application",
       "schematics": {
         "@schematics/angular:class": {
@@ -47,22 +47,36 @@
               {
                 "glob": "**/*",
                 "input": "public"
+              },
+              {
+                "glob": "editor.main.css",
+                "input": "node_modules/monaco-editor/min/vs/editor",
+                "output": "assets/monaco"
               }
             ],
+            "loader": {
+              ".md": "text",
+              ".ttf": "file"
+            },
             "styles": ["src/styles.css"]
           },
           "configurations": {
             "production": {
+              "optimization": {
+                "scripts": true,
+                "styles": true,
+                "fonts": false
+              },
               "budgets": [
                 {
                   "type": "initial",
-                  "maximumWarning": "500kB",
+                  "maximumWarning": "700kB",
                   "maximumError": "1MB"
                 },
                 {
                   "type": "anyComponentStyle",
-                  "maximumWarning": "4kB",
-                  "maximumError": "8kB"
+                  "maximumWarning": "24kB",
+                  "maximumError": "32kB"
                 }
               ],
               "outputHashing": "all"
@@ -85,10 +99,10 @@
           "builder": "@angular/build:dev-server",
           "configurations": {
             "production": {
-              "buildTarget": "iot-hub-fe:build:production"
+              "buildTarget": "frontend:build:production"
             },
             "development": {
-              "buildTarget": "iot-hub-fe:build:development"
+              "buildTarget": "frontend:build:development"
             }
           },
           "defaultConfiguration": "development"

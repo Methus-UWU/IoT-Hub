@@ -1,11 +1,18 @@
+/* Light sheet over the dark simulator shell. Greys come from the app theme
+   tokens in styles.css; blue stays reserved for focus, and the selected filter
+   uses a light grey fill so the cards keep the eye. */
 :host {
   --accent: #2563eb;
-  --accent-soft: rgb(37 99 235 / 0.1);
-  --ink: #111827;
-  --ink-muted: #64748b;
-  --line: #e2e8f0;
+  --ink: #202020;
+  --ink-soft: #4a4a4a;
+  --ink-muted: #686868;
+  --line: #e5e5e5;
+  --line-strong: #c8c8c8;
   --surface: #ffffff;
-  --surface-sunken: #f6f7f9;
+  --surface-soft: #fafafa;
+  --surface-sunken: #f5f5f5;
+  --surface-hover: #ededed;
+  --surface-active: #e4e4e4;
 
   position: fixed;
   z-index: 1000;
@@ -51,22 +58,21 @@ button {
   height: 100%;
   padding: 1.5rem;
   place-items: center;
-  background: rgb(15 23 42 / 0.42);
+  background: rgb(20 20 20 / 0.4);
   animation: overlay-in 140ms ease-out;
 }
 
 .add-device-modal {
   display: grid;
-  width: min(56rem, calc(100vw - 3rem));
-  max-height: 80vh;
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  width: min(66rem, calc(100vw - 3rem));
+  /* Locked shell: one fixed size regardless of how many cards survive the
+     active filter, so the modal never resizes as the result count changes. */
+  height: min(88vh, 44rem);
+  grid-template-rows: auto minmax(0, 1fr) auto;
   overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: 0.85rem;
+  border-radius: 0.9rem;
   background: var(--surface);
-  box-shadow:
-    0 18px 44px rgb(15 23 42 / 0.18),
-    0 2px 6px rgb(15 23 42 / 0.08);
+  box-shadow: 0 24px 80px rgb(0 0 0 / 0.24);
   animation: modal-in 160ms cubic-bezier(0.2, 0.75, 0.25, 1);
 }
 
@@ -94,32 +100,34 @@ button {
 
 .modal-header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: 1.15rem 1.25rem 0.6rem;
+  padding: 0.9rem 1rem 0.9rem 1.15rem;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
 }
 
 .modal-title h2 {
   margin: 0;
   color: var(--ink);
-  font-size: 1.12rem;
+  font-size: 1rem;
   font-weight: 700;
-  letter-spacing: -0.02em;
-  line-height: 1.25;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
 }
 
 .modal-title p {
-  margin: 0.2rem 0 0;
+  margin: 0.15rem 0 0;
   color: var(--ink-muted);
-  font-size: 0.82rem;
-  line-height: 1.35;
+  font-size: 0.76rem;
+  line-height: 1.3;
 }
 
 .close-button {
   display: grid;
-  width: 2rem;
-  height: 2rem;
+  width: 2.1rem;
+  height: 2.1rem;
   flex: none;
   border-radius: 0.5rem;
   background: transparent;
@@ -131,8 +139,13 @@ button {
 }
 
 .close-button:hover {
-  background: var(--surface-sunken);
+  background: var(--surface-hover);
   color: var(--ink);
+}
+
+.close-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 .close-button svg {
@@ -144,50 +157,158 @@ button {
   stroke-width: 1.7;
 }
 
-/* ---------- search ---------- */
+/* ---------- two-pane body ---------- */
 
-.filter-row {
+.modal-content {
+  display: grid;
+  min-height: 0;
+  grid-template-columns: 13.5rem minmax(0, 1fr);
+}
+
+/* ---------- filter rail ---------- */
+
+.filter-rail {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding: 0.75rem 0.6rem 0.9rem;
+  border-right: 1px solid var(--line);
+  background: var(--surface-soft);
+  /* Scrollable as a safety valve for very long catalogs, but the bar itself
+     stays hidden: the rail should read as a plain list, not a scroll pane. */
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+.filter-rail::-webkit-scrollbar {
+  display: none;
+}
+
+.rail-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.rail-heading {
+  padding: 0 0.55rem;
+  margin: 0 0 0.3rem;
+  color: #8f8f8f;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.rail-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.05rem;
+  padding: 0.3rem 0.55rem;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: 0.79rem;
+  font-weight: 500;
+  text-align: left;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
+}
+
+.rail-item:hover {
+  background: var(--surface-hover);
+  color: var(--ink);
+}
+
+.rail-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.rail-item-active {
+  background: var(--surface-active);
+  color: var(--ink);
+  font-weight: 650;
+}
+
+.rail-item-active:hover {
+  background: #dcdcdc;
+  color: var(--ink);
+}
+
+.rail-label {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rail-count {
+  flex: none;
+  color: #8f8f8f;
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.rail-item-active .rail-count {
+  color: var(--ink-muted);
+}
+
+.rail-icon {
+  width: 0.92rem;
+  height: 0.92rem;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
+}
+
+/* ---------- library pane ---------- */
+
+.library-pane {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.library-toolbar {
   display: flex;
   align-items: center;
-  gap: 0.45rem;
-  padding: 0.35rem 1.25rem 0.75rem;
+  gap: 0.75rem;
+  padding: 0.75rem 1.1rem;
 }
 
 .search-field {
   display: flex;
   min-width: 0;
-  height: 2.5rem;
+  height: 2.4rem;
   flex: 1;
   align-items: center;
   gap: 0.55rem;
   padding: 0 0.4rem 0 0.7rem;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--line);
   border-radius: 0.6rem;
   background: var(--surface-sunken);
   color: var(--ink-muted);
   transition:
     border-color 130ms ease,
-    box-shadow 130ms ease,
-    background 130ms ease;
-}
-
-.quick-filters {
-  display: flex;
-  flex: none;
-  align-items: center;
-  gap: 0.25rem;
-}
-
-.category-select {
-  display: block;
-  width: 9.75rem;
-  flex: none;
+    background 130ms ease,
+    box-shadow 130ms ease;
 }
 
 .search-field:focus-within {
   border-color: var(--accent);
   background: var(--surface);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  box-shadow: 0 0 0 3px rgb(37 99 235 / 0.12);
 }
 
 .search-field > svg {
@@ -206,7 +327,7 @@ button {
   border: 0;
   background: transparent;
   color: var(--ink);
-  font-size: 0.86rem;
+  font-size: 0.84rem;
   outline: none;
 }
 
@@ -215,7 +336,7 @@ button {
 }
 
 .search-field input::placeholder {
-  color: #94a3b8;
+  color: #9a9a9a;
 }
 
 .search-field > button {
@@ -230,7 +351,7 @@ button {
 }
 
 .search-field > button:hover {
-  background: #e6eaf0;
+  background: var(--surface-hover);
   color: var(--ink);
 }
 
@@ -247,82 +368,27 @@ button {
   flex: none;
   margin: 0;
   color: var(--ink-muted);
-  font-size: 0.75rem;
+  font-size: 0.74rem;
   font-variant-numeric: tabular-nums;
-}
-
-/* ---------- quick filters ---------- */
-
-.category-chip {
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  gap: 0.35rem;
-  height: 2.5rem;
-  padding: 0 0.55rem;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: var(--surface);
-  color: #475569;
-  font-size: 0.76rem;
-  font-weight: 600;
-  transition:
-    border-color 130ms ease,
-    background 130ms ease,
-    color 130ms ease;
-}
-
-.category-chip:hover {
-  border-color: #b6c2d2;
-  background: var(--surface-sunken);
-  color: var(--ink);
-}
-
-.category-chip-active {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-  color: #1d4ed8;
-}
-
-.category-chip small {
-  padding: 0 0.28rem;
-  border-radius: 999px;
-  background: rgb(15 23 42 / 0.06);
-  color: inherit;
-  font-size: 0.66rem;
-  font-variant-numeric: tabular-nums;
-}
-
-.category-chip-active small {
-  background: rgb(37 99 235 / 0.16);
-}
-
-.chip-icon {
-  width: 0.82rem;
-  height: 0.82rem;
-  fill: none;
-  stroke: currentColor;
-  stroke-linejoin: round;
-  stroke-width: 1.6;
 }
 
 /* ---------- device grid ---------- */
 
 .modal-body {
   min-height: 0;
-  padding: 0 1.25rem;
-  border-top: 1px solid var(--line);
+  padding: 0 1.1rem;
   overflow-y: auto;
   overscroll-behavior: contain;
+  scrollbar-color: #cbcbcb transparent;
   scrollbar-width: thin;
 }
 
 .device-grid {
   display: grid;
-  padding: 0.9rem 0 1.1rem;
+  padding: 0.15rem 0 1.1rem;
   margin: 0;
-  gap: 0.7rem;
-  grid-template-columns: repeat(auto-fill, minmax(14.5rem, 1fr));
+  gap: 0.65rem;
+  grid-template-columns: repeat(auto-fill, minmax(13.5rem, 1fr));
   list-style: none;
 }
 
@@ -335,118 +401,44 @@ button {
   display: grid;
   width: 100%;
   height: 100%;
-  padding: 0.55rem 0.55rem 0.65rem;
+  padding: 0.55rem 0.6rem 0.7rem;
   border: 1px solid var(--line);
   border-radius: 0.7rem;
   background: var(--surface);
-  gap: 0.55rem;
+  gap: 0.5rem;
   grid-template-rows: auto 1fr;
   text-align: left;
   transition:
     border-color 130ms ease,
-    box-shadow 130ms ease,
-    transform 130ms ease;
+    box-shadow 130ms ease;
 }
 
 .device-card:hover {
-  border-color: #b6c2d2;
-  box-shadow: 0 4px 12px rgb(15 23 42 / 0.08);
-  transform: translateY(-1px);
+  border-color: var(--line-strong);
+  box-shadow: 0 4px 12px rgb(20 20 20 / 0.08);
 }
 
 .device-card:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-.device-card-selected {
-  padding-bottom: 2.75rem;
   border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent);
-}
-
-.quantity-stepper {
-  position: absolute;
-  z-index: 3;
-  right: 0.7rem;
-  bottom: 0.7rem;
-  display: inline-flex;
-  height: 1.7rem;
-  align-items: center;
-  overflow: hidden;
-  border: 1px solid #bfdbfe;
-  border-radius: 0.45rem;
-  background: #fff;
-  box-shadow: 0 2px 6px rgb(15 23 42 / 0.08);
-}
-
-.quantity-stepper button {
-  display: grid;
-  width: 1.7rem;
-  height: 100%;
-  background: transparent;
-  color: #1d4ed8;
-  font-size: 0.9rem;
-  place-items: center;
-}
-
-.quantity-stepper button:hover {
-  background: var(--accent-soft);
-}
-
-.quantity-stepper button:focus-visible {
   outline: 2px solid var(--accent);
-  outline-offset: -2px;
-}
-
-.quantity-stepper output {
-  min-width: 1.6rem;
-  color: var(--ink);
-  font-size: 0.72rem;
-  font-weight: 700;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
+  outline-offset: 1px;
 }
 
 .thumbnail-frame {
   position: relative;
   display: block;
   width: 100%;
-  aspect-ratio: 16 / 10;
-  padding: 0.4rem;
-  border: 1px solid #eceff3;
+  aspect-ratio: 16 / 9;
+  padding: 0.65rem;
   border-radius: 0.5rem;
   background: var(--surface-sunken);
-}
-
-.selected-check {
-  position: absolute;
-  top: 0.35rem;
-  left: 0.35rem;
-  display: grid;
-  width: 1.15rem;
-  height: 1.15rem;
-  border-radius: 999px;
-  background: var(--accent);
-  color: #fff;
-  place-items: center;
-}
-
-.selected-check svg {
-  width: 0.7rem;
-  height: 0.7rem;
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 2.6;
 }
 
 .device-copy {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 0.12rem;
+  gap: 0.1rem;
 }
 
 .device-name {
@@ -454,7 +446,7 @@ button {
   overflow: hidden;
   color: var(--ink);
   -webkit-box-orient: vertical;
-  font-size: 0.83rem;
+  font-size: 0.82rem;
   font-weight: 650;
   -webkit-line-clamp: 2;
   line-height: 1.25;
@@ -463,74 +455,67 @@ button {
 .device-model {
   overflow: hidden;
   color: var(--ink-muted);
-  font-size: 0.72rem;
+  font-size: 0.71rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+/* Pin count plus the interface badges the registry already caps at four, kept
+   as quiet text so the card stays scannable by name first. */
 .device-meta {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 0.35rem;
-  margin-top: 0.18rem;
-  font-size: 0.68rem;
-}
-
-.device-category {
-  padding: 0.08rem 0.35rem;
-  border-radius: 999px;
-  background: var(--surface-sunken);
-  color: #475569;
-  font-weight: 600;
+  gap: 0.25rem;
+  margin-top: 0.32rem;
+  font-size: 0.65rem;
 }
 
 .device-pins {
-  color: #94a3b8;
+  color: #8f8f8f;
   font-variant-numeric: tabular-nums;
 }
 
-/* Interface and voltage badges derived from the part's pin types. Capped at
-   four by the registry so a card never turns into a wall of chips. */
-.device-badges {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.22rem;
-  margin-top: 0.28rem;
-}
-
 .device-badge {
-  padding: 0.05rem 0.32rem;
-  border: 1px solid color-mix(in srgb, var(--accent, #2563eb) 30%, transparent);
+  padding: 0.08rem 0.35rem;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--accent, #2563eb) 10%, transparent);
-  color: color-mix(in srgb, var(--accent, #2563eb) 78%, #0f172a);
-  font-size: 0.6rem;
+  background: var(--surface-sunken);
+  color: #5a5a5a;
   font-weight: 600;
   letter-spacing: 0.01em;
 }
 
 .favorite-button {
   position: absolute;
-  top: 0.85rem;
-  right: 0.85rem;
+  top: 0.75rem;
+  right: 0.75rem;
   display: grid;
-  width: 1.6rem;
-  height: 1.6rem;
+  width: 1.65rem;
+  height: 1.65rem;
   border-radius: 999px;
-  background: rgb(255 255 255 / 0.9);
-  color: #94a3b8;
+  background: rgb(255 255 255 / 0.92);
+  color: #9a9a9a;
+  opacity: 0;
   place-items: center;
   transition:
-    color 130ms ease,
-    background 130ms ease;
+    opacity 120ms ease,
+    color 120ms ease,
+    background 120ms ease;
+}
+
+.device-cell:hover .favorite-button,
+.device-cell:focus-within .favorite-button,
+.favorite-button-active {
+  opacity: 1;
 }
 
 .favorite-button:hover {
   background: #fff;
-  color: #f59e0b;
+  color: #d97706;
 }
 
 .favorite-button:focus-visible {
+  opacity: 1;
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
@@ -544,21 +529,24 @@ button {
   stroke-width: 1.6;
 }
 
-.favorite-button-active {
-  color: #f59e0b;
-}
-
 .favorite-button-active svg {
   fill: #fbbf24;
   stroke: #d97706;
+}
+
+/* Coarse pointers get no hover, so the star stays visible there. */
+@media (hover: none) {
+  .favorite-button {
+    opacity: 1;
+  }
 }
 
 /* ---------- empty state ---------- */
 
 .empty-state {
   display: grid;
-  padding: 2.4rem 1rem;
-  gap: 0.4rem;
+  padding: 3rem 1rem;
+  gap: 0.35rem;
   justify-items: center;
   text-align: center;
 }
@@ -570,7 +558,7 @@ button {
   margin-bottom: 0.2rem;
   border-radius: 0.6rem;
   background: var(--surface-sunken);
-  color: #94a3b8;
+  color: #9a9a9a;
   place-items: center;
 }
 
@@ -586,29 +574,29 @@ button {
 .empty-state h3 {
   margin: 0;
   color: var(--ink);
-  font-size: 0.92rem;
+  font-size: 0.9rem;
   font-weight: 650;
 }
 
 .empty-state p {
   margin: 0;
   color: var(--ink-muted);
-  font-size: 0.8rem;
+  font-size: 0.78rem;
 }
 
 .ghost-button {
   padding: 0.4rem 0.75rem;
   border: 1px solid var(--line);
   border-radius: 0.5rem;
-  margin-top: 0.5rem;
+  margin-top: 0.6rem;
   background: var(--surface);
   color: var(--ink);
-  font-size: 0.78rem;
+  font-size: 0.77rem;
   font-weight: 600;
 }
 
 .ghost-button:hover {
-  border-color: #b6c2d2;
+  border-color: var(--line-strong);
   background: var(--surface-sunken);
 }
 
@@ -619,128 +607,61 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: 0.7rem 1.25rem;
+  padding: 0.6rem 1.1rem;
   border-top: 1px solid var(--line);
-  background: #fbfcfd;
-}
-
-.footer-summary {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 0.6rem;
-}
-
-.footer-thumb {
-  display: block;
-  width: 3.1rem;
-  height: 2rem;
-  flex: none;
-  padding: 0.15rem;
-  border: 1px solid var(--line);
-  border-radius: 0.4rem;
-  background: var(--surface);
-}
-
-.footer-copy {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-}
-
-.footer-copy strong {
-  overflow: hidden;
-  color: var(--ink);
-  font-size: 0.83rem;
-  font-weight: 650;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.footer-copy small {
-  color: var(--ink-muted);
-  font-size: 0.72rem;
-}
-
-.footer-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.8rem;
+  background: var(--surface-soft);
 }
 
 .footer-hint {
   margin: 0;
-  color: #94a3b8;
-  font-size: 0.72rem;
+  color: #8f8f8f;
+  font-size: 0.71rem;
 }
 
-.primary-button {
-  display: inline-flex;
-  height: 2.35rem;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0 0.95rem;
-  border-radius: 0.55rem;
-  background: var(--accent);
-  color: #fff;
-  font-size: 0.83rem;
-  font-weight: 650;
-  transition: background 130ms ease;
-}
+/* ---------- narrow screens ---------- */
 
-.primary-button:hover:not(:disabled) {
-  background: #1d4ed8;
-}
-
-.primary-button:focus-visible {
-  outline: 2px solid #1d4ed8;
-  outline-offset: 2px;
-}
-
-.primary-button:disabled {
-  background: #cbd5e1;
-  color: #64748b;
-  cursor: not-allowed;
-}
-
-.primary-button svg {
-  width: 0.95rem;
-  height: 0.95rem;
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 2;
-}
-
-@media (max-width: 46rem) {
+@media (max-width: 52rem) {
   .modal-overlay {
     padding: 0.75rem;
   }
 
   .add-device-modal {
     width: 100%;
-    max-height: 88vh;
+    height: calc(100vh - 1.5rem);
   }
 
-  .filter-row {
-    flex-wrap: wrap;
+  /* The rail folds into a single scrollable row above the grid; on this width
+     a fixed sidebar would eat half the cards. */
+  .modal-content {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
   }
 
-  .search-field {
-    flex-basis: 100%;
-  }
-
-  .quick-filters {
+  .filter-rail {
+    flex-direction: row;
+    gap: 0.35rem;
+    padding: 0.55rem 0.75rem;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
     overflow-x: auto;
+    overflow-y: hidden;
   }
 
-  .category-select {
-    width: min(12rem, 100%);
+  .rail-group {
+    flex-direction: row;
+    gap: 0.35rem;
   }
 
-  .modal-footer {
-    flex-wrap: wrap;
+  .rail-heading {
+    display: none;
+  }
+
+  .rail-item {
+    width: auto;
+    flex: none;
+    border-radius: 999px;
+    background: var(--surface-sunken);
+    white-space: nowrap;
   }
 
   .footer-hint {

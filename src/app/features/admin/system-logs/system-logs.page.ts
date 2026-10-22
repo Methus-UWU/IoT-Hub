@@ -8,7 +8,7 @@ import { ServerMonitoringStore } from '../server-monitoring/server-monitoring.st
 const LOG_TONES: Record<LogLevel, StatusTone> = {
   info: 'neutral',
   warn: 'warning',
-  error: 'critical'
+  error: 'critical',
 };
 
 type LevelFilter = LogLevel | 'all';
@@ -16,7 +16,7 @@ type LevelFilter = LogLevel | 'all';
 @Component({
   selector: 'app-system-logs-page',
   imports: [StatusBadge, DatePipe],
-  templateUrl: './system-logs.page.html'
+  templateUrl: './system-logs.page.html',
 })
 export class SystemLogsPage {
   protected readonly store = inject(ServerMonitoringStore);
@@ -26,10 +26,10 @@ export class SystemLogsPage {
   protected readonly levelFilter = this._levelFilter.asReadonly();
 
   protected readonly filters: Array<{ value: LevelFilter; label: string }> = [
-    { value: 'all', label: 'All' },
-    { value: 'info', label: 'Info' },
-    { value: 'warn', label: 'Warning' },
-    { value: 'error', label: 'Error' }
+    { value: 'all', label: 'ทั้งหมด' },
+    { value: 'info', label: 'ข้อมูล' },
+    { value: 'warn', label: 'คำเตือน' },
+    { value: 'error', label: 'ข้อผิดพลาด' },
   ];
 
   protected readonly filteredLogs = computed(() => {

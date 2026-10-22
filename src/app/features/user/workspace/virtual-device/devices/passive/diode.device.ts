@@ -79,7 +79,9 @@ function createBehavior(): DeviceBehavior {
       const anode = context.readNode('A');
       const cathode = context.readNode('K');
       const conducting =
-        !anode.floating && !cathode.floating && anode.voltage - cathode.voltage >= FORWARD_DROP - 0.05;
+        !anode.floating &&
+        !cathode.floating &&
+        anode.voltage - cathode.voltage >= FORWARD_DROP - 0.05;
       context.emit('conducting', conducting);
     },
   };

@@ -1,0 +1,13 @@
+{
+  "devices": [
+    { "instanceId": "board", "deviceId": "esp32-devkit-v1" },
+    { "instanceId": "sensor", "deviceId": "bme280" },
+    { "instanceId": "display", "deviceId": "lcd" }
+  ],
+  "wires": [
+    ["board", "3V3", "sensor", "VCC"], ["board", "GND-L", "sensor", "GND"],
+    ["board", "GPIO21", "sensor", "SDA"], ["board", "GPIO22", "sensor", "SCL"],
+    ["board", "VIN", "display", "VCC"], ["board", "GND-L", "display", "GND"],
+    ["board", "GPIO21", "display", "SDA"], ["board", "GPIO22", "display", "SCL"]
+  ]
+}

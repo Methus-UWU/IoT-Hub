@@ -1,0 +1,160 @@
+.serial-monitor {
+  position: absolute;
+  z-index: 14;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--color-border-strong);
+  background: var(--color-surface);
+  box-shadow: 0 -8px 24px color-mix(in srgb, var(--color-ink) 8%, transparent);
+}
+.serial-resize-handle {
+  position: absolute;
+  z-index: 1;
+  top: -5px;
+  right: 0;
+  left: 0;
+  display: grid;
+  height: 12px;
+  place-items: center;
+  cursor: ns-resize;
+  touch-action: none;
+}
+.serial-resize-handle span {
+  width: 2.25rem;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--color-border-strong);
+}
+.serial-resize-handle:hover,
+.serial-resize-handle:focus-visible,
+.serial-resizing .serial-resize-handle {
+  background: color-mix(in srgb, var(--color-indigo-600) 10%, transparent);
+}
+.serial-resize-handle:hover span,
+.serial-resize-handle:focus-visible span,
+.serial-resizing .serial-resize-handle span {
+  background: var(--color-indigo-600);
+}
+.serial-resize-handle:focus-visible {
+  outline: 2px solid var(--color-indigo-600);
+  outline-offset: -2px;
+}
+.serial-resizing {
+  user-select: none;
+}
+.serial-monitor header {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  min-height: 3.25rem;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface-soft);
+}
+.serial-heading {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+.serial-heading > i {
+  width: 0.45rem;
+  height: 0.45rem;
+  flex: none;
+  border-radius: 50%;
+  background: var(--color-border-strong);
+}
+.serial-heading > i.is-live {
+  background: var(--color-green-600);
+}
+.serial-heading strong {
+  color: var(--color-ink);
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.serial-warning {
+  color: var(--color-amber-800);
+  font-size: 0.6875rem;
+}
+.serial-baud {
+  width: 7rem;
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+.serial-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+.serial-actions button {
+  display: inline-flex;
+  height: 2rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  color: var(--color-ink-muted);
+  background: var(--color-surface);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+.serial-actions button:hover:not(:disabled) {
+  color: var(--color-ink);
+  border-color: var(--color-border-strong);
+  background: var(--color-surface-muted);
+}
+.serial-actions button:focus-visible {
+  outline: 2px solid var(--color-indigo-600);
+  outline-offset: 2px;
+}
+.serial-actions button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.serial-actions svg {
+  width: 1rem;
+  height: 1rem;
+}
+.serial-clear {
+  padding: 0 0.625rem;
+}
+.serial-close {
+  width: 2rem;
+}
+.serial-output {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  padding: 0.7rem 0.9rem 1rem;
+  color: var(--color-ink);
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+  font-size: 0.75rem;
+  line-height: 1.7;
+  scrollbar-color: var(--color-border-strong) transparent;
+  scrollbar-width: thin;
+}
+.serial-output p {
+  margin: 0;
+}
+.serial-output span {
+  color: var(--color-ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+.serial-output .serial-success {
+  color: var(--color-green-700);
+}
+.serial-output .serial-muted {
+  color: var(--color-ink-muted);
+}
+.serial-output .serial-error {
+  color: var(--color-error);
+}

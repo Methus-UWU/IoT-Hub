@@ -1,13 +1,5 @@
-export type HealthLevel = 'ok' | 'warning' | 'critical';
-
-export type ServiceState = 'running' | 'degraded' | 'stopped';
-
-export type WebsiteState = 'up' | 'degraded' | 'down';
-
-export type DatabaseState = 'connected' | 'degraded' | 'disconnected';
-
-export type BackupState = 'success' | 'running' | 'failed';
-
+export type ServiceState = 'running' | 'degraded' | 'unavailable';
+export type DatabaseState = 'connected' | 'disconnected';
 export type LogLevel = 'info' | 'warn' | 'error';
 
 export interface UsageMetric {
@@ -16,34 +8,17 @@ export interface UsageMetric {
   totalBytes: number;
 }
 
-export interface NetworkMetric {
-  inboundBytesPerSec: number;
-  outboundBytesPerSec: number;
-}
-
 export interface ServiceStatus {
   name: string;
   state: ServiceState;
-  uptimeSeconds: number;
-}
-
-export interface WebsiteStatus {
-  name: string;
-  url: string;
-  state: WebsiteState;
-  responseTimeMs: number;
+  detail: string;
+  uptimeSeconds?: number;
 }
 
 export interface DatabaseStatus {
   state: DatabaseState;
-  latencyMs: number;
-  activeConnections: number;
-}
-
-export interface BackupStatus {
-  state: BackupState;
-  lastRunAt: Date;
-  sizeBytes: number;
+  latencyMs: number | null;
+  activeConnections: number | null;
 }
 
 export interface LogEntry {
@@ -54,56 +29,48 @@ export interface LogEntry {
   method: string;
   endpoint: string;
   statusCode: number;
-  ip: string;
+  durationMs: number;
+  requestId: string;
 }
 
 export interface PlatformOverview {
   totalUsers: number;
-  onlineUsers: number;
+  activeUsers: number;
   suspendedUsers: number;
-  totalDevices: number;
-  onlineDevices: number;
   totalProjects: number;
-  totalDocuments: number;
-  aiRequestsToday: number;
-}
-
-export interface DiskIoMetric {
-  readBytesPerSec: number;
-  writeBytesPerSec: number;
+  totalProjectFiles: number;
+  totalCommunityPosts: number;
 }
 
 export interface ServerDetail {
   uptimeSeconds: number;
-  loadAverage: [number, number, number];
-  processCount: number;
-  dockerContainersRunning: number;
-  dockerContainersTotal: number;
+  loadAverage: number[];
+  processId: number;
+}
+
+export interface RequestSummary {
+  total: number;
+  errors: number;
+  averageDurationMs: number;
+  windowMinutes: number;
 }
 
 export interface MetricHistoryPoint {
   capturedAt: Date;
   cpuPercent: number;
   memoryPercent: number;
-  diskPercent: number;
-  networkInBytesPerSec: number;
-  networkOutBytesPerSec: number;
-  diskReadBytesPerSec: number;
-  diskWriteBytesPerSec: number;
+  diskPercent: number | null;
 }
 
 export interface ServerMetricsSnapshot {
   capturedAt: Date;
-  platform: PlatformOverview;
+  platform: PlatformOverview | null;
   cpu: UsageMetric;
   memory: UsageMetric;
-  disk: UsageMetric;
-  network: NetworkMetric;
-  diskIo: DiskIoMetric;
+  disk: UsageMetric | null;
   detail: ServerDetail;
   services: ServiceStatus[];
-  websites: WebsiteStatus[];
   database: DatabaseStatus;
-  backup: BackupStatus;
+  requests: RequestSummary;
   logs: LogEntry[];
 }

@@ -1,0 +1,23 @@
+.user-text-field {
+  border: 1px solid #e1e1e1;
+  border-radius: 0.75rem;
+  outline: none;
+  box-shadow: none;
+  transition: border-color 140ms ease;
+}
+
+.user-text-field:hover {
+  border-color: #afafaf;
+}
+
+.user-text-field:focus {
+  border-color: #808080;
+  outline: none;
+  box-shadow: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .user-text-field {
+    transition: none;
+  }
+}

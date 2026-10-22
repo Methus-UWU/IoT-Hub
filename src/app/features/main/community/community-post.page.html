@@ -1,0 +1,353 @@
+<section class="thread-page">
+  <div class="thread-container">
+    <a class="back-link" [routerLink]="communityPath">
+      <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+        <path
+          d="M12 4.5 6.5 10l5.5 5.5"
+          stroke="currentColor"
+          stroke-width="1.6"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </svg>
+      กลับไปหน้าชุมชน
+    </a>
+
+    @if (loading()) {
+      <div class="thread-skeleton" role="status" aria-live="polite" aria-busy="true">
+        <app-community-post-skeleton [expanded]="true" />
+        <app-community-post-skeleton />
+        <span class="sr-only">กำลังโหลดกระทู้</span>
+      </div>
+    } @else if (post(); as detail) {
+      <article class="thread-post">
+        <div class="thread-vote">
+          <app-vote-control
+            [score]="detail.score"
+            [viewerVote]="detail.viewerVote"
+            [canVote]="signedIn()"
+            [label]="'กระทู้'"
+            (vote)="votePost($event)"
+          />
+        </div>
+
+        <div class="thread-body">
+          <div class="thread-meta">
+            <app-author-badge [username]="detail.author.username" [size]="1.9" />
+            <span class="dot" aria-hidden="true">·</span>
+            <time [attr.datetime]="detail.createdAt">{{ detail.createdAt | relativeTime }}</time>
+            <span class="dot" aria-hidden="true">·</span>
+            <span>{{ detail.viewCount }} ครั้งที่เปิดอ่าน</span>
+            <span class="post-kind" [attr.data-kind]="detail.kind">{{ kindLabel() }}</span>
+          </div>
+
+          <h1 class="thread-title">{{ detail.title }}</h1>
+
+          <div class="markdown-body" [innerHTML]="detail.body | markdown"></div>
+
+          <div class="thread-tags">
+            @for (tag of detail.tags; track tag.slug) {
+              <span class="thread-tag">{{ tag.name }}</span>
+            }
+          </div>
+
+          @if (detail.viewerIsAuthor) {
+            <div class="owner-actions">
+              @if (deletingPost()) {
+                <span class="confirm-text">ลบกระทู้นี้ถาวร?</span>
+                <button type="button" class="danger-link" (click)="deletePost()">ยืนยันลบ</button>
+                <button type="button" class="quiet-link" (click)="cancelDeletePost()">ยกเลิก</button>
+              } @else {
+                <button type="button" class="danger-link" (click)="askDeletePost()">ลบกระทู้</button>
+              }
+            </div>
+          }
+        </div>
+      </article>
+
+      <section class="answers" aria-labelledby="answers-heading">
+        <h2 id="answers-heading">{{ answerCount() }} คำตอบ</h2>
+
+        @if (error(); as message) {
+          <p class="thread-error" role="alert">{{ message }}</p>
+        }
+
+        @for (thread of threads(); track thread.answer.id) {
+          <article
+            class="answer"
+            [class.answer-accepted]="thread.answer.isAccepted"
+            [class.answer-collapsed]="isCollapsed(thread.answer.id)"
+          >
+            <div class="answer-vote">
+              <app-vote-control
+                [score]="thread.answer.score"
+                [viewerVote]="thread.answer.viewerVote"
+                [canVote]="signedIn()"
+                [label]="'คำตอบ'"
+                (vote)="voteComment(thread.answer.id, $event)"
+              />
+
+              @if (post()?.viewerIsAuthor) {
+                <button
+                  type="button"
+                  class="accept-button"
+                  [class.accept-button-active]="thread.answer.isAccepted"
+                  [attr.aria-pressed]="thread.answer.isAccepted"
+                  [attr.aria-label]="
+                    thread.answer.isAccepted ? 'ยกเลิกคำตอบที่ยอมรับ' : 'ทำเครื่องหมายว่าคำตอบนี้แก้ปัญหาได้'
+                  "
+                  (click)="toggleAccepted(thread.answer.id)"
+                >
+                  <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                    <path
+                      d="m5 10.5 3.2 3.2L15 7"
+                      stroke="currentColor"
+                      stroke-width="1.9"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                </button>
+              } @else if (thread.answer.isAccepted) {
+                <span class="accept-mark" aria-label="คำตอบที่ยอมรับ">
+                  <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                    <path
+                      d="m5 10.5 3.2 3.2L15 7"
+                      stroke="currentColor"
+                      stroke-width="1.9"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                </span>
+              }
+            </div>
+
+            <div class="answer-body">
+              <div class="answer-meta">
+                <button
+                  type="button"
+                  class="collapse-toggle"
+                  [attr.aria-expanded]="!isCollapsed(thread.answer.id)"
+                  [attr.aria-label]="
+                    isCollapsed(thread.answer.id) ? 'ขยายคำตอบนี้' : 'ย่อคำตอบนี้'
+                  "
+                  (click)="toggleCollapsed(thread.answer.id)"
+                >
+                  {{ isCollapsed(thread.answer.id) ? '+' : '−' }}
+                </button>
+                <app-author-badge [username]="thread.answer.author.username" />
+                <span class="dot" aria-hidden="true">·</span>
+                <time [attr.datetime]="thread.answer.createdAt">
+                  {{ thread.answer.createdAt | relativeTime }}
+                </time>
+                @if (thread.answer.isAccepted) {
+                  <span class="accepted-pill">แก้ปัญหาได้</span>
+                }
+                @if (isCollapsed(thread.answer.id)) {
+                  <span class="collapsed-hint">
+                    ย่อไว้ · {{ thread.replies.length + 1 }} ข้อความ
+                  </span>
+                }
+              </div>
+
+              @if (isCollapsed(thread.answer.id)) {
+                <!-- Folded: nothing below the meta line renders. -->
+              } @else if (editingId() === thread.answer.id) {
+                <textarea
+                  rows="5"
+                  class="composer-input"
+                  [value]="editDraft()"
+                  (input)="updateEditDraft($event)"
+                ></textarea>
+                <div class="composer-actions">
+                  <button
+                    type="button"
+                    class="primary-button"
+                    [disabled]="submitting()"
+                    (click)="submitEdit(thread.answer.id)"
+                  >
+                    บันทึก
+                  </button>
+                  <button type="button" class="quiet-link" (click)="cancelEdit()">ยกเลิก</button>
+                </div>
+              } @else {
+                <div class="markdown-body" [innerHTML]="thread.answer.body | markdown"></div>
+
+                <div class="answer-actions">
+                  <button type="button" class="quiet-link" (click)="startReply(thread.answer.id)">
+                    ตอบกลับ
+                  </button>
+                  @if (thread.answer.viewerIsAuthor) {
+                    <button
+                      type="button"
+                      class="quiet-link"
+                      (click)="startEdit(thread.answer.id, thread.answer.body)"
+                    >
+                      แก้ไข
+                    </button>
+                    @if (pendingDelete() === thread.answer.id) {
+                      <span class="confirm-text">ลบคำตอบนี้?</span>
+                      <button
+                        type="button"
+                        class="danger-link"
+                        (click)="confirmDelete(thread.answer.id)"
+                      >
+                        ยืนยัน
+                      </button>
+                      <button type="button" class="quiet-link" (click)="cancelDelete()">
+                        ยกเลิก
+                      </button>
+                    } @else {
+                      <button
+                        type="button"
+                        class="danger-link"
+                        (click)="askDelete(thread.answer.id)"
+                      >
+                        ลบ
+                      </button>
+                    }
+                  }
+                </div>
+              }
+
+              @if (!isCollapsed(thread.answer.id)) {
+                @for (reply of thread.replies; track reply.id) {
+                <div class="reply">
+                  <div class="answer-meta">
+                    <app-author-badge [username]="reply.author.username" [size]="1.4" />
+                    <span class="dot" aria-hidden="true">·</span>
+                    <time [attr.datetime]="reply.createdAt">
+                      {{ reply.createdAt | relativeTime }}
+                    </time>
+                  </div>
+
+                  @if (editingId() === reply.id) {
+                    <textarea
+                      rows="3"
+                      class="composer-input"
+                      [value]="editDraft()"
+                      (input)="updateEditDraft($event)"
+                    ></textarea>
+                    <div class="composer-actions">
+                      <button
+                        type="button"
+                        class="primary-button"
+                        [disabled]="submitting()"
+                        (click)="submitEdit(reply.id)"
+                      >
+                        บันทึก
+                      </button>
+                      <button type="button" class="quiet-link" (click)="cancelEdit()">ยกเลิก</button>
+                    </div>
+                  } @else {
+                    <div class="markdown-body reply-body" [innerHTML]="reply.body | markdown"></div>
+
+                    <div class="answer-actions">
+                      <app-vote-control
+                        [score]="reply.score"
+                        [viewerVote]="reply.viewerVote"
+                        [canVote]="signedIn()"
+                        [orientation]="'horizontal'"
+                        [label]="'ความเห็น'"
+                        (vote)="voteComment(reply.id, $event)"
+                      />
+                      @if (reply.viewerIsAuthor) {
+                        <button
+                          type="button"
+                          class="quiet-link"
+                          (click)="startEdit(reply.id, reply.body)"
+                        >
+                          แก้ไข
+                        </button>
+                        @if (pendingDelete() === reply.id) {
+                          <span class="confirm-text">ลบความเห็นนี้?</span>
+                          <button type="button" class="danger-link" (click)="confirmDelete(reply.id)">
+                            ยืนยัน
+                          </button>
+                          <button type="button" class="quiet-link" (click)="cancelDelete()">
+                            ยกเลิก
+                          </button>
+                        } @else {
+                          <button type="button" class="danger-link" (click)="askDelete(reply.id)">
+                            ลบ
+                          </button>
+                        }
+                      }
+                    </div>
+                  }
+                </div>
+              }
+
+              @if (replyingTo() === thread.answer.id) {
+                <div class="reply-composer">
+                  <textarea
+                    rows="3"
+                    class="composer-input"
+                    placeholder="ตอบกลับคำตอบนี้…"
+                    [value]="replyDraft()"
+                    (input)="updateReplyDraft($event)"
+                  ></textarea>
+                  <div class="composer-actions">
+                    <button
+                      type="button"
+                      class="primary-button"
+                      [disabled]="submitting()"
+                      (click)="submitReply(thread.answer.id)"
+                    >
+                      {{ submitting() ? 'กำลังส่ง…' : 'ส่งคำตอบกลับ' }}
+                    </button>
+                    <button type="button" class="quiet-link" (click)="cancelReply()">ยกเลิก</button>
+                  </div>
+                </div>
+              }
+              }
+            </div>
+          </article>
+        }
+
+        @if (answerCount() === 0) {
+          <p class="answers-empty">ยังไม่มีคำตอบ เป็นคนแรกที่ช่วยตอบได้เลย</p>
+        }
+
+        @if (signedIn()) {
+          <div class="answer-composer">
+            <label for="answer-input">คำตอบของคุณ</label>
+            <textarea
+              id="answer-input"
+              rows="6"
+              class="composer-input"
+              placeholder="เล่าว่าคุณแก้ปัญหานี้อย่างไร รองรับ Markdown และบล็อกโค้ดด้วย ```"
+              [value]="answerDraft()"
+              (input)="updateAnswerDraft($event)"
+            ></textarea>
+
+            @if (answerError(); as message) {
+              <p class="thread-error" role="alert">{{ message }}</p>
+            }
+
+            <button
+              type="button"
+              class="primary-button"
+              [disabled]="submitting() || !canSubmitAnswer()"
+              (click)="submitAnswer()"
+            >
+              {{ submitting() ? 'กำลังส่ง…' : 'ส่งคำตอบ' }}
+            </button>
+          </div>
+        } @else {
+          <div class="signin-prompt">
+            <p>เข้าสู่ระบบเพื่อตอบคำถามและโหวต</p>
+            <a routerLink="/auth/login">เข้าสู่ระบบ</a>
+          </div>
+        }
+      </section>
+    } @else {
+      <div class="thread-missing">
+        <h1>ไม่พบกระทู้นี้</h1>
+        <p>กระทู้อาจถูกลบไปแล้ว หรือลิงก์ไม่ถูกต้อง</p>
+        <a [routerLink]="communityPath">กลับไปหน้าชุมชน</a>
+      </div>
+    }
+  </div>
+</section>

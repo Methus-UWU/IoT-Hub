@@ -1,18 +1,19 @@
-import type { VirtualDevice } from '../../models/virtual-device.model';
+import type { OnboardLed, VirtualDevice } from '../../models/virtual-device.model';
 import type { DeviceDrawContext } from '../core/device-definition';
 import { bodyFromMm, HEADER_PITCH, u } from '../core/device-metrics';
-import { OUTLINE, PART, SILK } from '../core/device-palette';
+import { WOKWI } from '../core/device-palette';
 import {
-  chip,
-  indicatorLed,
-  maleHeader,
+  flatButton,
+  flatChip,
+  flatHeader,
+  flatLed,
+  flatUsbConnector,
   silkLabel,
-  tactileButton,
-  usbConnector,
 } from '../core/device-parts';
 import { pin } from '../core/device-pin';
 import { rect, text, type Shape } from '../core/device-shape';
 import type { PinType } from '../core/device-types';
+import { createBoardBehavior, ESP32_RUNTIME, onboardLedColor } from './board-behavior';
 
 /**
  * ESP32 DevKit V1 — the 30-pin DOIT board.
@@ -97,6 +98,9 @@ const RIGHT_HEADER: readonly PinSpec[] = [
   ['GPIO15', 'D15', 'digital', 'GPIO15 · ADC2 CH3, touch 3, HSPI CS — strapping pin'],
 ];
 
+/** The board's user LED: what `LED_BUILTIN` names, and what the artwork lights. */
+const ONBOARD_LED: OnboardLed = { pin: 'GPIO2', label: 'LED' };
+
 function headerPins(
   specs: readonly PinSpec[],
   x: number,
@@ -108,6 +112,7 @@ function headerPins(
       description: detail,
       aliases: label === id ? undefined : [label],
       voltage: type !== 'vcc' ? undefined : id === '3V3' ? 3.3 : 5,
+      maxCurrentMa: id === '3V3' ? 600 : undefined,
     }),
   );
 }
@@ -120,7 +125,7 @@ function headerLabels(
   return specs.map(([, label], index) =>
     text(x, HEADER_TOP + index * HEADER_PITCH + u(0.35), label, {
       size: u(0.9),
-      fill: SILK.white,
+      fill: WOKWI.label,
       anchor,
       weight: 600,
       mono: true,
@@ -131,20 +136,19 @@ function headerLabels(
 }
 
 function draw(context: DeviceDrawContext): readonly Shape[] {
-  const live = context.running;
 
   return [
     // PCB.
     rect(0, 0, WIDTH, HEIGHT, {
       rx: u(1),
-      fill: '#1f2a37',
-      stroke: '#0f1720',
+      fill: WOKWI.espBoard,
+      stroke: WOKWI.espBoardEdge,
       strokeWidth: u(0.2),
     }),
     rect(u(0.3), u(0.3), WIDTH - u(0.6), HEIGHT - u(0.6), {
       rx: u(0.8),
       fill: 'none',
-      stroke: '#33415a',
+      stroke: WOKWI.espBoardTrace,
       strokeWidth: u(0.1),
       opacity: 0.7,
       detail: 'normal',
@@ -153,8 +157,8 @@ function draw(context: DeviceDrawContext): readonly Shape[] {
     // ESP-WROOM-32: a metal shield can with the antenna keep-out above it.
     rect(MODULE_X, MODULE_TOP, MODULE_WIDTH, MODULE_HEIGHT, {
       rx: u(0.4),
-      fill: '#e6e8eb',
-      stroke: '#9aa1aa',
+      fill: WOKWI.module,
+      stroke: WOKWI.shieldEdge,
       strokeWidth: u(0.12),
     }),
     // Meandered PCB antenna, printed on the module's own substrate.
@@ -175,56 +179,76 @@ function draw(context: DeviceDrawContext): readonly Shape[] {
         `M ${MODULE_X + u(3)} ${MODULE_TOP + u(4.4)} h ${u(12)}`,
       ].join(' '),
       fill: 'none',
-      stroke: '#c8a33f',
+      stroke: WOKWI.antenna,
       strokeWidth: u(0.3),
       strokeLinecap: 'round',
     },
-    // Shield can. Slightly proud of the substrate, as the stamped lid is.
-    rect(MODULE_X + u(0.3), SHIELD_TOP, MODULE_WIDTH - u(0.6), MODULE_TOP + MODULE_HEIGHT - SHIELD_TOP - u(0.3), {
-      rx: u(0.3),
-      fill: '#c9ced4',
-      stroke: '#8a9099',
-      strokeWidth: u(0.15),
-    }),
-    rect(MODULE_X + u(1), SHIELD_TOP + u(0.7), MODULE_WIDTH - u(2), MODULE_TOP + MODULE_HEIGHT - SHIELD_TOP - u(1.7), {
-      rx: u(0.2),
-      fill: 'none',
-      stroke: '#a3a9b1',
-      strokeWidth: u(0.08),
-      detail: 'normal',
-    }),
+    // Shield can, kept matte to match the Wokwi reference artwork.
+    rect(
+      MODULE_X + u(0.3),
+      SHIELD_TOP,
+      MODULE_WIDTH - u(0.6),
+      MODULE_TOP + MODULE_HEIGHT - SHIELD_TOP - u(0.3),
+      {
+        rx: u(0.3),
+        fill: WOKWI.shield,
+        stroke: WOKWI.shieldEdge,
+        strokeWidth: u(0.15),
+      },
+    ),
+    rect(
+      MODULE_X + u(1),
+      SHIELD_TOP + u(0.7),
+      MODULE_WIDTH - u(2),
+      MODULE_TOP + MODULE_HEIGHT - SHIELD_TOP - u(1.7),
+      {
+        rx: u(0.2),
+        fill: 'none',
+        stroke: WOKWI.buttonEdge,
+        strokeWidth: u(0.08),
+        detail: 'normal',
+      },
+    ),
     silkLabel(WIDTH / 2, SHIELD_TOP + u(8), 'ESP-WROOM-32', {
       size: u(1.15),
-      fill: '#3f4854',
+      fill: WOKWI.espBoard,
       weight: 700,
       detail: 'normal',
     }),
     silkLabel(WIDTH / 2, SHIELD_TOP + u(10.2), 'ESP32-D0WDQ6', {
       size: u(0.8),
-      fill: '#5b6472',
+      fill: WOKWI.espBoardTrace,
       detail: 'high',
     }),
 
     // EN and BOOT. Both sit inboard of the headers: a 6 mm cap centred on the
     // pin row would swallow the clicks meant for the pins underneath it.
-    ...tactileButton(u(7.4), u(29.5), u(6)),
-    silkLabel(u(7.4), u(34), 'EN', { size: u(0.9), detail: 'normal' }),
-    ...tactileButton(WIDTH - u(7.4), u(29.5), u(6)),
-    silkLabel(WIDTH - u(7.4), u(34), 'BOOT', { size: u(0.9), detail: 'normal' }),
+    ...flatButton(u(7.9), u(29.5), u(6)),
+    silkLabel(u(7.9), u(34), 'EN', { size: u(0.9), detail: 'normal' }),
+    ...flatButton(WIDTH - u(7.9), u(29.5), u(6)),
+    silkLabel(WIDTH - u(7.9), u(34), 'BOOT', { size: u(0.9), detail: 'normal' }),
 
     // AMS1117 regulator and the CP2102 USB-UART bridge, in the gap between them.
-    ...chip(u(11.5), u(26.8), u(5.3), u(3.2), 'AMS', { labelSize: u(0.75) }),
-    ...chip(u(11.6), u(31), u(5), u(5), 'CP2102', { labelSize: u(0.7) }),
+    ...flatChip(u(11.5), u(26.8), u(5.3), u(3.2), 'AMS', u(0.75)),
+    ...flatChip(u(11.6), u(31), u(5), u(5), 'CP2102', u(0.7)),
 
-    // Power and user LEDs. The user LED tracks GPIO2 while the sim runs.
-    ...indicatorLed(u(12.4), u(37.5), 'red', true, u(0.6)),
-    ...indicatorLed(u(15.9), u(37.5), 'blue', live, u(0.6)),
+    // Power and user LEDs. The user LED follows GPIO2 while the sim runs.
+    ...flatLed(u(12.4), u(37.5), WOKWI.ledRed),
+    ...flatLed(u(15.9), u(37.5), onboardLedColor(context, WOKWI.ledBlue, WOKWI.ledBlueOff)),
     silkLabel(u(12.4), u(39.6), 'PWR', { size: u(0.7), detail: 'high' }),
     silkLabel(u(15.9), u(39.6), 'LED', { size: u(0.7), detail: 'high' }),
 
     // Decoupling caps, drawn only when zoomed in.
-    rect(u(9.6), u(36.9), u(1.8), u(1.2), { rx: u(0.2), fill: PART.plasticCream, detail: 'high' }),
-    rect(u(17.9), u(36.9), u(1.8), u(1.2), { rx: u(0.2), fill: PART.plasticCream, detail: 'high' }),
+    rect(u(9.6), u(36.9), u(1.8), u(1.2), {
+      rx: u(0.2),
+      fill: WOKWI.module,
+      detail: 'high',
+    }),
+    rect(u(17.9), u(36.9), u(1.8), u(1.2), {
+      rx: u(0.2),
+      fill: WOKWI.module,
+      detail: 'high',
+    }),
 
     silkLabel(WIDTH / 2, u(43), 'ESP32 DEVKIT V1', {
       size: u(1.1),
@@ -233,19 +257,21 @@ function draw(context: DeviceDrawContext): readonly Shape[] {
     }),
 
     // Micro-USB, overhanging the bottom edge exactly as the socket does.
-    ...usbConnector(WIDTH / 2 - u(3.75), HEIGHT - u(4), u(7.5), u(5.5), 'micro'),
+    ...flatUsbConnector(WIDTH / 2 - u(3.75), HEIGHT - u(4), u(7.5), u(5.5)),
 
     // Male header pins down both long edges.
-    ...maleHeader(LEFT_HEADER_X, HEADER_TOP, LEFT_HEADER.length, 'vertical'),
-    ...maleHeader(RIGHT_HEADER_X, HEADER_TOP, RIGHT_HEADER.length, 'vertical'),
+    ...flatHeader(LEFT_HEADER_X, HEADER_TOP, LEFT_HEADER.length, 'vertical'),
+    ...flatHeader(RIGHT_HEADER_X, HEADER_TOP, RIGHT_HEADER.length, 'vertical'),
 
     // Silkscreen pin names, printed inboard of each header.
-    ...headerLabels(LEFT_HEADER, LEFT_HEADER_X + u(1.1), 'start'),
-    ...headerLabels(RIGHT_HEADER, RIGHT_HEADER_X - u(1.1), 'end'),
+    // Half a header's width plus a gap, so names print beside the plastic, not on it.
+    ...headerLabels(LEFT_HEADER, LEFT_HEADER_X + u(1.6), 'start'),
+    ...headerLabels(RIGHT_HEADER, RIGHT_HEADER_X - u(1.6), 'end'),
   ];
 }
 
 export const ESP32_DEVKIT_V1: VirtualDevice = {
+  defaultSpi: { mosi: 'GPIO23', miso: 'GPIO19', clock: 'GPIO18', select: 'GPIO5' },
   id: 'esp32-devkit-v1',
   name: 'ESP32 DevKit V1',
   model: 'DOIT ESP32 DevKit V1 (30-pin)',
@@ -257,6 +283,9 @@ export const ESP32_DEVKIT_V1: VirtualDevice = {
   initiallyVisible: false,
   // The board prints every pin name, so the hover overlay would duplicate it.
   printsOwnPinLabels: true,
+  powerSource: true,
+  logicVoltage: 3.3,
+  maxLogicInputVoltage: 3.6,
   operatingVoltage: { min: 3, max: 12, recommended: 5 },
   interfaces: ['digital', 'analog', 'pwm', 'i2c', 'spi', 'uart', 'power'],
   pins: [
@@ -264,22 +293,14 @@ export const ESP32_DEVKIT_V1: VirtualDevice = {
     ...headerPins(RIGHT_HEADER, RIGHT_HEADER_X, 'right'),
   ],
   render: { draw, bleed: { bottom: u(1.5) } },
+  onboardLed: ONBOARD_LED,
+  simulation: (instanceId) => createBoardBehavior(instanceId, ESP32_RUNTIME, ONBOARD_LED),
   catalog: {
     categoryId: 'microcontrollers',
     category: 'Microcontrollers',
     aliases: ['esp32', 'devkit', 'doit esp32', 'wroom', 'อีเอสพี32'],
-    tags: [
-      'esp32',
-      'wifi',
-      'bluetooth',
-      'microcontroller',
-      'board',
-      '3V3',
-      'digital',
-      'analog',
-    ],
+    tags: ['esp32', 'wifi', 'bluetooth', 'microcontroller', 'board', '3V3', 'digital', 'analog'],
     interfaceLabel: 'ดิจิทัล / แอนะล็อก · 30 ขา',
-    typicalUsage:
-      'Wi-Fi and Bluetooth IoT projects that need plenty of GPIO and onboard radio.',
+    typicalUsage: 'Wi-Fi and Bluetooth IoT projects that need plenty of GPIO and onboard radio.',
   },
 };

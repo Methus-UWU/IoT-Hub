@@ -88,9 +88,7 @@ export function mm(millimetres: number): number {
  * Returns 1 for a part that has not declared its dimensions yet, so migrating
  * the catalog is one part at a time rather than one breaking change.
  */
-export function drawingScaleFor(
-  device: Pick<VirtualDevice, 'width' | 'physicalSize'>,
-): number {
+export function drawingScaleFor(device: Pick<VirtualDevice, 'width' | 'physicalSize'>): number {
   const physical = device.physicalSize;
   if (!physical || device.width <= 0 || physical.widthMm <= 0) return 1;
 
@@ -98,9 +96,10 @@ export function drawingScaleFor(
 }
 
 /** The part's footprint on the canvas, in pixels, at 100% zoom. */
-export function renderedSize(
-  device: Pick<VirtualDevice, 'width' | 'height' | 'physicalSize'>,
-): { width: number; height: number } {
+export function renderedSize(device: Pick<VirtualDevice, 'width' | 'height' | 'physicalSize'>): {
+  width: number;
+  height: number;
+} {
   const scale = drawingScaleFor(device);
   return { width: device.width * scale, height: device.height * scale };
 }

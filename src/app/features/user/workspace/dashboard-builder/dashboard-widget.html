@@ -235,51 +235,98 @@
         </div>
       }
       @case ('line-chart') {
-        <div class="chart-widget">
-          <div class="chart-summary">
-            <div><span>Average</span><strong>27.8°C</strong></div>
-            <div><span>Peak</span><strong>31.2°C</strong></div>
-            <span class="chart-live"><i></i> Live</span>
+        @if (series() !== null) {
+          @if (liveChart(); as chart) {
+            <div class="chart-widget">
+              <div class="chart-summary">
+                <div>
+                  <span>Average</span><strong>{{ chart.average }}</strong>
+                </div>
+                <div>
+                  <span>Peak</span><strong>{{ chart.peak }}</strong>
+                </div>
+                <span class="chart-live"><i></i> Live</span>
+              </div>
+              <div class="line-chart-area">
+                <span class="axis-label axis-high">{{ chart.high }}</span>
+                <span class="axis-label axis-mid">{{ chart.mid }}</span>
+                <span class="axis-label axis-low">{{ chart.low }}</span>
+                <svg
+                  viewBox="0 0 560 170"
+                  preserveAspectRatio="none"
+                  role="img"
+                  [attr.aria-label]="chart.label"
+                >
+                  <defs>
+                    <linearGradient [attr.id]="'chart-' + widget().id" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0" stop-color="var(--widget-accent)" stop-opacity=".24" />
+                      <stop offset="1" stop-color="var(--widget-accent)" stop-opacity="0" />
+                    </linearGradient>
+                  </defs>
+                  <path class="chart-grid-line" d="M0 20h560M0 82h560M0 145h560" />
+                  <path [attr.d]="chart.area" [attr.fill]="'url(#chart-' + widget().id + ')'" />
+                  <path class="chart-line" [attr.d]="chart.line" />
+                  <circle
+                    [attr.cx]="chart.lastX"
+                    [attr.cy]="chart.lastY"
+                    r="4"
+                    fill="white"
+                    stroke="var(--widget-accent)"
+                    stroke-width="3"
+                  />
+                </svg>
+              </div>
+            </div>
+          } @else {
+            <p class="chart-empty">No readings in this range yet.</p>
+          }
+        } @else {
+          <div class="chart-widget">
+            <div class="chart-summary">
+              <div><span>Average</span><strong>27.8°C</strong></div>
+              <div><span>Peak</span><strong>31.2°C</strong></div>
+              <span class="chart-live"><i></i> Live</span>
+            </div>
+            <div class="line-chart-area">
+              <span class="axis-label axis-high">32°</span>
+              <span class="axis-label axis-mid">26°</span>
+              <span class="axis-label axis-low">20°</span>
+              <svg
+                viewBox="0 0 560 170"
+                preserveAspectRatio="none"
+                role="img"
+                aria-label="Temperature rose from 24 to 29 degrees during the selected period"
+              >
+                <defs>
+                  <linearGradient [attr.id]="'chart-' + widget().id" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0" stop-color="var(--widget-accent)" stop-opacity=".24" />
+                    <stop offset="1" stop-color="var(--widget-accent)" stop-opacity="0" />
+                  </linearGradient>
+                </defs>
+                <path class="chart-grid-line" d="M0 20h560M0 82h560M0 145h560" />
+                <path
+                  d="M0 135C35 125 56 90 92 99s54 30 88 2 58-70 96-54 44 53 78 38 49-51 85-36 53 56 121 10v111H0Z"
+                  [attr.fill]="'url(#chart-' + widget().id + ')'"
+                />
+                <path
+                  class="chart-line"
+                  d="M0 135C35 125 56 90 92 99s54 30 88 2 58-70 96-54 44 53 78 38 49-51 85-36 53 56 121 10"
+                />
+                <circle
+                  cx="439"
+                  cy="49"
+                  r="4"
+                  fill="white"
+                  stroke="var(--widget-accent)"
+                  stroke-width="3"
+                />
+              </svg>
+            </div>
+            <div class="chart-times">
+              <span>12 AM</span><span>6 AM</span><span>12 PM</span><span>6 PM</span><span>Now</span>
+            </div>
           </div>
-          <div class="line-chart-area">
-            <span class="axis-label axis-high">32°</span>
-            <span class="axis-label axis-mid">26°</span>
-            <span class="axis-label axis-low">20°</span>
-            <svg
-              viewBox="0 0 560 170"
-              preserveAspectRatio="none"
-              role="img"
-              aria-label="Temperature rose from 24 to 29 degrees during the selected period"
-            >
-              <defs>
-                <linearGradient [attr.id]="'chart-' + widget().id" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0" stop-color="var(--widget-accent)" stop-opacity=".24" />
-                  <stop offset="1" stop-color="var(--widget-accent)" stop-opacity="0" />
-                </linearGradient>
-              </defs>
-              <path class="chart-grid-line" d="M0 20h560M0 82h560M0 145h560" />
-              <path
-                d="M0 135C35 125 56 90 92 99s54 30 88 2 58-70 96-54 44 53 78 38 49-51 85-36 53 56 121 10v111H0Z"
-                [attr.fill]="'url(#chart-' + widget().id + ')'"
-              />
-              <path
-                class="chart-line"
-                d="M0 135C35 125 56 90 92 99s54 30 88 2 58-70 96-54 44 53 78 38 49-51 85-36 53 56 121 10"
-              />
-              <circle
-                cx="439"
-                cy="49"
-                r="4"
-                fill="white"
-                stroke="var(--widget-accent)"
-                stroke-width="3"
-              />
-            </svg>
-          </div>
-          <div class="chart-times">
-            <span>12 AM</span><span>6 AM</span><span>12 PM</span><span>6 PM</span><span>Now</span>
-          </div>
-        </div>
+        }
       }
       @case ('bar-chart') {
         <div class="bar-widget" role="img" aria-label="Bar chart showing seven recent readings">

@@ -20,6 +20,10 @@
   opacity: 1;
 }
 
+:host.editor-warm .monaco-host {
+  transition: none;
+}
+
 .editor-loading {
   position: absolute;
   z-index: 2;

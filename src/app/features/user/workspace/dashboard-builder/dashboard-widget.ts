@@ -38,6 +38,11 @@ export class DashboardWidgetComponent {
   readonly editMode = input(true);
   readonly moving = input(false);
   readonly invalid = input(false);
+  /**
+   * The datastream's history while the dashboard is live, oldest first; null outside
+   * live mode, where charts show a sample shape.
+   */
+  readonly series = input<readonly number[] | null>(null);
 
   readonly selectRequested = output<WidgetSelectRequest>();
   readonly moveStarted = output<WidgetPointerRequest>();
@@ -68,6 +73,36 @@ export class DashboardWidgetComponent {
 
   /** Filled portion of the slider track, as a percentage. */
   protected readonly rangeFill = computed(() => this.clampedControl());
+
+  /** The live line chart: SVG paths in a 560 x 170 box, plus its summary. */
+  protected readonly liveChart = computed(() => {
+    const values = this.series();
+    if (!values || values.length < 2) return null;
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const span = max - min || 1;
+    const x = (index: number) => (index / (values.length - 1)) * 560;
+    const y = (value: number) => 155 - ((value - min) / span) * 135;
+    const line = values
+      .map((value, index) => `${index ? 'L' : 'M'}${x(index).toFixed(1)} ${y(value).toFixed(1)}`)
+      .join(' ');
+    const decimals = Math.min(4, Math.max(0, Math.round(this.widget().settings.decimals)));
+    const unit = this.widget().settings.unit;
+    const format = (value: number) => `${value.toFixed(decimals)}${unit}`;
+    const average = values.reduce((sum, value) => sum + value, 0) / values.length;
+    return {
+      line,
+      area: `${line} L560 170 L0 170 Z`,
+      lastX: x(values.length - 1),
+      lastY: y(values[values.length - 1]),
+      average: format(average),
+      peak: format(max),
+      high: format(max),
+      mid: format((max + min) / 2),
+      low: format(min),
+      label: `${values.length} readings from ${format(min)} to ${format(max)}`,
+    };
+  });
 
   protected readonly positionLabel = computed(() => {
     const layout = this.layout();

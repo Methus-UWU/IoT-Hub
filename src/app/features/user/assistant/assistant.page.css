@@ -1,0 +1,307 @@
+﻿:host {
+  display: block;
+  height: 100%;
+  color: var(--color-ink);
+  background: var(--color-surface-soft);
+}
+.assistant-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 28rem;
+  width: min(100%, 64rem);
+  margin-inline: auto;
+  padding: 2rem 2rem 1rem;
+}
+.assistant-header,
+.header-actions,
+.mode-toggle,
+.composer-actions {
+  display: flex;
+  align-items: center;
+}
+.assistant-header {
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding-bottom: 1.5rem;
+}
+h1 {
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+.assistant-heading {
+  flex: 1 1 22rem;
+}
+.eyebrow {
+  margin: 0 0 0.5rem;
+  color: var(--color-ink-muted);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+}
+.description {
+  max-width: 38rem;
+  margin: 0.5rem 0 0;
+  color: var(--color-ink-muted);
+  font-size: 0.875rem;
+  line-height: 1.75;
+}
+.header-actions {
+  gap: 0.75rem;
+}
+.mode-toggle {
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  background: var(--color-surface);
+}
+button {
+  font: inherit;
+  cursor: pointer;
+  transition: background-color 150ms ease;
+}
+.mode-toggle button {
+  min-height: 2.5rem;
+  padding: 0.5rem 0.85rem;
+  border: 0;
+  border-radius: 0.4rem;
+  background: transparent;
+  color: var(--color-ink-muted);
+  font-size: 0.8rem;
+}
+.mode-toggle button:hover:not(:disabled),
+.new-chat:hover {
+  color: var(--color-ink);
+  background: var(--color-surface-muted);
+}
+.mode-toggle button.active,
+.mode-toggle button.active:hover:not(:disabled) {
+  background: var(--color-primary);
+  color: var(--color-surface);
+}
+.new-chat,
+.send-button {
+  display: grid;
+  width: 2.5rem;
+  height: 2.5rem;
+  flex: none;
+  place-items: center;
+  border: 0;
+  border-radius: 0.4rem;
+}
+.new-chat {
+  background: transparent;
+  color: var(--color-ink-muted);
+}
+svg {
+  width: 1.2rem;
+  height: 1.2rem;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.assistant-card {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  overflow: hidden;
+  background: var(--color-surface);
+  flex-direction: column;
+}
+.thread {
+  flex: 1;
+  min-height: 0;
+  padding: 1.25rem;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-strong) transparent;
+}
+.empty-state {
+  color: var(--color-ink-muted);
+  font-size: 0.875rem;
+  line-height: 1.8;
+}
+.empty-state p {
+  margin: 0 0 0.5rem;
+}
+.suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-top: 1.75rem;
+}
+.suggestions button {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.65rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.4rem;
+  background: var(--color-surface);
+  color: var(--color-primary);
+  font-size: 0.8rem;
+  text-align: left;
+}
+.suggestions button:hover {
+  background: var(--color-surface-soft);
+}
+.suggestions span {
+  color: var(--color-ink-muted);
+}
+.message {
+  margin-bottom: 1.75rem;
+  max-width: 100%;
+}
+.message.from-user {
+  display: flex;
+  justify-content: flex-end;
+}
+.user-text {
+  max-width: 75%;
+  margin: 0;
+  padding: 0.8rem 1.15rem;
+  border-radius: 0.5rem;
+  background: var(--color-primary);
+  color: var(--color-surface);
+  font-size: 0.925rem;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.markdown-content {
+  font-size: 0.95rem;
+  line-height: 1.85;
+  overflow-wrap: anywhere;
+}
+.typing,
+.thread-error {
+  margin: 0.5rem 0;
+  font-size: 0.875rem;
+  line-height: 1.7;
+}
+.typing {
+  color: var(--color-ink-muted);
+}
+.thread-error {
+  color: var(--color-error);
+}
+.composer {
+  flex: none;
+  padding: 0.9rem 1rem 0.65rem;
+  border-top: 1px solid var(--color-border);
+}
+.composer:focus-within {
+  border-color: var(--color-border-strong);
+}
+.composer textarea {
+  display: block;
+  width: 100%;
+  min-height: 3.25rem;
+  max-height: 10rem;
+  field-sizing: content;
+  padding: 0.2rem 0.2rem 0.5rem;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink);
+  font: inherit;
+  font-size: 0.95rem;
+  line-height: 1.7;
+  resize: none;
+}
+.composer textarea::placeholder {
+  color: var(--color-ink-muted);
+}
+.composer textarea:focus-visible {
+  outline: none;
+}
+.composer:has(textarea:focus-visible) {
+  outline: 2px solid var(--color-border-strong);
+  outline-offset: 2px;
+}
+.composer-actions {
+  justify-content: space-between;
+  gap: 1rem;
+}
+.composer-actions span {
+  color: var(--color-ink-muted);
+  font-size: 0.7rem;
+}
+.send-button {
+  background: var(--color-ink);
+  color: var(--color-surface);
+}
+.send-button:hover:not(:disabled) {
+  background: var(--color-primary);
+}
+.send-button:disabled {
+  background: var(--color-surface-muted);
+  color: var(--color-ink-muted);
+}
+button:disabled {
+  cursor: not-allowed;
+}
+button:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
+}
+.assistant-note {
+  margin: 0.75rem auto 0;
+  color: var(--color-ink-muted);
+  font-size: 0.7rem;
+  line-height: 1.7;
+  text-align: center;
+}
+@media (max-width: 640px) {
+  .assistant-page {
+    padding: 1rem 1rem 0.75rem;
+  }
+  .assistant-header {
+    gap: 0.75rem;
+    padding-bottom: 0.5rem;
+  }
+  .header-actions {
+    gap: 0.25rem;
+  }
+  .mode-toggle button {
+    padding-inline: 0.65rem;
+    font-size: 0.75rem;
+  }
+  .thread {
+    padding: 1.25rem 0.25rem;
+  }
+  .empty-state {
+    padding-block: 1rem;
+  }
+  .suggestions {
+    gap: 0.5rem;
+    margin-top: 1.25rem;
+  }
+  .suggestions button {
+    font-size: 0.75rem;
+    padding: 0.6rem 0.75rem;
+    gap: 0.5rem;
+  }
+  .user-text {
+    max-width: 92%;
+  }
+  .composer textarea {
+    font-size: 1rem;
+  }
+  .composer-actions span {
+    font-size: 0.625rem;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  button {
+    transition: none;
+  }
+}

@@ -5,7 +5,6 @@
  */
 
 .board,
-.hardware,
 .placement-ghost {
   filter: drop-shadow(0 1px 2px rgb(15 23 42 / 14%));
 }
@@ -406,7 +405,12 @@
   font-size: 7.5px;
   font-weight: 700;
   opacity: 0;
+  visibility: hidden;
   pointer-events: none;
+  text-rendering: geometricPrecision;
+  transition:
+    opacity 100ms ease-out,
+    visibility 0s linear 100ms;
   vector-effect: non-scaling-stroke;
 }
 
@@ -415,6 +419,8 @@
 .device-pin:focus-visible .pin-label,
 .pin-pending .pin-label {
   opacity: 0.92;
+  visibility: visible;
+  transition-delay: 0s;
 }
 
 .device-pin.pin-wire-selected .pin-label {
@@ -422,6 +428,8 @@
   stroke: #f8fafc;
   stroke-width: 3px;
   opacity: 1;
+  visibility: visible;
+  transition-delay: 0s;
 }
 
 /* Hardware with PCB silkscreen labels does not need the outlined canvas label. */
@@ -431,7 +439,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .board-pin circle.pin-contact,
-  .device-pin .pin-contact {
+  .device-pin .pin-contact,
+  .device-pin .pin-label {
     transition: none;
   }
 }

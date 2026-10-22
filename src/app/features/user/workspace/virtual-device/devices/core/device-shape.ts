@@ -13,6 +13,163 @@
 /** How much fine detail to draw. Thumbnails drop the small stuff. */
 export type DetailLevel = 'low' | 'normal' | 'high';
 
+// -------------------------------------------------------------------- paints
+// A fill or stroke is either a plain CSS colour or a gradient. Gradients are
+// what separate "a grey rectangle" from "a stamped metal shield can": real
+// hardware is lit from somewhere, and a single flat fill can never say that.
+//
+// A gradient is *data*, not a `<defs>` id, so a part stays pure and printable.
+// The renderer hashes each gradient into a stable id and emits one `<defs>`
+// entry per distinct gradient, which is why two boards using the same gold
+// header share one definition instead of one per pin.
+
+export interface GradientStop {
+  /** 0..1 along the gradient axis. */
+  readonly offset: number;
+  readonly color: string;
+  readonly opacity?: number;
+}
+
+export interface LinearGradientPaint {
+  readonly kind: 'linear';
+  /**
+   * Direction in degrees: 0 points left→right, 90 points top→bottom. Defaults
+   * to 90, which is the overhead lighting nearly every part wants.
+   */
+  readonly angle?: number;
+  readonly stops: readonly GradientStop[];
+}
+
+export interface RadialGradientPaint {
+  readonly kind: 'radial';
+  /** Centre and radius as fractions of the shape's bounding box. */
+  readonly cx?: number;
+  readonly cy?: number;
+  readonly r?: number;
+  readonly stops: readonly GradientStop[];
+}
+
+export type GradientPaint = LinearGradientPaint | RadialGradientPaint;
+export type Paint = string | GradientPaint;
+
+export function isGradient(paint: Paint | undefined): paint is GradientPaint {
+  return typeof paint === 'object' && paint !== null;
+}
+
+/** Two stops along the given angle — the shading almost every surface needs. */
+export function linear(
+  from: string,
+  to: string,
+  angle = 90,
+  stops?: readonly GradientStop[],
+): LinearGradientPaint {
+  return {
+    kind: 'linear',
+    angle,
+    stops: stops ?? [
+      { offset: 0, color: from },
+      { offset: 1, color: to },
+    ],
+  };
+}
+
+/** A highlight blooming from one point — domes, lenses, lit LEDs, buttons. */
+export function radial(
+  stops: readonly GradientStop[],
+  options: { readonly cx?: number; readonly cy?: number; readonly r?: number } = {},
+): RadialGradientPaint {
+  return { kind: 'radial', stops, ...options };
+}
+
+/**
+ * A stable id for a gradient, derived from its own definition.
+ *
+ * Deriving rather than counting matters: the same gradient reached through two
+ * different parts must produce the same id, otherwise every placed component
+ * would add its own copy of every `<defs>` entry it uses. Two documents that
+ * both define the id define it identically, so a duplicate is harmless.
+ */
+export function paintId(paint: GradientPaint): string {
+  const signature =
+    paint.kind === 'linear'
+      ? `l${paint.angle ?? 90}`
+      : `r${paint.cx ?? 0.5},${paint.cy ?? 0.5},${paint.r ?? 0.5}`;
+  const body = paint.stops
+    .map((stop) => `${stop.offset}:${stop.color}:${stop.opacity ?? 1}`)
+    .join('|');
+  return `dg${hash(`${signature}#${body}`)}`;
+}
+
+/** FNV-1a, base36. Short, stable, and collision-free enough for a palette. */
+function hash(value: string): string {
+  let result = 0x811c9dc5;
+  for (let index = 0; index < value.length; index++) {
+    result ^= value.charCodeAt(index);
+    result = Math.imul(result, 0x01000193);
+  }
+  return (result >>> 0).toString(36);
+}
+
+/** The `fill`/`stroke` attribute value for a paint. */
+export function paintRef(paint: Paint | undefined, fallback: string | null): string | null {
+  if (paint === undefined) return fallback;
+  return isGradient(paint) ? `url(#${paintId(paint)})` : paint;
+}
+
+/**
+ * Every distinct gradient in a shape tree, de-duplicated by id.
+ *
+ * The renderer calls this once per artwork and emits the result as `<defs>`.
+ */
+export function collectGradients(shapes: readonly Shape[]): readonly GradientPaint[] {
+  const found = new Map<string, GradientPaint>();
+
+  const visit = (list: readonly Shape[]): void => {
+    for (const shape of list) {
+      if (shape.kind === 'group') {
+        visit(shape.children);
+        continue;
+      }
+      for (const paint of [
+        (shape as { fill?: Paint }).fill,
+        (shape as { stroke?: Paint }).stroke,
+      ]) {
+        if (isGradient(paint)) found.set(paintId(paint), paint);
+      }
+    }
+  };
+
+  visit(shapes);
+  return [...found.values()];
+}
+
+/**
+ * Gradient axis endpoints in `objectBoundingBox` units.
+ *
+ * Expressed as x1/y1/x2/y2 rather than `gradientTransform` so the definition
+ * survives being scaled by the canvas zoom without skewing.
+ */
+export function linearAxis(angle: number): {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+} {
+  const radians = (angle * Math.PI) / 180;
+  const dx = Math.cos(radians) / 2;
+  const dy = Math.sin(radians) / 2;
+  return {
+    x1: round4(0.5 - dx),
+    y1: round4(0.5 - dy),
+    x2: round4(0.5 + dx),
+    y2: round4(0.5 + dy),
+  };
+}
+
+function round4(value: number): number {
+  return Math.round(value * 10000) / 10000;
+}
+
 export interface ShapeBase {
   /**
    * The coarsest level at which this shape appears. Omitting it means "always
@@ -30,8 +187,8 @@ export interface RectShape extends ShapeBase {
   readonly width: number;
   readonly height: number;
   readonly rx?: number;
-  readonly fill?: string;
-  readonly stroke?: string;
+  readonly fill?: Paint;
+  readonly stroke?: Paint;
   readonly strokeWidth?: number;
 }
 
@@ -40,8 +197,8 @@ export interface CircleShape extends ShapeBase {
   readonly cx: number;
   readonly cy: number;
   readonly r: number;
-  readonly fill?: string;
-  readonly stroke?: string;
+  readonly fill?: Paint;
+  readonly stroke?: Paint;
   readonly strokeWidth?: number;
 }
 
@@ -51,17 +208,19 @@ export interface EllipseShape extends ShapeBase {
   readonly cy: number;
   readonly rx: number;
   readonly ry: number;
-  readonly fill?: string;
-  readonly stroke?: string;
+  readonly fill?: Paint;
+  readonly stroke?: Paint;
   readonly strokeWidth?: number;
 }
 
 export interface PathShape extends ShapeBase {
   readonly kind: 'path';
   readonly d: string;
-  readonly fill?: string;
-  readonly stroke?: string;
+  readonly fill?: Paint;
+  readonly stroke?: Paint;
   readonly strokeWidth?: number;
+  /** `evenodd` allows one path to cut real transparent holes from a surface. */
+  readonly fillRule?: 'nonzero' | 'evenodd';
   readonly strokeLinecap?: 'butt' | 'round' | 'square';
   readonly strokeLinejoin?: 'miter' | 'round' | 'bevel';
 }
@@ -72,7 +231,7 @@ export interface LineShape extends ShapeBase {
   readonly y1: number;
   readonly x2: number;
   readonly y2: number;
-  readonly stroke?: string;
+  readonly stroke?: Paint;
   readonly strokeWidth?: number;
   readonly strokeLinecap?: 'butt' | 'round' | 'square';
 }
@@ -83,7 +242,7 @@ export interface TextShape extends ShapeBase {
   readonly y: number;
   readonly text: string;
   readonly size?: number;
-  readonly fill?: string;
+  readonly fill?: Paint;
   readonly anchor?: 'start' | 'middle' | 'end';
   readonly weight?: number | 'normal' | 'bold';
   readonly letterSpacing?: number;
@@ -99,13 +258,7 @@ export interface GroupShape extends ShapeBase {
 }
 
 export type Shape =
-  | RectShape
-  | CircleShape
-  | EllipseShape
-  | PathShape
-  | LineShape
-  | TextShape
-  | GroupShape;
+  RectShape | CircleShape | EllipseShape | PathShape | LineShape | TextShape | GroupShape;
 
 const DETAIL_RANK: Readonly<Record<DetailLevel, number>> = { low: 0, normal: 1, high: 2 };
 

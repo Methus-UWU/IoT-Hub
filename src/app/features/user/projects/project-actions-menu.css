@@ -1,0 +1,174 @@
+:host {
+  position: absolute;
+  top: 1rem;
+  right: 0.85rem;
+}
+
+.menu-trigger {
+  display: grid;
+  width: 1.9rem;
+  height: 1.9rem;
+  place-items: center;
+  border-radius: 0.5rem;
+  color: #afafaf;
+  background: transparent;
+  cursor: pointer;
+  transition: 140ms ease;
+}
+.menu-trigger:hover,
+.menu-trigger[aria-expanded='true'] {
+  color: #2b2b2b;
+  background: #f1f1f1;
+}
+.menu-trigger:focus-visible {
+  outline: 2px solid #afafaf;
+  outline-offset: 1px;
+}
+.menu-trigger svg {
+  width: 0.85rem;
+  height: 0.85rem;
+}
+
+/* The card lifts on hover with a transform and clips its overflow, so a plain
+   fixed menu would be contained and clipped by it. The popover top layer escapes
+   both; the coordinates still come from the trigger rect. */
+.actions-menu {
+  position: fixed;
+  inset: auto;
+  z-index: 120;
+  display: none;
+  flex-direction: column;
+  overflow: visible;
+  margin: 0;
+  gap: 0.125rem;
+  border: 1px solid #e1e1e1;
+  border-radius: 0.875rem;
+  padding: 0.375rem;
+  background: #fff;
+  box-shadow: 0 16px 40px rgb(43 43 43 / 0.12);
+}
+
+.actions-menu:popover-open {
+  display: flex;
+}
+
+.actions-menu hr {
+  height: 1px;
+  margin: 0.25rem 0.35rem;
+  border: 0;
+  background: #f1f1f1;
+}
+
+.menu-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.55rem;
+  border-radius: 0.625rem;
+  padding: 0.55rem 0.7rem;
+  color: #545454;
+  background: transparent;
+  font-size: 0.8125rem;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  transition: 100ms ease;
+}
+.menu-item:hover {
+  color: #2b2b2b;
+  background: #f5f5f5;
+}
+.menu-item:focus-visible {
+  outline: 2px solid #afafaf;
+  outline-offset: -2px;
+}
+.menu-item svg {
+  width: 1rem;
+  height: 1rem;
+  flex: none;
+  color: #808080;
+}
+
+.menu-item-danger,
+.menu-item-danger svg {
+  color: var(--color-error);
+}
+.menu-item-danger:hover {
+  color: var(--color-error);
+  background: color-mix(in srgb, var(--color-error) 8%, #fff);
+}
+
+.confirm-dialog {
+  width: min(28rem, calc(100vw - 2rem));
+  max-height: calc(100dvh - 2rem);
+  margin: auto;
+  padding: 1.5rem;
+  border: 1px solid var(--color-gray-200);
+  border-radius: 1rem;
+  background: var(--color-white);
+  color: var(--color-primary-dark);
+  text-align: left;
+}
+.confirm-dialog::backdrop {
+  background: color-mix(in srgb, var(--color-primary-dark) 45%, transparent);
+}
+.confirm-dialog h2 {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+.confirm-dialog p {
+  margin: 0.75rem 0;
+  font-size: 0.875rem;
+  color: var(--color-primary);
+}
+.project-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.error {
+  color: var(--color-error);
+}
+
+.confirmation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+.confirm-button {
+  display: inline-flex;
+  min-height: 2.5rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 0.9rem;
+  border: 1px solid var(--color-gray-300);
+  border-radius: 0.625rem;
+  color: var(--color-primary-dark);
+  background: var(--color-white);
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+.confirm-button:hover {
+  background: var(--color-gray-50);
+}
+.confirm-button:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
+}
+.confirm-button-danger {
+  color: var(--color-error);
+  border-color: color-mix(in srgb, var(--color-error) 40%, var(--color-gray-300));
+}
+.confirm-button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu-trigger,
+  .menu-item {
+    transition: none;
+  }
+}

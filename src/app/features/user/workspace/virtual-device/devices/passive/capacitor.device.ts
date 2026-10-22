@@ -7,7 +7,7 @@ import {
 import { bodyFromMm, u } from '../core/device-metrics';
 import { OUTLINE, PART, SILK } from '../core/device-palette';
 import { pin } from '../core/device-pin';
-import { circle, line, rect, text, type Shape } from '../core/device-shape';
+import { circle, line, path, rect, text, type Shape } from '../core/device-shape';
 
 /** Formats farads the way a schematic labels them: pF / nF / µF. */
 export function formatCapacitance(farads: number): string {
@@ -22,15 +22,24 @@ function trim(value: number): string {
 
 // ------------------------------------------------------------- ceramic disc
 
-/** A 5 mm disc on the 5.08 mm lead spacing these are supplied at. */
+/**
+ * A 6 mm dipped disc on the 5.08 mm lead spacing these are supplied at. The legs
+ * leave the body close together through the epoxy drip under the disc, then
+ * bend out to the pitch — the kink is what makes it read as a real disc part.
+ */
 const CERAMIC_BODY = bodyFromMm({ widthMm: 7, heightMm: 11 });
 const CERAMIC_W = CERAMIC_BODY.width;
 const CERAMIC_H = CERAMIC_BODY.height;
 const CERAMIC_CX = CERAMIC_W / 2;
 const CERAMIC_LEAD_PITCH = u(5.08);
 const CERAMIC_LEG_X0 = CERAMIC_CX - CERAMIC_LEAD_PITCH / 2;
-const CERAMIC_DISC_CY = u(3);
-const CERAMIC_DISC_R = u(2.5);
+const CERAMIC_DISC_CY = u(3.4);
+const CERAMIC_DISC_R = u(3.1);
+/** Where the legs leave the epoxy, and where the bend ends. */
+const CERAMIC_LEG_EXIT_Y = u(7.4);
+const CERAMIC_LEG_EXIT_HALF = u(0.75);
+const CERAMIC_BEND_END_Y = u(9);
+const CERAMIC_EDGE = '#8a5f22';
 
 const CERAMIC_PROPS: readonly DevicePropertyDefinition[] = [
   {
@@ -50,21 +59,39 @@ const CERAMIC_PROPS: readonly DevicePropertyDefinition[] = [
 function drawCeramic(context: DeviceDrawContext): readonly Shape[] {
   const farads = numberState(context, 'capacitance', 1e-7);
   return [
-    ...[CERAMIC_LEG_X0, CERAMIC_LEG_X0 + CERAMIC_LEAD_PITCH].map((x) =>
-      line(x, CERAMIC_DISC_CY + u(1.6), x, CERAMIC_H, {
-        stroke: PART.metal,
-        strokeWidth: u(0.45),
-        strokeLinecap: 'round',
-      }),
+    // Legs: out of the epoxy side by side, bent out to the pitch, then straight.
+    ...[-1, 1].map((side) => {
+      const exitX = CERAMIC_CX + side * CERAMIC_LEG_EXIT_HALF;
+      const pinX = CERAMIC_CX + (side * CERAMIC_LEAD_PITCH) / 2;
+      return path(
+        `M ${exitX} ${CERAMIC_LEG_EXIT_Y} L ${pinX} ${CERAMIC_BEND_END_Y} V ${CERAMIC_H}`,
+        {
+          fill: 'none',
+          stroke: PART.metal,
+          strokeWidth: u(0.45),
+          strokeLinecap: 'round',
+          strokeLinejoin: 'round',
+        },
+      );
+    }),
+    // The epoxy drip the disc was dipped through, tapering onto the legs.
+    path(
+      `M ${CERAMIC_CX - u(1.3)} ${u(6)} Q ${CERAMIC_CX - u(0.8)} ${u(7.9)} ${CERAMIC_CX} ${u(8)} ` +
+        `Q ${CERAMIC_CX + u(0.8)} ${u(7.9)} ${CERAMIC_CX + u(1.3)} ${u(6)} Z`,
+      {
+        fill: PART.ceramicDisc,
+        stroke: CERAMIC_EDGE,
+        strokeWidth: u(0.15),
+      },
     ),
     // Dipped ceramic disc.
     circle(CERAMIC_CX, CERAMIC_DISC_CY, CERAMIC_DISC_R, {
       fill: PART.ceramicDisc,
-      stroke: OUTLINE,
-      strokeWidth: u(0.15),
+      stroke: CERAMIC_EDGE,
+      strokeWidth: u(0.2),
     }),
-    text(CERAMIC_CX, CERAMIC_DISC_CY + u(0.4), capCode(farads), {
-      size: u(1.2),
+    text(CERAMIC_CX, CERAMIC_DISC_CY + u(0.55), capCode(farads), {
+      size: u(1.6),
       fill: '#3a2c12',
       anchor: 'middle',
       weight: 700,

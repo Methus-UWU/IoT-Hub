@@ -1,5 +1,6 @@
 import { Component, computed, input, output, signal } from '@angular/core';
 
+import { Datastream, DatastreamDataType, DatastreamInput } from './dashboard-api.client';
 import { DashboardIcon } from './dashboard-icon';
 import {
   DashboardBreakpoint,
@@ -32,6 +33,12 @@ export interface DashboardSettingsChange {
 
 export type BulkWidgetAction = 'align-left' | 'align-top' | 'duplicate' | 'delete';
 
+/** A part on the project's canvas, as the data tab names it. */
+export interface InspectorComponent {
+  id: string;
+  label: string;
+}
+
 @Component({
   selector: 'app-widget-inspector',
   imports: [DashboardIcon],
@@ -44,7 +51,12 @@ export class WidgetInspector {
   readonly breakpoint = input.required<DashboardBreakpoint>();
   readonly layoutLocked = input(false);
   readonly deviceScope = input('All devices');
+  /** The project's devices; the dashboard shows the chosen one's live values. */
+  readonly devices = input<readonly { id: string; name: string }[]>([]);
   readonly dateRange = input('24h');
+  /** The project's datastreams: the only values a widget may bind to. */
+  readonly datastreams = input<readonly Datastream[]>([]);
+  readonly components = input<readonly InspectorComponent[]>([]);
 
   readonly widgetPatched = output<WidgetInspectorPatch>();
   readonly layoutChanged = output<WidgetLayoutFieldChange>();
@@ -52,6 +64,7 @@ export class WidgetInspector {
   readonly bulkActionRequested = output<BulkWidgetAction>();
   readonly dashboardSettingsChanged = output<DashboardSettingsChange>();
   readonly closeRequested = output<void>();
+  readonly datastreamCreated = output<DatastreamInput>();
 
   protected readonly activeTab = signal<InspectorTab>('general');
   protected readonly tabs: readonly { id: InspectorTab; label: string; icon: string }[] = [
@@ -79,6 +92,16 @@ export class WidgetInspector {
   protected readonly selectedLayout = computed(
     () => this.widget()?.layouts[this.breakpoint()] ?? null,
   );
+  protected readonly boundStream = computed(
+    () => this.datastreams().find((stream) => stream.key === this.widget()?.datasource) ?? null,
+  );
+  protected readonly boundComponentLabel = computed(() => {
+    const id = this.boundStream()?.componentId ?? this.widget()?.deviceId;
+    if (!id) return '';
+    return this.components().find((component) => component.id === id)?.label ?? 'Removed part';
+  });
+  protected readonly creatingStream = signal(false);
+  protected readonly dataTypes: readonly DatastreamDataType[] = ['number', 'boolean', 'string'];
   protected readonly selectedWidgetIcon = computed(() =>
     this.widget() ? widgetDefinition(this.widget()!.type).icon : 'info',
   );
@@ -109,6 +132,37 @@ export class WidgetInspector {
 
   protected patchText(field: 'title' | 'subtitle' | 'deviceId' | 'datasource', event: Event): void {
     this.patchWidget({ [field]: (event.target as HTMLInputElement).value });
+  }
+
+  /** Binding a datastream also names its part, so the two can never disagree. */
+  protected bindDatastream(event: Event): void {
+    const key = (event.target as HTMLSelectElement).value;
+    const stream = this.datastreams().find((item) => item.key === key);
+    this.patchWidget({
+      datasource: stream?.key ?? '',
+      deviceId: stream?.componentId ?? '',
+      ...(stream?.unit ? { settings: { unit: stream.unit } } : {}),
+    });
+  }
+
+  protected submitDatastream(event: Event): void {
+    event.preventDefault();
+    const form = event.target as HTMLFormElement;
+    const data = new FormData(form);
+    const value = (name: string) => String(data.get(name) ?? '').trim();
+    const number = (name: string) => (value(name) === '' ? null : Number(value(name)));
+    this.datastreamCreated.emit({
+      key: value('key'),
+      name: value('name') || value('key'),
+      dataType: value('dataType') as DatastreamDataType,
+      unit: value('unit'),
+      min: number('min'),
+      max: number('max'),
+      source: value('source'),
+      componentId: value('componentId') || null,
+    });
+    form.reset();
+    this.creatingStream.set(false);
   }
 
   protected patchState(event: Event): void {

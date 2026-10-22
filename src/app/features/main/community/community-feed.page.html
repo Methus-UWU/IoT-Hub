@@ -1,0 +1,200 @@
+<section class="community-page" aria-labelledby="community-heading">
+  <header class="community-banner">
+    <div class="banner-inner">
+      <span class="banner-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none">
+          <path
+            d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
+      </span>
+      <div class="banner-text">
+        <h1 id="community-heading">ชุมชน IoT Hub</h1>
+        <p>ถามปัญหาบอร์ด เซนเซอร์ และเฟิร์มแวร์ แล้วให้คนที่เคยเจอเหมือนกันช่วยตอบ</p>
+      </div>
+      <button type="button" class="ask-button" (click)="startPost()">
+        <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+          <path
+            d="M10 4.5v11M4.5 10h11"
+            stroke="currentColor"
+            stroke-width="1.9"
+            stroke-linecap="round"
+          />
+        </svg>
+        ตั้งกระทู้
+      </button>
+    </div>
+  </header>
+
+  <div class="community-container">
+    @if (loading() && posts().length === 0) {
+      <app-community-feed-skeleton />
+    } @else {
+    <div class="community-layout">
+      <div class="feed-column">
+        <div class="create-bar">
+          @if (identityLoading()) {
+            <div class="identity-skeleton flex items-center gap-2" role="status" aria-label="กำลังโหลดบัญชีผู้ใช้" aria-busy="true">
+              <span aria-hidden="true" class="size-8 shrink-0 rounded-full bg-neutral-200"></span>
+              <span aria-hidden="true" class="h-3 w-16 rounded bg-neutral-200"></span>
+            </div>
+          } @else {
+            <app-author-badge [username]="username()" [size]="2" />
+          }
+          <button type="button" class="create-input" (click)="startPost()">คุณอยากถามอะไร?</button>
+        </div>
+
+        <div class="sort-bar">
+          <div class="sort-tabs" role="tablist" aria-label="การเรียงลำดับ">
+            @for (tab of sortTabs; track tab.value) {
+              <button
+                type="button"
+                role="tab"
+                [attr.aria-selected]="filters().sort === tab.value"
+                [class.tab-active]="filters().sort === tab.value"
+                (click)="setSort(tab.value)"
+              >
+                <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                  <path
+                    [attr.d]="tab.icon"
+                    stroke="currentColor"
+                    stroke-width="1.6"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+                {{ tab.label }}
+              </button>
+            }
+          </div>
+
+          <label class="feed-search">
+            <span class="sr-only">ค้นหากระทู้</span>
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle cx="10.5" cy="10.5" r="6.5" stroke="currentColor" stroke-width="1.7" />
+              <path
+                d="m15.5 15.5 4.5 4.5"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+              />
+            </svg>
+            <input
+              type="search"
+              placeholder="ค้นหาในชุมชน"
+              [value]="searchDraft()"
+              (input)="updateSearch($event)"
+            />
+          </label>
+          @if (!searchDraft()) {
+            <app-recent-searches scope="community" (picked)="pickRecentSearch($event)" />
+          }
+        </div>
+
+        @if (activeTagName(); as tagName) {
+          <div class="active-filter">
+            <span
+              >กำลังดูหัวข้อ <strong>{{ tagName }}</strong></span
+            >
+            <button type="button" (click)="toggleTag(filters().tag ?? '')">ล้างตัวกรอง</button>
+          </div>
+        }
+
+        @if (error(); as message) {
+          <div class="feed-error" role="alert">
+            <p>{{ message }}</p>
+            <button type="button" (click)="retry()">ลองอีกครั้ง</button>
+          </div>
+        }
+
+        @if (loading()) {
+          <div class="feed-list" role="status" aria-label="กำลังโหลดกระทู้" aria-busy="true">
+            @for (row of skeletonRows; track row) {
+              <app-community-post-skeleton />
+            }
+          </div>
+        } @else {
+          <div class="feed-list">
+            @for (post of posts(); track post.id) {
+              <app-community-post-card
+                [post]="post"
+                [canVote]="signedIn()"
+                [basePath]="communityBasePath"
+                (vote)="vote(post.id, $event)"
+                (tagSelected)="toggleTag($event)"
+              />
+            }
+          </div>
+
+          @if (hasLoaded() && posts().length === 0 && !error()) {
+            <div class="feed-empty">
+              <h2>ยังไม่มีกระทู้ตรงกับที่ค้นหา</h2>
+              <p>ลองเปลี่ยนคำค้น เลือกหัวข้ออื่น หรือเป็นคนแรกที่ตั้งคำถามนี้</p>
+              <button type="button" (click)="startPost()">ตั้งกระทู้</button>
+            </div>
+          }
+
+          @if (loadingMore()) {
+            <div class="feed-list" role="status" aria-label="กำลังโหลดกระทู้เพิ่มเติม" aria-busy="true">
+              <app-community-post-skeleton />
+              <app-community-post-skeleton />
+            </div>
+          }
+
+          @if (hasMore()) {
+            <button type="button" class="load-more" [disabled]="loadingMore()" (click)="loadMore()">
+              {{ loadingMore() ? 'กำลังโหลด…' : 'โหลดเพิ่ม' }}
+            </button>
+          }
+        }
+      </div>
+
+      <aside class="side-column">
+        <section class="side-card">
+          <h2>เกี่ยวกับชุมชนนี้</h2>
+          <p>
+            ที่รวมคำถามและคำตอบเรื่องอุปกรณ์เชื่อมต่อเครือข่าย ตั้งแต่ต่อวงจรไม่ติด
+            ไปจนถึงเฟิร์มแวร์ค้าง ตอบได้ทุกคน โหวตคำตอบที่ใช้ได้จริงขึ้นบนสุด
+          </p>
+          <button type="button" class="side-ask" (click)="startPost()">ตั้งกระทู้</button>
+        </section>
+
+        <section class="side-card side-card-tags">
+          <h2>หัวข้อ</h2>
+          <div class="side-tags">
+            @if (tagsLoading() && tags().length === 0) {
+              <div role="status" aria-label="กำลังโหลดหัวข้อ" aria-busy="true" class="space-y-4 py-2">
+                @for (row of skeletonRows; track row) {
+                  <div aria-hidden="true" class="flex justify-between gap-4">
+                    <span class="h-3 w-24 rounded bg-neutral-200"></span>
+                    <span class="h-3 w-4 rounded bg-neutral-100"></span>
+                  </div>
+                }
+              </div>
+            }
+            @for (tag of tags(); track tag.slug) {
+              <button
+                type="button"
+                [class.tag-active]="filters().tag === tag.slug"
+                [attr.aria-pressed]="filters().tag === tag.slug"
+                (click)="toggleTag(tag.slug)"
+              >
+                <span>{{ tag.name }}</span>
+                <small>{{ tag.postCount }}</small>
+              </button>
+            }
+          </div>
+        </section>
+      </aside>
+    </div>
+    }
+  </div>
+</section>
+
+@if (composerOpen()) {
+  <app-ask-question-page (closed)="closeComposer()" />
+}

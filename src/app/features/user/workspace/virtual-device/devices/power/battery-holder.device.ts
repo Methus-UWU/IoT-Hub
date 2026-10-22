@@ -68,29 +68,30 @@ function createBatteryHolder(options: BatteryOptions): VirtualDevice {
 
       // Cells, each drawn at its real diameter with a spring at one end and a
       // button contact at the other.
-      ...repeat(options.cells, { x: cellPitch }, (_, x) => [
-        rect(x, u(2.5), u(options.cellMm.diameter), u(options.cellMm.length), {
-          rx: u(0.6),
-          fill: '#3a4049',
-          stroke: '#20242a',
-          strokeWidth: u(0.12),
-          detail: 'normal',
-        }),
-        rect(
-          x + u(options.cellMm.diameter) / 2 - u(1.4),
-          u(2.5),
-          u(2.8),
-          u(1.4),
-          { rx: u(0.3), fill: PART.metal, detail: 'normal' },
-        ),
-        rect(
-          x,
-          u(2.5) + u(options.cellMm.length) - u(1),
-          u(options.cellMm.diameter),
-          u(1),
-          { fill: PART.metalDark, opacity: 0.6, detail: 'high' },
-        ),
-      ], { x: u(PACK_MARGIN), y: 0 }),
+      ...repeat(
+        options.cells,
+        { x: cellPitch },
+        (_, x) => [
+          rect(x, u(2.5), u(options.cellMm.diameter), u(options.cellMm.length), {
+            rx: u(0.6),
+            fill: '#3a4049',
+            stroke: '#20242a',
+            strokeWidth: u(0.12),
+            detail: 'normal',
+          }),
+          rect(x + u(options.cellMm.diameter) / 2 - u(1.4), u(2.5), u(2.8), u(1.4), {
+            rx: u(0.3),
+            fill: PART.metal,
+            detail: 'normal',
+          }),
+          rect(x, u(2.5) + u(options.cellMm.length) - u(1), u(options.cellMm.diameter), u(1), {
+            fill: PART.metalDark,
+            opacity: 0.6,
+            detail: 'high',
+          }),
+        ],
+        { x: u(PACK_MARGIN), y: 0 },
+      ),
 
       // Flying leads.
       line(u(2.5), height - u(1), u(2.5), height + u(LEAD_LENGTH), {
@@ -112,14 +113,16 @@ function createBatteryHolder(options: BatteryOptions): VirtualDevice {
         mono: true,
         detail: 'normal',
       }),
-      text(u(2.5), height - u(1.8), '+', {
+      // Polarity marks sit in the bottom margin beside their leads, below the
+      // cells and off the wires.
+      text(u(4), height - u(0.6), '+', {
         size: u(1.6),
         fill: '#fca5a5',
         anchor: 'middle',
         weight: 800,
         detail: 'normal',
       }),
-      text(width - u(2.5), height - u(1.8), '−', {
+      text(width - u(4), height - u(0.6), '−', {
         size: u(1.6),
         fill: '#cbd5e1',
         anchor: 'middle',
@@ -152,6 +155,7 @@ function createBatteryHolder(options: BatteryOptions): VirtualDevice {
     // never disagree about how big the pack is.
     physicalSize: { widthMm: width / UNITS_PER_MM, heightMm: height / UNITS_PER_MM },
     initiallyVisible: false,
+    powerSource: true,
     operatingVoltage: { min: 0, max: packVolts, recommended: packVolts },
     interfaces: ['power'],
     pins: [

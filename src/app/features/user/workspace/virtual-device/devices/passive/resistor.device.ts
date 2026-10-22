@@ -5,9 +5,10 @@ import {
   type DevicePropertyDefinition,
 } from '../core/device-definition';
 import { bodyFromMm, u } from '../core/device-metrics';
+import { PART } from '../core/device-palette';
 import { pin } from '../core/device-pin';
-import { line, rect, type Shape } from '../core/device-shape';
-import type { DeviceBehavior } from '../core/device-simulation';
+import { rect, type Shape } from '../core/device-shape';
+import { propertyNumber, type DeviceBehavior } from '../core/device-simulation';
 import type { VirtualDevice } from '../../models/virtual-device.model';
 
 /**
@@ -97,10 +98,10 @@ const PROPERTIES: readonly DevicePropertyDefinition[] = [
     id: 'resistance',
     label: 'Resistance',
     kind: 'number',
-    defaultValue: 220,
+    defaultValue: 100,
     min: 0.1,
     max: 10_000_000,
-    step: 1,
+    step: 0.1,
     unit: 'Ω',
     group: 'electrical',
     description: 'Drives the printed colour bands.',
@@ -111,11 +112,12 @@ const PROPERTIES: readonly DevicePropertyDefinition[] = [
     kind: 'select',
     defaultValue: '5',
     group: 'electrical',
+    description: 'Printed as the last band: brown ±1 %, red ±2 %, gold ±5 %, silver ±10 %.',
     options: [
-      { value: '1', label: '±1 % (brown)' },
-      { value: '2', label: '±2 % (red)' },
-      { value: '5', label: '±5 % (gold)' },
-      { value: '10', label: '±10 % (silver)' },
+      { value: '1', label: '±1 %' },
+      { value: '2', label: '±2 %' },
+      { value: '5', label: '±5 %' },
+      { value: '10', label: '±10 %' },
     ],
   },
   {
@@ -135,7 +137,7 @@ const PROPERTIES: readonly DevicePropertyDefinition[] = [
 ];
 
 function draw(context: DeviceDrawContext): readonly Shape[] {
-  const ohms = numberState(context, 'resistance', 220);
+  const ohms = numberState(context, 'resistance', 100);
   const tolerance = stringState(context, 'tolerance', '5');
   const { first, second, exponent } = resistorBands(ohms);
 
@@ -149,24 +151,23 @@ function draw(context: DeviceDrawContext): readonly Shape[] {
   // the visual gap is how you tell which end to read from.
   const bandX = [BODY_X + u(1.2), BODY_X + u(2.1), BODY_X + u(3), BODY_X + u(5.1)];
 
+  const leftLead = { x: 0, width: BODY_X + u(0.4) };
+  const rightLead = {
+    x: BODY_X + BODY_WIDTH - u(0.4),
+    width: WIDTH - BODY_X - BODY_WIDTH + u(0.4),
+  };
+
   return [
-    // Axial leads.
-    line(0, MID_Y, BODY_X, MID_Y, {
-      stroke: '#b8b8b8',
-      strokeWidth: u(0.5),
-      strokeLinecap: 'square',
-    }),
-    line(WIDTH, MID_Y, BODY_X + BODY_WIDTH, MID_Y, {
-      stroke: '#b8b8b8',
-      strokeWidth: u(0.5),
-      strokeLinecap: 'square',
-    }),
+    // Axial leads, flat metal. No gradient pass: the part is drawn as a
+    // schematic-flat symbol, so nothing here should imply a cylinder.
+    rect(leftLead.x, MID_Y - u(0.25), leftLead.width, u(0.5), { fill: PART.metal }),
+    rect(rightLead.x, MID_Y - u(0.25), rightLead.width, u(0.5), { fill: PART.metal }),
 
     // A clean capsule: the moulded body has no hard outline in the flesh, and
     // giving it one makes the colour bands harder to read at small sizes.
     rect(BODY_X, MID_Y - BODY_HALF, BODY_WIDTH, BODY_HALF * 2, {
       rx: BODY_HALF,
-      fill: '#dec29f',
+      fill: PART.resistorBody,
     }),
 
     // Flat IEC colour bands. Their positions remain independent of the value,
@@ -191,6 +192,9 @@ export const RESISTOR: VirtualDevice = {
   ...BODY,
   initiallyVisible: false,
   rotatable: true,
+  // "1" and "2" are an ordering, not a pinout: a resistor is not polarised, so
+  // printing them over the bands costs legibility and tells the user nothing.
+  hidesPinLabels: true,
   pins: [
     pin('1', 0, MID_Y, 'passive', { side: 'left', description: 'Resistors are not polarised' }),
     pin('2', WIDTH, MID_Y, 'passive', {
@@ -201,12 +205,24 @@ export const RESISTOR: VirtualDevice = {
   properties: PROPERTIES,
   interfaces: ['passive'],
   limitsCurrent: true,
-  render: { draw },
-  // A resistor passes voltage: without this bond it would be an open circuit
-  // and every correctly-built LED circuit would stay dark. The current-limiting
-  // it provides is checked structurally instead — see `limitsCurrent`.
+  render: { draw, bleed: { left: u(0.5), right: u(0.5), top: u(1), bottom: u(1) } },
+  // A resistor carries each end's level to the other end as a weak drive in
+  // proportion to its conductance. So it lights the LED it feeds, a pull-up holds
+  // an input high until a button pulls it to ground — without a short, which the
+  // old zero-ohm bond made of every pull-up — and two in series divide their rails.
+  // The current-limiting it provides is checked structurally — see `limitsCurrent`.
   simulation: (): DeviceBehavior => ({
-    connect: (context) => context.bond('1', '2'),
+    drive: (context) => {
+      const resistance = Math.max(1, propertyNumber(context, 'resistance', 220));
+      for (const [near, far] of [
+        ['1', '2'],
+        ['2', '1'],
+      ] as const) {
+        const node = context.readNode(far);
+        if (node.floating) continue;
+        context.drive(near, node.voltage, 'weak', node.duty, 1 / resistance);
+      }
+    },
   }),
   catalog: {
     categoryId: 'passive-components',

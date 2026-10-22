@@ -7,7 +7,7 @@
  * exercises the registry guards, every part's `draw()`, and the pure physics
  * helpers without needing a DOM.
  *
- * Run it from `iot-hub-fe/`:
+ * Run it from `frontend/`:
  *
  *   node_modules/@esbuild/win32-x64/esbuild.exe scripts/verify-devices.ts \
  *     --bundle --platform=node --format=cjs --outfile=.tmp/verify.cjs \
@@ -30,6 +30,8 @@ import {
 } from '../src/app/features/user/workspace/virtual-device/devices/core/device-types';
 import { mixRgb } from '../src/app/features/user/workspace/virtual-device/devices/basic/rgb-led.device';
 import { DEVICES, deviceById } from '../src/app/features/user/workspace/virtual-device/devices/device-catalog';
+import { DEVICE_DATASHEETS } from '../src/app/features/user/documents/device-datasheets';
+import { LIBRARY_CATALOG } from '../src/app/features/user/workspace/virtual-device/simulation/firmware/libraries/library-catalog';
 import { wiperResistance } from '../src/app/features/user/workspace/virtual-device/devices/input/potentiometer.device';
 import {
   formatResistance,
@@ -39,10 +41,10 @@ import { breadboardNode } from '../src/app/features/user/workspace/virtual-devic
 import { ldrResistance } from '../src/app/features/user/workspace/virtual-device/devices/sensors/ldr.device';
 import { ledBrightness } from '../src/app/features/user/workspace/virtual-device/devices/basic/led.device';
 import { contactClosed } from '../src/app/features/user/workspace/virtual-device/devices/input/push-button.device';
-import { BOARD_PINS } from '../src/app/features/user/workspace/virtual-device/devices/microcontrollers/esp32-devkit.board';
+const boardDevice = { instanceId: 'board', definition: deviceById('esp32-devkit-v1')!, properties: {} };
 import type { DeviceBehavior } from '../src/app/features/user/workspace/virtual-device/devices/core/device-simulation';
 import type { WireConnection } from '../src/app/features/user/workspace/virtual-device/models/virtual-device.model';
-import { devicePinKey, simulateTick, type SimulationResult } from '../src/app/features/user/workspace/virtual-device/simulation/circuit-simulator';
+import { devicePinKey, simulateTick, type SimulationResult, type SimulatedDevice } from '../src/app/features/user/workspace/virtual-device/simulation/circuit-simulator';
 import { validateCircuit } from '../src/app/features/user/workspace/virtual-device/simulation/wire-validation';
 
 let pass = 0;
@@ -107,9 +109,9 @@ eq('rgb dim red keeps hue', mixRgb(64, 0, 0).color, 'rgb(255, 0, 0)');
 eq('rgb dim red drops level', Math.round(mixRgb(64, 0, 0).level * 100) / 100, 0.25);
 
 // --- potentiometer taper ---------------------------------------------------
-eq('linear midpoint', wiperResistance(10_000, 50, 'linear'), 5000);
-eq('log taper sits lower at midpoint', wiperResistance(10_000, 50, 'log') < 5000, true);
-eq('travel clamps above 100 %', wiperResistance(10_000, 150, 'linear'), 10_000);
+eq('linear midpoint', wiperResistance(10_000, 2047.5, 'linear'), 5000);
+eq('log taper sits lower at midpoint', wiperResistance(10_000, 2047.5, 'log') < 5000, true);
+eq('travel clamps above 4095 counts', wiperResistance(10_000, 5000, 'linear'), 10_000);
 
 // --- breadboard internal nets ----------------------------------------------
 eq('A1 and E1 share a strip', breadboardNode('A1'), breadboardNode('E1'));
@@ -146,6 +148,41 @@ const ids = DEVICES.map((device) => device.id);
 eq('device ids are unique', new Set(ids).size, ids.length);
 eq('every part has pins', DEVICES.every((device) => device.pins.length > 0), true);
 eq('every part has tags', DEVICES.every((device) => device.catalog.tags.length > 0), true);
+eq(
+  'every pin has electrical type and direction metadata',
+  DEVICES.every((device) =>
+    device.pins.every((pin) => Boolean(pin.type) && Boolean(pin.direction)),
+  ),
+  true,
+);
+eq(
+  'every catalog part has a substantial datasheet',
+  DEVICES.every((device) => (DEVICE_DATASHEETS[device.id]?.trim().length ?? 0) >= 200),
+  true,
+);
+eq(
+  'datasheets do not name deleted catalog parts',
+  Object.keys(DEVICE_DATASHEETS).every((id) => Boolean(deviceById(id))),
+  true,
+);
+const libraryDeviceIds = LIBRARY_CATALOG.flatMap((library) => library.devices);
+eq(
+  'library references name existing catalog parts',
+  libraryDeviceIds.every((id) => Boolean(deviceById(id))),
+  true,
+);
+eq(
+  'every library-driven part has a simulator behavior',
+  libraryDeviceIds.every((id) => Boolean(deviceById(id)?.simulation)),
+  true,
+);
+eq(
+  'library references have no duplicate device within one library',
+  LIBRARY_CATALOG.every(
+    (library) => new Set(library.devices).size === library.devices.length,
+  ),
+  true,
+);
 eq('OLED advertises I2C', deviceBadges(deviceById('oled-096-i2c')!).includes('I2C'), true);
 eq('DHT22 advertises 1-Wire', deviceInterfaces(deviceById('dht22')!).includes('onewire'), true);
 eq(
@@ -168,7 +205,8 @@ function buildCircuit(pressed: boolean): SimulationResult {
   const button = deviceById('button')!;
   const led = deviceById('led')!;
 
-  const devices = [
+  const devices: SimulatedDevice[] = [
+    boardDevice,
     { instanceId: 'btn', definition: button, properties: { pressed, mode: 'no' } },
     { instanceId: 'led1', definition: led, properties: { color: 'red' } },
   ];
@@ -176,7 +214,7 @@ function buildCircuit(pressed: boolean): SimulationResult {
   const behaviors = new Map<string, DeviceBehavior>();
   for (const device of devices) {
     const factory = device.definition.simulation;
-    if (factory) behaviors.set(device.instanceId, factory());
+    if (factory) behaviors.set(device.instanceId, factory(device.instanceId));
   }
 
   const wire = (
@@ -189,11 +227,10 @@ function buildCircuit(pressed: boolean): SimulationResult {
     {
       devices,
       connections: [
-        wire('w1', { type: 'board', pinId: '3v3' }, { type: 'device', deviceId: 'btn', pinId: '1' }),
+        wire('w1', { type: 'device', deviceId: 'board', pinId: '3V3' }, { type: 'device', deviceId: 'btn', pinId: '1' }),
         wire('w2', { type: 'device', deviceId: 'btn', pinId: '3' }, { type: 'device', deviceId: 'led1', pinId: 'A' }),
-        wire('w3', { type: 'device', deviceId: 'led1', pinId: 'K' }, { type: 'board', pinId: 'gnd-left' }),
+        wire('w3', { type: 'device', deviceId: 'led1', pinId: 'K' }, { type: 'device', deviceId: 'board', pinId: 'GND-L' }),
       ],
-      boardPins: BOARD_PINS,
       deltaMs: 16,
     },
     behaviors,
@@ -247,9 +284,8 @@ function validate(
   connections: readonly WireConnection[],
 ) {
   return validateCircuit({
-    devices: devices.map((d) => ({ instanceId: d.instanceId, definition: d.definition! })),
+    devices: [boardDevice, ...devices.map((d) => ({ instanceId: d.instanceId, definition: d.definition! }))],
     connections,
-    boardPins: BOARD_PINS,
   });
 }
 
@@ -269,7 +305,7 @@ const strictPart = {
 // 1. 5 V rail into a 3.3 V-max part → overvoltage warning.
 const over = validate(
   [{ instanceId: 'o1', definition: strictPart }],
-  [vWire('w', { type: 'board', pinId: 'vin' }, { type: 'device', deviceId: 'o1', pinId: 'VCC' })],
+  [vWire('w', { type: 'device', deviceId: 'board', pinId: 'VIN' }, { type: 'device', deviceId: 'o1', pinId: 'VCC' })],
 );
 eq('5V into a 3.3V part warns', over.some((i) => i.code === 'overvoltage'), true);
 eq('overvoltage is a warning, not an error',
@@ -278,7 +314,7 @@ eq('overvoltage is a warning, not an error',
 // 2. Same part on the 3V3 rail → clean.
 const ok = validate(
   [{ instanceId: 'o1', definition: strictPart }],
-  [vWire('w', { type: 'board', pinId: '3v3' }, { type: 'device', deviceId: 'o1', pinId: 'VCC' })],
+  [vWire('w', { type: 'device', deviceId: 'board', pinId: '3V3' }, { type: 'device', deviceId: 'o1', pinId: 'VCC' })],
 );
 eq('3V3 into a 3.3V part is clean', ok.filter((i) => i.code === 'overvoltage').length, 0);
 
@@ -287,12 +323,12 @@ eq('3V3 into a 3.3V part is clean', ok.filter((i) => i.code === 'overvoltage').l
 // validator that cries wolf is one users learn to ignore.
 const oled5v = validate(
   [{ instanceId: 'o1', definition: oled }],
-  [vWire('w', { type: 'board', pinId: 'vin' }, { type: 'device', deviceId: 'o1', pinId: 'VCC' })],
+  [vWire('w', { type: 'device', deviceId: 'board', pinId: 'VIN' }, { type: 'device', deviceId: 'o1', pinId: 'VCC' })],
 );
 eq('5V into the 5V-rated OLED is fine', oled5v.filter((i) => i.code === 'overvoltage').length, 0);
 const dht5v = validate(
   [{ instanceId: 'd1', definition: dht }],
-  [vWire('w', { type: 'board', pinId: 'vin' }, { type: 'device', deviceId: 'd1', pinId: 'VCC' })],
+  [vWire('w', { type: 'device', deviceId: 'board', pinId: 'VIN' }, { type: 'device', deviceId: 'd1', pinId: 'VCC' })],
 );
 eq('5V into DHT22 is fine', dht5v.filter((i) => i.code === 'overvoltage').length, 0);
 
@@ -327,10 +363,33 @@ eq('OUT into DATA is clean', oneOut.filter((i) => i.code === 'output-conflict').
 // 7. Unconnected parts produce nothing.
 eq('no wires, no findings', validate([{ instanceId: 'd1', definition: dht }], []).length, 0);
 
+// A user who starts wiring a module but omits power or half of its bus gets a
+// concrete diagnosis instead of a display that silently stays blank.
+const partialOled = validate(
+  [{ instanceId: 'o1', definition: oled }],
+  [vWire('w', { type: 'device', deviceId: 'board', pinId: 'GPIO21' }, { type: 'device', deviceId: 'o1', pinId: 'SDA' })],
+);
+eq('partly wired OLED reports missing power', partialOled.some((i) => i.code === 'missing-required-power'), true);
+eq('partly wired OLED reports missing SCL', partialOled.some((i) => i.code === 'incomplete-i2c'), true);
+
+const duplicateI2cAddress = validate(
+  [
+    { instanceId: 'o1', definition: oled },
+    { instanceId: 'o2', definition: oled },
+  ],
+  [
+    vWire('sda1', { type: 'device', deviceId: 'board', pinId: 'GPIO21' }, { type: 'device', deviceId: 'o1', pinId: 'SDA' }),
+    vWire('scl1', { type: 'device', deviceId: 'board', pinId: 'GPIO22' }, { type: 'device', deviceId: 'o1', pinId: 'SCL' }),
+    vWire('sda2', { type: 'device', deviceId: 'board', pinId: 'GPIO21' }, { type: 'device', deviceId: 'o2', pinId: 'SDA' }),
+    vWire('scl2', { type: 'device', deviceId: 'board', pinId: 'GPIO22' }, { type: 'device', deviceId: 'o2', pinId: 'SCL' }),
+  ],
+);
+eq('duplicate I2C address on one bus is an error', duplicateI2cAddress.some((i) => i.code === 'i2c-address-conflict' && i.severity === 'error'), true);
+
 // 8. Findings carry a stable id (so dismissing one makes it stay dismissed).
 const again = validate(
   [{ instanceId: 'o1', definition: strictPart }],
-  [vWire('w', { type: 'board', pinId: 'vin' }, { type: 'device', deviceId: 'o1', pinId: 'VCC' })],
+  [vWire('w', { type: 'device', deviceId: 'board', pinId: 'VIN' }, { type: 'device', deviceId: 'o1', pinId: 'VCC' })],
 );
 eq('finding ids are stable across runs',
    again.map((i) => i.id).sort().join(','), over.map((i) => i.id).sort().join(','));
@@ -344,17 +403,16 @@ eq('findings reference their device', over.every((i) => i.deviceIds.length > 0),
 // across two rails — which needs the solver's bond pass to notice.
 function railBridge(pressed: boolean) {
   const button = deviceById('button')!;
-  const devices = [{ instanceId: 'btn', definition: button, properties: { pressed, mode: 'no' } }];
+  const devices: SimulatedDevice[] = [boardDevice, { instanceId: 'btn', definition: button, properties: { pressed, mode: 'no' } }];
   const behaviors = new Map<string, DeviceBehavior>();
-  behaviors.set('btn', button.simulation!());
+  behaviors.set('btn', button.simulation!('btn'));
   return simulateTick(
     {
       devices,
       connections: [
-        vWire('a', { type: 'board', pinId: '3v3' }, { type: 'device', deviceId: 'btn', pinId: '1' }),
-        vWire('b', { type: 'device', deviceId: 'btn', pinId: '3' }, { type: 'board', pinId: 'gnd-left' }),
+        vWire('a', { type: 'device', deviceId: 'board', pinId: '3V3' }, { type: 'device', deviceId: 'btn', pinId: '1' }),
+        vWire('b', { type: 'device', deviceId: 'btn', pinId: '3' }, { type: 'device', deviceId: 'board', pinId: 'GND-L' }),
       ],
-      boardPins: BOARD_PINS,
       deltaMs: 16,
     },
     behaviors,
@@ -375,22 +433,22 @@ eq(
 function breadboardRig(ledColumn: string) {
   const bb = deviceById('breadboard-half')!;
   const led = deviceById('led')!;
-  const devices = [
+  const devices: SimulatedDevice[] = [
+    boardDevice,
     { instanceId: 'bb', definition: bb, properties: {} },
     { instanceId: 'l1', definition: led, properties: { color: 'red' } },
   ];
   const behaviors = new Map<string, DeviceBehavior>();
-  for (const d of devices) if (d.definition.simulation) behaviors.set(d.instanceId, d.definition.simulation());
+  for (const d of devices) if (d.definition.simulation) behaviors.set(d.instanceId, d.definition.simulation(d.instanceId));
   return simulateTick(
     {
       devices,
       connections: [
         // 3V3 into hole A1, LED anode into hole E1 (same column, same strip).
-        vWire('a', { type: 'board', pinId: '3v3' }, { type: 'device', deviceId: 'bb', pinId: 'A1' }),
+        vWire('a', { type: 'device', deviceId: 'board', pinId: '3V3' }, { type: 'device', deviceId: 'bb', pinId: 'A1' }),
         vWire('b', { type: 'device', deviceId: 'bb', pinId: ledColumn }, { type: 'device', deviceId: 'l1', pinId: 'A' }),
-        vWire('c', { type: 'device', deviceId: 'l1', pinId: 'K' }, { type: 'board', pinId: 'gnd-left' }),
+        vWire('c', { type: 'device', deviceId: 'l1', pinId: 'K' }, { type: 'device', deviceId: 'board', pinId: 'GND-L' }),
       ],
-      boardPins: BOARD_PINS,
       deltaMs: 16,
     },
     behaviors,
@@ -408,8 +466,8 @@ const resistorDef = deviceById('resistor')!;
 const bare = validate(
   [{ instanceId: 'l1', definition: ledDef }],
   [
-    vWire('a', { type: 'board', pinId: '3v3' }, { type: 'device', deviceId: 'l1', pinId: 'A' }),
-    vWire('b', { type: 'device', deviceId: 'l1', pinId: 'K' }, { type: 'board', pinId: 'gnd-left' }),
+    vWire('a', { type: 'device', deviceId: 'board', pinId: '3V3' }, { type: 'device', deviceId: 'l1', pinId: 'A' }),
+    vWire('b', { type: 'device', deviceId: 'l1', pinId: 'K' }, { type: 'device', deviceId: 'board', pinId: 'GND-L' }),
   ],
 );
 eq('bare LED on a rail warns', bare.some((i) => i.code === 'no-series-resistor'), true);
@@ -421,9 +479,9 @@ const guarded = validate(
     { instanceId: 'r1', definition: resistorDef },
   ],
   [
-    vWire('a', { type: 'board', pinId: '3v3' }, { type: 'device', deviceId: 'r1', pinId: '1' }),
+    vWire('a', { type: 'device', deviceId: 'board', pinId: '3V3' }, { type: 'device', deviceId: 'r1', pinId: '1' }),
     vWire('b', { type: 'device', deviceId: 'r1', pinId: '2' }, { type: 'device', deviceId: 'l1', pinId: 'A' }),
-    vWire('c', { type: 'device', deviceId: 'l1', pinId: 'K' }, { type: 'board', pinId: 'gnd-left' }),
+    vWire('c', { type: 'device', deviceId: 'l1', pinId: 'K' }, { type: 'device', deviceId: 'board', pinId: 'GND-L' }),
   ],
 );
 eq('a series resistor clears the warning', guarded.filter((i) => i.code === 'no-series-resistor').length, 0);
@@ -431,7 +489,7 @@ eq('a series resistor clears the warning', guarded.filter((i) => i.code === 'no-
 // A part that is not current-sensitive must never trigger it.
 const oledOnRail = validate(
   [{ instanceId: 'o1', definition: oled }],
-  [vWire('a', { type: 'board', pinId: '3v3' }, { type: 'device', deviceId: 'o1', pinId: 'VCC' })],
+  [vWire('a', { type: 'device', deviceId: 'board', pinId: '3V3' }, { type: 'device', deviceId: 'o1', pinId: 'VCC' })],
 );
 eq('modules on a rail are fine', oledOnRail.filter((i) => i.code === 'no-series-resistor').length, 0);
 
@@ -440,17 +498,16 @@ eq('modules on a rail are fine', oledOnRail.filter((i) => i.code === 'no-series-
 // terminals have resolved.
 function potRig(position: number) {
   const pot = deviceById('potentiometer')!;
-  const devices = [{ instanceId: 'p1', definition: pot, properties: { position, resistance: 10000, taper: 'linear' } }];
+  const devices: SimulatedDevice[] = [boardDevice, { instanceId: 'p1', definition: pot, properties: { wiper: position / 100 * 4095, resistance: 10000, taper: 'linear' } }];
   const behaviors = new Map<string, DeviceBehavior>();
-  behaviors.set('p1', pot.simulation!());
+  behaviors.set('p1', pot.simulation!('p1'));
   const result = simulateTick(
     {
       devices,
       connections: [
-        vWire('a', { type: 'board', pinId: '3v3' }, { type: 'device', deviceId: 'p1', pinId: '3' }),
-        vWire('b', { type: 'device', deviceId: 'p1', pinId: '1' }, { type: 'board', pinId: 'gnd-left' }),
+        vWire('a', { type: 'device', deviceId: 'board', pinId: '3V3' }, { type: 'device', deviceId: 'p1', pinId: '3' }),
+        vWire('b', { type: 'device', deviceId: 'p1', pinId: '1' }, { type: 'device', deviceId: 'board', pinId: 'GND-L' }),
       ],
-      boardPins: BOARD_PINS,
       deltaMs: 50,
     },
     behaviors,
@@ -466,19 +523,18 @@ eq('wiper at 25 %', Math.round(potRig(25).voltage * 100) / 100, 0.83);
 // --- PIR hold timing --------------------------------------------------------
 function pirRun(steps: readonly { motion: boolean; dt: number }[], repeatMode: boolean) {
   const pir = deviceById('pir-hc-sr501')!;
-  const behavior = pir.simulation!();
+  const behavior = pir.simulation!('s1');
   const behaviors = new Map<string, DeviceBehavior>([['s1', behavior]]);
   let last: ReturnType<typeof simulateTick> | undefined;
   for (const step of steps) {
     last = simulateTick(
       {
-        devices: [{
+        devices: [boardDevice, {
           instanceId: 's1',
           definition: pir,
           properties: { motion: step.motion, delay: 2, sensitivity: 60, retrigger: repeatMode },
         }],
-        connections: [],
-        boardPins: BOARD_PINS,
+        connections: [vWire('pir-vcc', { type: 'device', deviceId: 'board', pinId: 'VIN' }, { type: 'device', deviceId: 's1', pinId: 'VCC' }), vWire('pir-gnd', { type: 'device', deviceId: 'board', pinId: 'GND-L' }, { type: 'device', deviceId: 's1', pinId: 'GND' })],
         deltaMs: step.dt,
       },
       behaviors,
@@ -512,13 +568,12 @@ eq(
 
 // PIR drives its OUT pin high while held.
 const pirDef = deviceById('pir-hc-sr501')!;
-const pirBehavior = pirDef.simulation!();
+const pirBehavior = pirDef.simulation!('s1');
 const pirBehaviors = new Map<string, DeviceBehavior>([['s1', pirBehavior]]);
 const pirInput = (motion: boolean, dt: number) => simulateTick(
   {
-    devices: [{ instanceId: 's1', definition: pirDef, properties: { motion, delay: 2, retrigger: true } }],
-    connections: [],
-    boardPins: BOARD_PINS,
+    devices: [boardDevice, { instanceId: 's1', definition: pirDef, properties: { motion, delay: 2, retrigger: true } }],
+    connections: [vWire('pir-vcc', { type: 'device', deviceId: 'board', pinId: 'VIN' }, { type: 'device', deviceId: 's1', pinId: 'VCC' }), vWire('pir-gnd', { type: 'device', deviceId: 'board', pinId: 'GND-L' }, { type: 'device', deviceId: 's1', pinId: 'GND' })],
     deltaMs: dt,
   },
   pirBehaviors,
@@ -537,14 +592,14 @@ function batteryRig(reversed: boolean) {
   const diode = deviceById(`diode-1n4007`)!;
   const resistor = deviceById(`resistor`)!;
   const led = deviceById(`led`)!;
-  const devices = [
+  const devices: SimulatedDevice[] = [
     { instanceId: `bat`, definition: battery, properties: { voltage: 6 } },
     { instanceId: `d1`, definition: diode, properties: {} },
     { instanceId: `r1`, definition: resistor, properties: { resistance: 220 } },
     { instanceId: `l1`, definition: led, properties: { color: `red` } },
   ];
   const behaviors = new Map<string, DeviceBehavior>();
-  for (const d of devices) if (d.definition.simulation) behaviors.set(d.instanceId, d.definition.simulation());
+  for (const d of devices) if (d.definition.simulation) behaviors.set(d.instanceId, d.definition.simulation(d.instanceId));
   // battery + -> diode A, diode K -> resistor 1, resistor 2 -> LED A, LED K -> battery -
   const wires = reversed
     ? [
@@ -559,7 +614,7 @@ function batteryRig(reversed: boolean) {
     vWire(`w3`, { type: `device`, deviceId: `r1`, pinId: `2` }, { type: `device`, deviceId: `l1`, pinId: `A` }),
     vWire(`w4`, { type: `device`, deviceId: `l1`, pinId: `K` }, { type: `device`, deviceId: `bat`, pinId: `-` }),
   );
-  return simulateTick({ devices, connections: wires, boardPins: BOARD_PINS, deltaMs: 50 }, behaviors);
+  return simulateTick({ devices, connections: wires, deltaMs: 50 }, behaviors);
 }
 
 eq(`battery lights an LED with no board`, (batteryRig(false).runtime[`l1`]?.[`brightness`] as number) > 0, true);

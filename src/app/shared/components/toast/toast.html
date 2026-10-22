@@ -1,0 +1,61 @@
+<div
+  class="toast"
+  [class.toast-leaving]="leaving()"
+  [attr.data-tone]="tone()"
+  [attr.role]="role()"
+  [attr.aria-live]="tone() === 'error' ? 'assertive' : 'polite'"
+>
+  <span class="toast-icon" aria-hidden="true">
+    @switch (tone()) {
+      @case ('success') {
+        <svg viewBox="0 0 20 20" fill="none">
+          <circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="1.5" />
+          <path
+            d="m6.8 10 2 2 4.4-4.5"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
+      }
+      @case ('error') {
+        <svg viewBox="0 0 20 20" fill="none">
+          <circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="1.5" />
+          <path
+            d="M10 6.3v4.3M10 13.6h.01"
+            stroke="currentColor"
+            stroke-width="1.6"
+            stroke-linecap="round"
+          />
+        </svg>
+      }
+      @default {
+        <svg viewBox="0 0 20 20" fill="none">
+          <circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="1.5" />
+          <path
+            d="M10 9v4M10 6.5h.01"
+            stroke="currentColor"
+            stroke-width="1.6"
+            stroke-linecap="round"
+          />
+        </svg>
+      }
+    }
+  </span>
+
+  <p>{{ message() }}</p>
+
+  <button type="button" class="toast-close" aria-label="ปิดการแจ้งเตือน" (click)="dismiss()">
+    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+      <path
+        d="m5 5 10 10M15 5 5 15"
+        stroke="currentColor"
+        stroke-width="1.6"
+        stroke-linecap="round"
+      />
+    </svg>
+  </button>
+
+  <span class="toast-progress" [style.animation-duration.ms]="duration()" aria-hidden="true"></span>
+</div>
