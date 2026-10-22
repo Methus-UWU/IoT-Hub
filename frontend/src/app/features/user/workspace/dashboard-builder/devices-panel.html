@@ -1,0 +1,117 @@
+<header class="devices-head">
+  <div>
+    <h2 id="devices-panel-title">Devices</h2>
+    <p>บอร์ดจริงที่ส่งค่าเข้าโปรเจกต์นี้ แต่ละตัวมี token ของตัวเอง</p>
+  </div>
+  <button type="button" class="icon-button" aria-label="ปิด Devices" (click)="closed.emit()">
+    <app-dashboard-icon name="close" />
+  </button>
+</header>
+
+@if (status(); as current) {
+  <p class="devices-status" [class.warning]="current.kind === 'warning'" role="status">
+    {{ current.text }}
+  </p>
+}
+
+@if (revealed(); as issued) {
+  <section class="token-reveal" aria-labelledby="token-title">
+    <h3 id="token-title">Token ของ {{ issued.deviceName }}</h3>
+    <p class="token-warning">
+      แสดงครั้งเดียวเท่านั้น ระบบเก็บแค่ค่า hash คัดลอกเก็บไว้ก่อนปิดหน้าต่างนี้
+    </p>
+    <div class="token-row">
+      <input type="text" readonly aria-label="Device token" [value]="issued.token" />
+      <button type="button" (click)="copy(issued.token)">
+        {{ copied() ? 'คัดลอกแล้ว' : 'Copy' }}
+      </button>
+    </div>
+    <details>
+      <summary>ตัวอย่างโค้ด ESP32 ที่ส่งค่าเข้ามา</summary>
+      <pre><code>{{ sketch() }}</code></pre>
+      <button type="button" (click)="copy(sketch())">Copy code</button>
+    </details>
+  </section>
+}
+
+<form class="device-create" (submit)="create($event)">
+  <label for="device-name">เพิ่มบอร์ด</label>
+  <div class="token-row">
+    <input
+      id="device-name"
+      name="name"
+      required
+      maxlength="60"
+      placeholder="เช่น Living Room ESP32"
+    />
+    <button type="submit" class="primary" [disabled]="busy()">Add</button>
+  </div>
+</form>
+
+<section class="device-list" aria-label="รายการ device" [attr.aria-busy]="!loaded()">
+  @if (!loaded()) {
+    @for (row of [1, 2]; track row) {
+      <div class="device-skeleton" aria-hidden="true"><span></span><span></span></div>
+    }
+  } @else if (devices().length === 0) {
+    <p class="empty">ยังไม่มี device เพิ่มบอร์ดแล้วนำ token ไปใส่ในโค้ด</p>
+  } @else {
+    <ul>
+      @for (device of devices(); track device.id) {
+        <li [class.selected]="device.id === selectedDeviceId()">
+          <div class="device-meta">
+            <strong>
+              <span
+                class="status-dot"
+                [class.online]="device.online"
+                [attr.aria-label]="device.online ? 'online' : 'offline'"
+                role="img"
+              ></span>
+              {{ device.name }}
+            </strong>
+            <small>
+              {{ device.online ? 'Online' : 'Offline' }} ·
+              @if (device.lastSeenAt) {
+                ส่งข้อมูลล่าสุด {{ device.lastSeenAt | date: 'short' }}
+              } @else {
+                ยังไม่เคยส่งข้อมูล
+              }
+              · token …{{ device.tokenHint }}
+            </small>
+          </div>
+          <div class="device-actions">
+            @if (confirmingDelete() === device.id) {
+              <button type="button" class="danger" [disabled]="busy()" (click)="remove(device)">
+                ยืนยันลบ
+              </button>
+              <button type="button" (click)="confirmingDelete.set(null)">ยกเลิก</button>
+            } @else {
+              <button
+                type="button"
+                [disabled]="device.id === selectedDeviceId()"
+                (click)="deviceSelected.emit(device.id)"
+              >
+                {{ device.id === selectedDeviceId() ? 'แสดงอยู่' : 'แสดงบนแดชบอร์ด' }}
+              </button>
+              <button type="button" [disabled]="busy()" (click)="rotate(device)">New token</button>
+              <button
+                type="button"
+                class="danger-text"
+                [disabled]="busy()"
+                (click)="confirmingDelete.set(device.id)"
+              >
+                Delete
+              </button>
+            }
+          </div>
+        </li>
+      }
+    </ul>
+  }
+</section>
+
+<footer class="devices-foot">
+  บอร์ดส่งค่าไปที่ <code>{{ apiBase() }}/telemetry</code> โดยใส่ header
+  <code>Authorization: Device &lt;token&gt;</code> และอ่านค่าจากปุ่ม/สวิตช์ที่
+  <code>/controls</code>
+</footer>

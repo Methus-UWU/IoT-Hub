@@ -1,0 +1,321 @@
+<div class="ai-workspace relative">
+  <header class="ai-toolbar">
+    <div class="toolbar-leading">
+      <div class="min-w-0">
+        <p class="text-sm font-medium text-ink">ผู้ช่วย AI ของ IoT Hub</p>
+        <p class="text-xs text-ink-muted">ใช้โมเดลเดียวกับ IDE</p>
+      </div>
+
+      <button
+        type="button"
+        class="history-trigger"
+        (click)="toggleHistory()"
+        [attr.aria-expanded]="historyOpen()"
+        aria-controls="chat-history-panel"
+        aria-label="เปิดประวัติแชท"
+      >
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path
+            d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3L4.5 9M4.5 4.5V9H9"
+            stroke="currentColor"
+            stroke-width="1.6"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+          <path
+            d="M12 8v4l2.5 1.5"
+            stroke="currentColor"
+            stroke-width="1.6"
+            stroke-linecap="round"
+          />
+        </svg>
+        @if (store.conversations().length) {
+          <span class="history-count">{{ store.conversations().length }}</span>
+        }
+      </button>
+    </div>
+
+    <div class="toolbar-actions">
+      <span
+        class="provider-status"
+        [class.provider-status-ready]="store.configured()"
+        [attr.aria-label]="
+          store.configured() ? 'API พร้อมใช้งาน' : 'ยังไม่ได้ตั้งค่า OpenRouter API key'
+        "
+      >
+        <span class="status-dot" aria-hidden="true"></span>
+        <span class="hidden sm:inline">{{ store.configured() ? 'พร้อมใช้งาน' : 'Demo mode' }}</span>
+      </span>
+      @if (store.stale()) {
+        <span class="provider-status" title="ดึงรายการโมเดลสดไม่สำเร็จ กำลังใช้ข้อมูลสำรอง">
+          <span class="hidden sm:inline">แคตตาล็อกสำรอง</span>
+        </span>
+      }
+      <button
+        type="button"
+        class="new-chat-button"
+        (click)="startNewChat()"
+        [disabled]="!store.hasMessages() || store.sending()"
+        aria-label="เริ่มบทสนทนาใหม่"
+      >
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path
+            d="M12 5v14M5 12h14"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+          />
+        </svg>
+        <span class="hidden sm:inline">แชตใหม่</span>
+      </button>
+    </div>
+  </header>
+
+  @if (historyOpen()) {
+    <div class="history-backdrop" (click)="closeHistory()" aria-hidden="true"></div>
+    <aside id="chat-history-panel" class="history-panel" aria-label="ประวัติแชท">
+      <div class="history-header">
+        <div>
+          <p>ประวัติการสนทนา</p>
+          <h2>ประวัติแชท</h2>
+        </div>
+        <button
+          type="button"
+          class="history-close"
+          (click)="closeHistory()"
+          aria-label="ปิดประวัติแชท"
+        >
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path
+              d="m7 7 10 10M17 7 7 17"
+              stroke="currentColor"
+              stroke-width="1.7"
+              stroke-linecap="round"
+            />
+          </svg>
+        </button>
+      </div>
+
+      <button type="button" class="history-new-chat" (click)="startNewChat()">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path
+            d="M12 5v14M5 12h14"
+            stroke="currentColor"
+            stroke-width="1.7"
+            stroke-linecap="round"
+          />
+        </svg>
+        เริ่มแชทใหม่
+      </button>
+
+      <div class="history-list scrollbar-thin">
+        @if (!store.conversations().length) {
+          <div class="history-empty">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path
+                d="M7 8h10M7 12h6M5 19l2.5-2H18a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v9a2 2 0 0 0 1 1.73V19Z"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+            <p>ยังไม่มีประวัติแชท</p>
+            <span>บทสนทนาใหม่จะปรากฏที่นี่</span>
+          </div>
+        } @else {
+          @for (conversation of store.conversations(); track conversation.id) {
+            <div
+              class="history-item"
+              [class.history-item-active]="store.activeConversationId() === conversation.id"
+            >
+              <button
+                type="button"
+                class="history-open-chat"
+                (click)="openConversation(conversation.id)"
+              >
+                <span class="history-item-title">{{ conversation.title }}</span>
+                <span class="history-item-meta">
+                  {{ conversation.updatedAt | date: 'dd MMM, HH:mm' }}
+                </span>
+              </button>
+              <button
+                type="button"
+                class="history-delete"
+                (click)="deleteConversation($event, conversation.id)"
+                [attr.aria-label]="'ลบแชท ' + conversation.title"
+              >
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path
+                    d="M5 7h14M9 7V4.5h6V7m-8 0 .7 12h8.6L17 7M10 10.5v5M14 10.5v5"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </button>
+            </div>
+          }
+        }
+      </div>
+    </aside>
+  }
+
+  <section #conversation class="conversation scrollbar-thin" aria-label="บทสนทนากับผู้ช่วย AI">
+    @if (!store.hasMessages()) {
+      <div class="welcome-state">
+        <div class="ai-orb" aria-hidden="true">
+          <span></span>
+        </div>
+        <p class="welcome-eyebrow">ผู้ช่วยวิเคราะห์ระบบ</p>
+        <h1>สวัสดีผู้ดูแลระบบ มีอะไรให้ช่วยวิเคราะห์?</h1>
+        <p class="welcome-description">
+          ถามเรื่องสถานะระบบ บันทึกคำขอ บริการ ฐานข้อมูล หรือขอแนวทางแก้ปัญหาได้เลย
+        </p>
+        <div class="suggestion-list" aria-label="คำถามแนะนำ">
+          @for (suggestion of suggestions; track suggestion.label) {
+            <button
+              type="button"
+              class="suggestion-chip"
+              (click)="useSuggestion(suggestion.prompt)"
+              [disabled]="store.sending()"
+            >
+              {{ suggestion.label }}
+            </button>
+          }
+        </div>
+      </div>
+    } @else {
+      <div class="message-list" aria-live="polite">
+        @for (message of store.messages(); track message.id) {
+          <article class="message" [class.message-user]="message.role === 'user'">
+            <div
+              class="message-avatar"
+              [class.message-avatar-user]="message.role === 'user'"
+              aria-hidden="true"
+            >
+              @if (message.role === 'assistant') {
+                <svg viewBox="0 0 24 24" fill="none">
+                  <path
+                    d="M12 3.5 14 9l5.5 2-5.5 2-2 5.5-2-5.5-5.5-2L10 9l2-5.5Z"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              } @else {
+                <span>A</span>
+              }
+            </div>
+            <div class="message-body">
+              <div class="message-meta">
+                <strong>{{ message.role === 'assistant' ? 'ผู้ช่วย AI' : 'ผู้ดูแลระบบ' }}</strong>
+                @if (message.model) {
+                  <span>{{ message.model }}</span>
+                }
+                @if (message.autoSelected) {
+                  <span class="message-auto-badge" title="ระบบเลือกโมเดลนี้ให้ตามเนื้องาน">
+                    อัตโนมัติ
+                  </span>
+                }
+                <time [attr.datetime]="message.createdAt.toISOString()">
+                  {{ message.createdAt | date: 'HH:mm' }}
+                </time>
+              </div>
+              @if (message.role === 'assistant') {
+                <div class="markdown-content" [innerHTML]="message.content | markdown"></div>
+              } @else {
+                <p>{{ message.content }}</p>
+              }
+            </div>
+          </article>
+        }
+
+        @if (store.sending()) {
+          <article class="message" aria-label="AI กำลังประมวลผล">
+            <div class="message-avatar" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M12 3.5 14 9l5.5 2-5.5 2-2 5.5-2-5.5-5.5-2L10 9l2-5.5Z"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </div>
+            <div class="message-body">
+              <div class="message-meta"><strong>ผู้ช่วย AI</strong></div>
+              <div class="typing-indicator" aria-hidden="true">
+                <span></span><span></span><span></span>
+              </div>
+            </div>
+          </article>
+        }
+      </div>
+    }
+  </section>
+
+  <footer class="composer-area">
+    @if (store.error()) {
+      <div id="composer-error" class="composer-error" role="alert">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6" />
+          <path
+            d="M12 7.5v5M12 16.5h.01"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+          />
+        </svg>
+        {{ store.error() }}
+      </div>
+    }
+    <form class="composer" (submit)="$event.preventDefault(); submit()">
+      <label class="sr-only" for="ai-prompt">พิมพ์คำถามถึง AI</label>
+      <textarea
+        id="ai-prompt"
+        rows="1"
+        [formControl]="promptControl"
+        (keydown)="handleKeydown($event)"
+        placeholder="ถามเกี่ยวกับระบบของคุณ..."
+        [attr.aria-describedby]="store.error() ? 'composer-hint composer-error' : 'composer-hint'"
+      ></textarea>
+      @if (store.sending()) {
+        <button
+          type="button"
+          class="send-button send-button-stop"
+          (click)="stopGeneration()"
+          aria-label="หยุดการประมวลผล AI"
+        >
+          <span class="stop-icon" aria-hidden="true"></span>
+        </button>
+      } @else {
+        <button
+          type="submit"
+          class="send-button"
+          [disabled]="!promptControl.value.trim()"
+          aria-label="ส่งข้อความ"
+        >
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path
+              d="m6 12 12-7-3.5 14-3-5-5.5-2Z"
+              stroke="currentColor"
+              stroke-width="1.7"
+              stroke-linejoin="round"
+            />
+            <path
+              d="m11.5 14 3-3"
+              stroke="currentColor"
+              stroke-width="1.7"
+              stroke-linecap="round"
+            />
+          </svg>
+        </button>
+      }
+    </form>
+    <p id="composer-hint" class="composer-hint">
+      AI อาจตอบผิดพลาดได้ ควรตรวจสอบก่อนเปลี่ยนแปลงระบบจริง
+    </p>
+  </footer>
+</div>

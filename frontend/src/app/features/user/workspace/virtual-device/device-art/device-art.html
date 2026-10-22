@@ -1,0 +1,13 @@
+<svg:defs [appDeviceGradients]="shapes()"></svg:defs>
+<svg:g class="component-body" [appDeviceShapes]="shapes()"></svg:g>
+
+@if (showCaption()) {
+  <svg:text
+    class="device-caption"
+    [attr.x]="device().width / 2"
+    [attr.y]="device().height + 16"
+    text-anchor="middle"
+  >
+    {{ captionText() }}
+  </svg:text>
+}

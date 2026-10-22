@@ -1,0 +1,181 @@
+<div class="pricing-surface relative min-h-[calc(100vh-4rem)] overflow-hidden pb-10 pt-10 sm:pt-12">
+  <div class="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+    <div class="ambient-orb -left-52 top-36"></div>
+    <div class="ambient-orb -right-56 top-24 [animation-delay:-7s]"></div>
+    <div class="diamond-field -left-22"></div>
+    <div class="diamond-field -right-22"></div>
+  </div>
+
+  <section class="relative mx-auto max-w-6xl px-4 sm:px-6 lg:px-8" aria-labelledby="pricing-title">
+    <div class="mx-auto max-w-2xl text-center">
+      <p
+        class="pricing-eyebrow inline-flex rounded-sm border border-[#e1e1e1] bg-white px-2 py-1.5 text-[11px] font-extrabold text-[#545454] shadow-sm"
+      >
+        ราคา
+      </p>
+      <h1
+        id="pricing-title"
+        class="pricing-title mt-4 text-4xl font-extrabold tracking-[-0.055em] text-[#2b2b2b] sm:text-5xl"
+      >
+        ราคาที่เข้าใจง่าย
+        <span class="block text-[#808080]">และเติบโตไปพร้อมกับคุณ!</span>
+      </h1>
+      <p
+        class="pricing-subtitle mx-auto mt-4 max-w-lg text-xs leading-relaxed text-[#545454] sm:text-sm"
+      >
+        เชื่อมต่ออุปกรณ์ จัดการเวิร์กโฟลว์ให้ง่ายขึ้น และเติบโตด้วยเครื่องมือ AI ที่เข้าใจโปรเจกต์ของคุณ
+      </p>
+
+      <div class="billing-selector mx-auto mt-7" role="group" aria-label="เลือกรอบการชำระเงิน">
+        <button
+          type="button"
+          class="billing-label"
+          [class.billing-label-active]="billingPeriod() === 'monthly'"
+          [attr.aria-pressed]="billingPeriod() === 'monthly'"
+          (click)="setBillingPeriod('monthly')"
+        >
+          รายเดือน
+        </button>
+        <button
+          type="button"
+          role="switch"
+          class="billing-toggle"
+          [attr.aria-checked]="billingPeriod() === 'annual'"
+          aria-label="ใช้การชำระเงินรายปี"
+          (click)="toggleBillingPeriod()"
+        >
+          <span
+            class="billing-thumb"
+            [class.billing-thumb-annual]="billingPeriod() === 'annual'"
+            aria-hidden="true"
+          ></span>
+        </button>
+        <button
+          type="button"
+          class="billing-label"
+          [class.billing-label-active]="billingPeriod() === 'annual'"
+          [attr.aria-pressed]="billingPeriod() === 'annual'"
+          (click)="setBillingPeriod('annual')"
+        >
+          รายปี
+        </button>
+        <span class="save-badge">-10%</span>
+      </div>
+      <p class="mt-1.5 min-h-4 text-[11px] text-[#545454]" aria-live="polite">
+        @if (billingPeriod() === 'annual') {
+          ชำระแบบรายปี ราคาที่แสดงคือค่าเฉลี่ยต่อเดือน
+        }
+      </p>
+    </div>
+
+    <div class="relative z-10 mt-14 grid items-stretch gap-13 lg:grid-cols-3 lg:gap-4">
+      @for (plan of plans(); track plan.name) {
+        <article
+          class="pricing-card relative flex flex-col overflow-hidden rounded-2xl border border-[#e1e1e1] bg-white shadow-[0_16px_45px_rgba(43,43,43,0.05)] lg:min-h-[31rem]"
+          [class.featured-plan]="plan.featured"
+          [attr.aria-labelledby]="'plan-' + plan.name"
+        >
+          @if (plan.featured) {
+            <div class="popular-ribbon">ยอดนิยม</div>
+          }
+
+          <div
+            class="plan-body flex flex-1 flex-col p-5 sm:p-6"
+            [class.featured-plan-body]="plan.featured"
+          >
+            <header>
+              <h2
+                [id]="'plan-' + plan.name"
+                class="inline-flex rounded-sm border border-[#e1e1e1] px-2 py-1.5 text-[9px] font-extrabold uppercase tracking-[0.1em] text-[#2b2b2b]"
+              >
+                {{ plan.name }}
+              </h2>
+              <div class="mt-4 flex min-h-10 items-baseline gap-1 text-[#2b2b2b]">
+                <span class="text-2xl font-extrabold tracking-tight" aria-hidden="true">
+                  ฿{{ plan.price | number: '1.0-0' }}
+                </span>
+                <span class="text-[11px] text-[#545454]" aria-hidden="true">
+                  @if (plan.price === 0) {
+                    /ตลอดไป
+                  } @else {
+                    /เดือน
+                  }
+                </span>
+                <span class="sr-only">
+                  @if (plan.price === 0) {
+                    ฟรีตลอดไป
+                  } @else {
+                    {{ plan.price | number: '1.0-0' }} บาทต่อเดือน
+                  }
+                </span>
+              </div>
+              <p class="mt-3 min-h-10 text-xs leading-relaxed text-[#545454]">
+                {{ plan.description }}
+              </p>
+            </header>
+
+            <a
+              class="plan-button mt-4"
+              [class.plan-button-featured]="plan.featured"
+              routerLink="/auth/signup"
+            >
+              {{ plan.callToAction }}
+            </a>
+
+            <div class="mt-5 border-t border-[#e1e1e1] pt-4">
+              <p class="text-[11px] font-semibold text-[#2b2b2b]">สิ่งที่ได้รับ:</p>
+              <ul class="mt-3 space-y-2" role="list">
+                @for (feature of plan.features; track feature) {
+                  <li class="plan-feature text-[11px] leading-4.5 text-[#545454]">
+                    {{ feature }}
+                  </li>
+                }
+              </ul>
+            </div>
+
+            <p
+              class="mt-auto flex items-center gap-1.5 pt-5 text-[11px] font-medium text-[#2b2b2b]"
+            >
+              <svg viewBox="0 0 24 24" fill="none" class="h-3.5 w-3.5 shrink-0" aria-hidden="true">
+                <path
+                  d="M12 8v4l2.5 1.5M21 12a9 9 0 1 1-2.64-6.36"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+                <path
+                  d="M21 4v5h-5"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+              {{ plan.retention }}
+            </p>
+          </div>
+        </article>
+      }
+    </div>
+  </section>
+
+  <section
+    class="model-section relative mx-auto mt-9 max-w-4xl px-4 text-center sm:px-6"
+    aria-labelledby="models-title"
+  >
+    <h2 id="models-title" class="text-[11px] font-medium text-[#545454]">
+      ใช้ได้กับโมเดล AI ที่คุณคุ้นเคย
+    </h2>
+    <ul class="mt-5 grid grid-cols-2 items-center gap-x-8 gap-y-5 sm:grid-cols-4" role="list">
+      @for (model of modelPartners; track model.name) {
+        <li
+          class="model-logo inline-flex items-center justify-center gap-2 text-sm font-bold tracking-[-0.02em] text-[#545454] transition hover:-translate-y-0.5 hover:text-[#2b2b2b]"
+        >
+          <img [ngSrc]="model.logo" width="24" height="24" alt="" />
+          <span>{{ model.name }}</span>
+        </li>
+      }
+    </ul>
+  </section>
+</div>

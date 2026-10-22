@@ -1,0 +1,1102 @@
+@if (project(); as currentProject) {
+  <section
+    class="workspace-page"
+    [class.ai-panel-open]="aiOpen()"
+    [attr.inert]="pageLoading() ? '' : null"
+    aria-label="Project workspace"
+  >
+    <header class="workspace-toolbar">
+      <div class="toolbar-context">
+        <div class="toolbar-project">
+          <span>
+            <strong>{{ currentProject.name }}</strong>
+            <small><i aria-hidden="true"></i>{{ notice() }}</small>
+          </span>
+        </div>
+
+        @if (view() === 'ide') {
+          <div
+            class="execution-target-switch"
+            role="radiogroup"
+            aria-label="เลือกว่าจะใช้อุปกรณ์จำลองหรืออุปกรณ์จริง"
+          >
+            <button
+              type="button"
+              class="execution-target-option simulation-target-option"
+              [class.execution-target-active]="executionTarget() === 'simulation'"
+              [attr.aria-checked]="executionTarget() === 'simulation'"
+              [disabled]="buildState() === 'building' || serialState() === 'connecting'"
+              role="radio"
+              (click)="selectExecutionTarget('simulation')"
+            >
+              <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                <rect
+                  x="3.5"
+                  y="4"
+                  width="13"
+                  height="10"
+                  rx="2"
+                  stroke="currentColor"
+                  stroke-width="1.35"
+                />
+                <path
+                  d="M7 17h6M10 14v3M7.5 8.8h5"
+                  stroke="currentColor"
+                  stroke-width="1.35"
+                  stroke-linecap="round"
+                />
+              </svg>
+              <span>จำลอง</span>
+            </button>
+            <button
+              type="button"
+              class="execution-target-option hardware-target-option"
+              [class.execution-target-active]="executionTarget() === 'hardware'"
+              [attr.aria-checked]="executionTarget() === 'hardware'"
+              [disabled]="buildState() === 'building' || serialState() === 'connecting'"
+              role="radio"
+              (click)="selectExecutionTarget('hardware')"
+            >
+              <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                <rect
+                  x="5"
+                  y="3"
+                  width="10"
+                  height="14"
+                  rx="2"
+                  stroke="currentColor"
+                  stroke-width="1.35"
+                />
+                <path
+                  d="M8 6h4M8 14h4"
+                  stroke="currentColor"
+                  stroke-width="1.35"
+                  stroke-linecap="round"
+                />
+                <circle cx="10" cy="10" r="1.3" fill="currentColor" />
+              </svg>
+              <span>อุปกรณ์จริง</span>
+            </button>
+          </div>
+        }
+      </div>
+
+      <div class="toolbar-actions">
+        @if (view() === 'ide') {
+          @if (executionTarget() === 'hardware') {
+            <app-custom-select
+              class="device-select"
+              [options]="deviceOptions()"
+              [value]="selectedPort()"
+              [disabled]="buildState() === 'building' || serialState() === 'connecting'"
+              [compact]="true"
+              [menuWidth]="248"
+              [closeRequest]="deviceMenuCloseRequest()"
+              ariaLabel="เลือกพอร์ต USB ของบอร์ด"
+              (valueChange)="selectPort($event)"
+              (openChange)="handleDeviceMenuOpen($event)"
+            />
+            <button
+              type="button"
+              class="tool-button upload-tool"
+              aria-label="อัปโหลดเฟิร์มแวร์ไปยังอุปกรณ์จริง"
+              [disabled]="!selectedPort() || buildState() === 'building'"
+              (click)="uploadFirmware()"
+            >
+              <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                <path
+                  d="M10 13V3M6.5 6.5 10 3l3.5 3.5M4 11.5V16h12v-4.5"
+                  stroke="currentColor"
+                  stroke-width="1.35"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+              <span>{{ uploadLabel() }}</span>
+            </button>
+          } @else {
+            <button
+              type="button"
+              class="tool-button simulator-tool"
+              aria-label="เปิดหน้าอุปกรณ์จำลอง"
+              (click)="openSimulator()"
+            >
+              <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                <path
+                  d="M5 3.5h10a1.5 1.5 0 0 1 1.5 1.5v8A1.5 1.5 0 0 1 15 14.5H5A1.5 1.5 0 0 1 3.5 13V5A1.5 1.5 0 0 1 5 3.5Z"
+                  stroke="currentColor"
+                  stroke-width="1.35"
+                />
+                <path d="m8.2 7 4.6 2.5-4.6 2.5V7Z" fill="currentColor" />
+                <path
+                  d="M7 17h6"
+                  stroke="currentColor"
+                  stroke-width="1.35"
+                  stroke-linecap="round"
+                />
+              </svg>
+              <span>เปิด Simulator</span>
+            </button>
+          }
+          <button
+            type="button"
+            class="tool-button ai-toggle"
+            [class.tool-button-active]="aiOpen()"
+            [attr.aria-pressed]="aiOpen()"
+            (click)="toggleAiPanel()"
+          >
+            <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+              <path
+                d="M4 4.5h12v9H9l-3.5 2.5v-2.5H4z"
+                stroke="currentColor"
+                stroke-width="1.3"
+                stroke-linejoin="round"
+              />
+              <path
+                d="m10 6 .45 1.2a2 2 0 0 0 1.35 1.35L13 9l-1.2.45a2 2 0 0 0-1.35 1.35L10 12l-.45-1.2A2 2 0 0 0 8.2 9.45L7 9l1.2-.45A2 2 0 0 0 9.55 7.2L10 6Z"
+                fill="currentColor"
+              />
+            </svg>
+            <span>AI</span>
+          </button>
+
+          <div class="toolbar-more">
+            <button
+              type="button"
+              class="tool-button icon-tool"
+              aria-label="More workspace actions"
+              [attr.aria-expanded]="toolbarMenuOpen()"
+              (click)="toggleToolbarMenu($event)"
+            >
+              <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                <circle cx="5" cy="10" r="1.1" fill="currentColor" />
+                <circle cx="10" cy="10" r="1.1" fill="currentColor" />
+                <circle cx="15" cy="10" r="1.1" fill="currentColor" />
+              </svg>
+            </button>
+            @if (toolbarMenuOpen()) {
+              <div class="toolbar-more-menu" role="menu">
+                <input
+                  #importInput
+                  class="toolbar-more-file-input"
+                  type="file"
+                  accept=".ino,.cpp,.h,.py,.json,.ini"
+                  (change)="handleUpload($event)"
+                />
+                <button
+                  type="button"
+                  class="toolbar-menu-action"
+                  role="menuitem"
+                  (click)="importInput.click()"
+                >
+                  <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                    <path
+                      d="M10 13V3M6.5 6.5 10 3l3.5 3.5M4 11.5V16h12v-4.5"
+                      stroke="currentColor"
+                      stroke-width="1.35"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                  Import source file
+                </button>
+                <button
+                  type="button"
+                  class="toolbar-menu-action"
+                  role="menuitem"
+                  (click)="openLibraries()"
+                >
+                  <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                    <path
+                      d="M4 3.5h3v13H4zM8.5 3.5h3v13h-3zM13 4.2l2.9-.8 3 12.6-2.9.7z"
+                      stroke="currentColor"
+                      stroke-width="1.3"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                  Libraries
+                </button>
+                <button
+                  type="button"
+                  class="toolbar-menu-action"
+                  role="menuitem"
+                  (click)="exportProject()"
+                >
+                  <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                    <path
+                      d="M10 3v10M6.5 9.5 10 13l3.5-3.5M4 15.5V17h12v-1.5"
+                      stroke="currentColor"
+                      stroke-width="1.35"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                  Export project
+                </button>
+              </div>
+            }
+          </div>
+
+          <button
+            type="button"
+            class="deploy-button"
+            [disabled]="buildState() === 'building'"
+            (click)="buildProject()"
+          >
+            <span class="deploy-dot" aria-hidden="true"></span>
+            {{ buildLabel() }}
+          </button>
+        } @else {
+          <button type="button" class="tool-button" (click)="exportProject()">
+            <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+              <path
+                d="M10 3v10M6.5 9.5 10 13l3.5-3.5M4 15.5V17h12v-1.5"
+                stroke="currentColor"
+                stroke-width="1.35"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+            <span>Export</span>
+          </button>
+          <button
+            type="button"
+            class="deploy-button"
+            [disabled]="deployState() === 'building'"
+            (click)="deploy()"
+          >
+            <span class="deploy-dot" aria-hidden="true"></span>
+            {{ deployLabel() }}
+          </button>
+        }
+      </div>
+    </header>
+
+    @if (view() === 'dashboard') {
+      <main class="project-dashboard">
+        <div class="dashboard-heading">
+          <div>
+            <span class="eyebrow">Project overview</span>
+            <h1>{{ currentProject.name }}</h1>
+            <p>{{ currentProject.description }}</p>
+          </div>
+          <a [routerLink]="['/user/projects', currentProject.id, 'ide']" class="open-ide-button">
+            Open source code
+            <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+              <path
+                d="M4 10h12M12 6l4 4-4 4"
+                stroke="currentColor"
+                stroke-width="1.4"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </a>
+        </div>
+
+        <div class="dashboard-stats" aria-label="Project telemetry">
+          <article>
+            <span>Device status</span
+            ><strong class="status-online"><i aria-hidden="true"></i>Online</strong
+            ><small>Last seen 12 sec ago</small>
+          </article>
+          <article>
+            <span>Temperature</span><strong>27.4°C</strong><small>Normal range</small>
+          </article>
+          <article><span>Humidity</span><strong>68%</strong><small>+2.1% this hour</small></article>
+          <article>
+            <span>Soil moisture</span><strong>42%</strong><small>Watering at 30%</small>
+          </article>
+        </div>
+
+        <div class="dashboard-grid">
+          <article class="deployment-card">
+            <header>
+              <div>
+                <span class="eyebrow">Web server</span>
+                <h2>Deployment</h2>
+              </div>
+              <span class="live-badge"><i aria-hidden="true"></i>Live</span>
+            </header>
+            <div class="deployment-preview">
+              <span class="browser-bar"
+                ><i></i><i></i><i></i><small>{{ currentProject.deploymentUrl }}</small></span
+              >
+              <div class="preview-content">
+                <span class="preview-icon" aria-hidden="true"
+                  ><svg viewBox="0 0 24 24" fill="none">
+                    <path
+                      d="M5 18h14M7 15l3-3 2 2 4-5 2 3"
+                      stroke="currentColor"
+                      stroke-width="1.4"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    /></svg
+                ></span>
+                <strong>Device dashboard</strong>
+                <small>Live telemetry is available</small>
+              </div>
+            </div>
+            <footer>
+              <span>{{ currentProject.deploymentUrl }}</span
+              ><button type="button" (click)="deploy()">Redeploy</button>
+            </footer>
+          </article>
+
+          <article class="project-details-card">
+            <span class="eyebrow">Configuration</span>
+            <h2>Project details</h2>
+            <dl>
+              <div>
+                <dt>Board</dt>
+                <dd>{{ currentProject.board }}</dd>
+              </div>
+              <div>
+                <dt>Framework</dt>
+                <dd>{{ currentProject.framework }}</dd>
+              </div>
+              <div>
+                <dt>Source files</dt>
+                <dd>{{ currentProject.files.length }} files</dd>
+              </div>
+              <div>
+                <dt>Setup</dt>
+                <dd>{{ currentProject.setupMode === 'ai' ? 'AI assisted' : 'Manual' }}</dd>
+              </div>
+            </dl>
+          </article>
+        </div>
+      </main>
+    } @else {
+      <div
+        #ideLayout
+        class="ide-layout"
+        [class.ai-open]="aiOpen()"
+        [class.is-resizing]="resizingAi()"
+        [style.--ai-panel-width.px]="aiPanelWidth()"
+      >
+        <section class="editor-shell" aria-label="Source code editor">
+          <div class="editor-tabs" role="tablist" aria-label="Open files">
+            <div class="editor-tab-list">
+              @for (filename of openedFiles(); track filename) {
+                <div
+                  class="editor-tab"
+                  [class.editor-tab-active]="filename === activeFilename()"
+                  [class.opacity-25]="draggedFile() === filename"
+                  [class.cursor-grabbing]="draggedFile() === filename"
+                  [attr.data-filename]="filename"
+                  title="ลากเพื่อจัดลำดับแท็บ"
+                  (pointerdown)="prepareFileDrag(filename, $event)"
+                  (pointermove)="moveFileDrag($event)"
+                  (pointerup)="finishFileDrag($event)"
+                  (pointercancel)="finishFileDrag($event)"
+                >
+                  <button
+                    type="button"
+                    class="editor-tab-main"
+                    role="tab"
+                    [attr.aria-selected]="filename === activeFilename()"
+                    [attr.tabindex]="filename === activeFilename() ? 0 : -1"
+                    (click)="handleFileTabClick(filename, $event)"
+                    (keydown)="handleFileTabKeydown($event)"
+                  >
+                    <app-file-icon [filename]="filename" />
+                    <span>{{ filename }}</span>
+                    @if (tabIsDirty(filename)) {
+                      <i class="tab-dirty" aria-hidden="true"></i>
+                    }
+                  </button>
+                  <button
+                    type="button"
+                    class="editor-tab-close"
+                    [disabled]="!canDeleteFiles()"
+                    [attr.aria-label]="'ลบไฟล์ ' + filename"
+                    [attr.title]="
+                      canDeleteFiles() ? 'ลบไฟล์ ' + filename : 'โปรเจกต์ต้องมีอย่างน้อย 1 ไฟล์'
+                    "
+                    (click)="requestFileDeletion(filename, $event)"
+                  >
+                    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                      <path
+                        d="m6 6 8 8M14 6l-8 8"
+                        stroke="currentColor"
+                        stroke-width="1.3"
+                        stroke-linecap="round"
+                      />
+                    </svg>
+                  </button>
+                </div>
+              }
+              <button
+                type="button"
+                class="flex h-full min-w-24 shrink-0 items-center justify-center gap-1.5 border-r border-slate-200 px-3 text-[0.62rem] font-semibold text-slate-500 transition hover:bg-white hover:text-slate-900 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-slate-400"
+                aria-label="์New file"
+                (click)="requestNewFile()"
+              >
+                <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                  <path
+                    d="M10 4v12M4 10h12"
+                    stroke="currentColor"
+                    stroke-width="1.4"
+                    stroke-linecap="round"
+                  />
+                </svg>
+                New File
+              </button>
+            </div>
+            <div class="editor-tab-actions">
+              <span [class.unsaved-label]="isDirty()">{{ isDirty() ? 'Unsaved' : 'Saved' }}</span>
+              <button
+                type="button"
+                class="save-button"
+                [disabled]="!isDirty()"
+                title="Save (Ctrl+S)"
+                (click)="saveFile()"
+              >
+                <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                  <path
+                    d="M4 3.5h9l3 3v10H4z"
+                    stroke="currentColor"
+                    stroke-width="1.3"
+                    stroke-linejoin="round"
+                  />
+                  <path
+                    d="M7 3.5v5h6v-5M7 16v-4.5h6V16"
+                    stroke="currentColor"
+                    stroke-width="1.3"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+                <span>Save</span>
+              </button>
+            </div>
+          </div>
+
+          @if (tabDragPreview(); as preview) {
+            <div
+              class="pointer-events-none fixed z-200 flex h-[2.65rem] items-center gap-2 overflow-hidden rounded-lg border border-indigo-200 bg-white px-3 text-[0.64rem] font-semibold text-slate-700 shadow-2xl ring-3 ring-indigo-100/70"
+              [style.left.px]="preview.left"
+              [style.top.px]="preview.top"
+              [style.width.px]="preview.width"
+              aria-hidden="true"
+            >
+              <app-file-icon class="h-4 w-4 shrink-0" [filename]="preview.filename" />
+              <span class="truncate">{{ preview.filename }}</span>
+            </div>
+          }
+
+          <div class="editor-content" [attr.aria-busy]="!codeReady() || applyingCode()">
+            <!-- The editor stays mounted; loading and applying are drawn over it. -->
+            <app-monaco-code-editor
+              [filePath]="activeModelPath()"
+              [value]="code()"
+              [language]="editorLanguage()"
+              [readOnly]="applyingCode()"
+              [ariaLabel]="activeFilename() + ' source code editor'"
+              (valueChange)="updateCode($event)"
+              (cursorChange)="updateCursor($event)"
+              (saveRequested)="saveFile()"
+              (settled)="editorSettled.set(true)"
+            />
+            <!-- Opening the page is covered by the page skeleton; this one is for AI rewrites
+                 and for switching to a file whose text is still being read. -->
+            @if ((!codeReady() && !pageLoading()) || rewritingActiveFile()) {
+              <app-workspace-skeleton class="editor-skeleton" part="code" />
+            }
+            @if (applyingCode()) {
+              <div class="editor-applying" role="status">
+                <span class="editor-applying-bar" aria-hidden="true"></span>
+                {{
+                  rewritingActiveFile()
+                    ? 'AI กำลังเขียนโค้ดใหม่ในไฟล์นี้…'
+                    : 'กำลังปรับใช้โค้ดจาก AI…'
+                }}
+              </div>
+            }
+          </div>
+
+          <section
+            class="console-panel"
+            [class.console-collapsed]="!consoleOpen()"
+            [class.console-error-state]="buildState() === 'error'"
+            [class.console-running-state]="buildState() === 'building'"
+            aria-label="IDE output panel"
+          >
+            <div class="console-heading">
+              <div class="panel-tabs" role="tablist" aria-label="Output panels">
+                <button
+                  type="button"
+                  role="tab"
+                  [attr.aria-selected]="bottomPanelTab() === 'build'"
+                  [class.panel-tab-active]="bottomPanelTab() === 'build'"
+                  (click)="selectBottomPanel('build')"
+                >
+                  <i aria-hidden="true"></i>
+                  Compile output
+                  <small
+                    [class.console-success]="buildState() === 'success'"
+                    [class.console-error]="buildState() === 'error'"
+                    >{{ buildStatusLabel() }}</small
+                  >
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  [attr.aria-selected]="bottomPanelTab() === 'serial'"
+                  [class.panel-tab-active]="bottomPanelTab() === 'serial'"
+                  (click)="selectBottomPanel('serial')"
+                >
+                  <i
+                    class="serial-tab-dot"
+                    [class.serial-connected-dot]="serialState() === 'connected'"
+                    aria-hidden="true"
+                  ></i>
+                  Serial Monitor
+                  <small>{{ serialStatusLabel() }}</small>
+                </button>
+              </div>
+              <button
+                type="button"
+                class="panel-collapse-button"
+                [attr.aria-expanded]="consoleOpen()"
+                aria-label="Toggle output panel"
+                (click)="consoleOpen.set(!consoleOpen())"
+              >
+                <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                  <path
+                    d="m6 12 4-4 4 4"
+                    stroke="currentColor"
+                    stroke-width="1.3"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </button>
+            </div>
+            @if (consoleOpen()) {
+              @if (bottomPanelTab() === 'build') {
+                <div class="console-output" role="tabpanel" aria-live="polite">
+                  @for (line of buildLogs(); track $index) {
+                    <span
+                      [class.output-success]="buildState() === 'success' && $last"
+                      [class.output-error]="buildState() === 'error'"
+                      >{{ line }}</span
+                    >
+                  }
+                </div>
+              } @else {
+                <div class="serial-panel" role="tabpanel">
+                  <div class="serial-toolbar">
+                    <span
+                      class="serial-status"
+                      [class.serial-status-connected]="serialState() === 'connected'"
+                      ><i aria-hidden="true"></i>{{ serialStatusLabel() }}</span
+                    >
+                    <div class="serial-baud-field">
+                      <span>Baud</span>
+                      <app-custom-select
+                        class="serial-baud-select"
+                        [options]="serialBaudOptions"
+                        [value]="serialBaud().toString()"
+                        [disabled]="buildState() === 'building' || serialState() === 'connecting'"
+                        [compact]="true"
+                        [dense]="true"
+                        [menuWidth]="144"
+                        ariaLabel="ความเร็ว Serial (baud)"
+                        (valueChange)="updateSerialBaud($event)"
+                      />
+                    </div>
+                    <label class="serial-check">
+                      <input
+                        type="checkbox"
+                        [checked]="serialTimestamp()"
+                        (change)="serialTimestamp.set(!serialTimestamp())"
+                      />
+                      Timestamp
+                    </label>
+                    <label class="serial-check">
+                      <input
+                        type="checkbox"
+                        [checked]="serialAutoScroll()"
+                        (change)="serialAutoScroll.set(!serialAutoScroll())"
+                      />
+                      Auto scroll
+                    </label>
+                    <span class="serial-toolbar-spacer"></span>
+                    <button type="button" (click)="clearSerialLog()">Clear</button>
+                    <button
+                      type="button"
+                      [disabled]="serialLines().length === 0"
+                      (click)="exportSerialLog()"
+                    >
+                      Export
+                    </button>
+                    <button
+                      type="button"
+                      class="serial-connect-button"
+                      [class.serial-disconnect-button]="serialState() === 'connected'"
+                      [disabled]="
+                        executionTarget() !== 'hardware' ||
+                        !selectedPort() ||
+                        serialState() === 'connecting'
+                      "
+                      (click)="toggleSerialMonitor()"
+                    >
+                      {{ monitorLabel() }}
+                    </button>
+                  </div>
+                  <div #serialOutput class="serial-output" aria-live="polite">
+                    @if (serialLines().length === 0) {
+                      <span class="serial-empty">
+                        {{
+                          executionTarget() === 'simulation'
+                            ? 'Switch to a physical device to use Serial Monitor.'
+                            : serialState() === 'connected'
+                              ? 'Listening for serial output…'
+                              : 'เลือกพอร์ต USB เพื่อรับข้อมูล หรือกด Monitor เพื่อเชื่อมต่ออีกครั้ง'
+                        }}
+                      </span>
+                    }
+                    @for (line of serialLines(); track line.id) {
+                      <span [class.serial-error-line]="line.stream === 'stderr'">
+                        @if (serialTimestamp()) {
+                          <time>{{ formatSerialTimestamp(line.timestamp) }}</time>
+                        }
+                        {{ line.text }}
+                      </span>
+                    }
+                  </div>
+                </div>
+              }
+            }
+          </section>
+
+          <footer class="editor-statusbar">
+            <span [class.simulation-status]="executionTarget() === 'simulation'"
+              ><i aria-hidden="true"></i
+              >{{
+                executionTarget() === 'simulation'
+                  ? 'Simulation target'
+                  : currentProject.status === 'online'
+                    ? 'Device connected'
+                    : 'Device offline'
+              }}</span
+            >
+            <span>{{ languageLabel() }}</span>
+            <span>UTF-8</span>
+            <span
+              class="backend-status"
+              [class.backend-offline]="backendStatus() === 'offline'"
+              [class.backend-checking]="backendStatus() === 'checking'"
+              ><i aria-hidden="true"></i>{{ backendStatusLabel() }}</span
+            >
+            <span class="status-spacer"></span>
+            <span>Ln {{ cursorLine() }}, Col {{ cursorColumn() }}</span>
+          </footer>
+        </section>
+
+        @if (aiOpen()) {
+          <aside class="ai-panel" aria-label="ผู้ช่วยเขียนโค้ด AI">
+            <div
+              class="ai-resize-handle"
+              role="separator"
+              tabindex="0"
+              aria-label="ปรับความกว้างแผงผู้ช่วย AI"
+              aria-orientation="vertical"
+              aria-valuemin="280"
+              aria-valuemax="640"
+              [attr.aria-valuenow]="aiPanelWidth()"
+              [attr.aria-valuetext]="'กว้าง ' + aiPanelWidth() + ' พิกเซล'"
+              (pointerdown)="beginAiResize($event)"
+              (pointermove)="resizeAiPanel($event, ideLayout)"
+              (pointerup)="finishAiResize($event)"
+              (pointercancel)="finishAiResize($event)"
+              (keydown)="resizeAiWithKeyboard($event, ideLayout)"
+              (dblclick)="resetAiPanelWidth(ideLayout)"
+            >
+              <span aria-hidden="true"></span>
+            </div>
+            <header class="ai-panel-header">
+              <div class="ai-profile">
+                <app-ai-assistant-avatar />
+                <div class="ai-profile-copy">
+                  <strong>{{ assistantName }}</strong>
+                  <span>ผู้ช่วยพัฒนาโปรเจกต์ของคุณ</span>
+                </div>
+                <button
+                  type="button"
+                  class="ai-close-button"
+                  aria-label="ปิดผู้ช่วย AI"
+                  (click)="closeAiPanel()"
+                >
+                  <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                    <path
+                      d="m5 5 10 10M15 5 5 15"
+                      stroke="currentColor"
+                      stroke-width="1.35"
+                      stroke-linecap="round"
+                    />
+                  </svg>
+                </button>
+              </div>
+              <div class="ai-session-toolbar">
+                <div class="ai-session-picker">
+                  <span class="ai-session-label">บทสนทนา</span>
+                  @if (loadingSessions()) {
+                    <span
+                      class="ai-picker-skeleton"
+                      role="status"
+                      aria-label="กำลังโหลดบทสนทนา"
+                    ></span>
+                  } @else {
+                    <app-custom-select
+                      [options]="chatSessionOptions()"
+                      [value]="activeSessionId()"
+                      [compact]="true"
+                      [menuWidth]="320"
+                      [closeRequest]="sessionMenuCloseRequest()"
+                      ariaLabel="เลือกบทสนทนา AI"
+                      placeholder="เลือกบทสนทนา"
+                      (valueChange)="openChatSession($event)"
+                      (openChange)="handleSessionMenuOpen($event)"
+                    />
+                  }
+                </div>
+                <button type="button" class="ai-new-chat-button" (click)="startNewChatSession()">
+                  <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                    <path
+                      d="M10 4v12M4 10h12"
+                      stroke="currentColor"
+                      stroke-width="1.5"
+                      stroke-linecap="round"
+                    />
+                  </svg>
+                  <span>แชทใหม่</span>
+                </button>
+                @if (!isDraftChat()) {
+                  <button
+                    type="button"
+                    class="ai-delete-chat-button"
+                    aria-label="ลบบทสนทนานี้"
+                    title="ลบบทสนทนานี้"
+                    (click)="deleteChatSession()"
+                  >
+                    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                      <path
+                        d="M5 6h10M8 6V4.5h4V6M6.5 6l.6 9.5h5.8l.6-9.5"
+                        stroke="currentColor"
+                        stroke-width="1.35"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
+                    </svg>
+                  </button>
+                }
+              </div>
+            </header>
+
+            <div class="chat-messages" aria-live="polite">
+              @if (legacySessions().length) {
+                <div class="ai-legacy-banner" role="status">
+                  <p>
+                    พบแชทเก่า {{ legacySessions().length }} รายการจากก่อนอัปเดต
+                    ซึ่งยังไม่ได้ผูกกับโปรเจกต์ใด
+                  </p>
+                  <div>
+                    <button
+                      type="button"
+                      class="ai-legacy-import"
+                      [disabled]="importingLegacy()"
+                      (click)="importLegacyChats()"
+                    >
+                      {{ importingLegacy() ? 'กำลังนำเข้า…' : 'นำเข้าโปรเจกต์นี้' }}
+                    </button>
+                    <button
+                      type="button"
+                      [disabled]="importingLegacy()"
+                      (click)="discardLegacyChats()"
+                    >
+                      ทิ้ง
+                    </button>
+                  </div>
+                </div>
+              }
+              <div class="chat-context">
+                <span class="context-icon" aria-hidden="true">
+                  <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none">
+                    <path
+                      d="M6 3.5h5l3 3V16.5H6v-13Z"
+                      stroke="currentColor"
+                      stroke-width="1.25"
+                      stroke-linejoin="round"
+                    />
+                    <path d="M11 3.5v3h3" stroke="currentColor" stroke-width="1.25" />
+                  </svg>
+                </span>
+                <span>ไฟล์ที่กำลังใช้งาน</span><strong>{{ activeFilename() }}</strong>
+              </div>
+              @if (loadingMessages()) {
+                <div class="chat-skeleton" role="status" aria-label="กำลังโหลดข้อความ">
+                  @for (row of [1, 2, 3]; track row) {
+                    <div
+                      class="chat-skeleton-row"
+                      [class.chat-skeleton-user]="row === 2"
+                      aria-hidden="true"
+                    >
+                      <span class="chat-skeleton-avatar"></span>
+                      <span class="chat-skeleton-lines"><i></i><i></i><i></i></span>
+                    </div>
+                  }
+                </div>
+              } @else if (messages().length === 1) {
+                <div
+                  class="chat-welcome flex min-h-[70%] flex-col items-center justify-center px-1 pt-8 pb-16 text-center"
+                >
+                  <span class="welcome-orb" aria-hidden="true"><i></i></span>
+                  <small class="text-[0.7rem] font-bold tracking-[0.12em] text-indigo-500 uppercase"
+                    >ผู้ช่วยอัจฉริยะ IoT Hub</small
+                  >
+                  <h2 class="mt-2 text-base font-semibold tracking-tight text-slate-900">
+                    วันนี้อยากให้ช่วยพัฒนาอะไร?
+                  </h2>
+                  <p class="mt-2 max-w-80 text-[0.8125rem] leading-relaxed text-slate-500">
+                    {{ messages()[0].text }}
+                  </p>
+                  <div class="suggestions" aria-label="คำถามแนะนำ">
+                    <button
+                      type="button"
+                      (click)="useSuggestion('อธิบายการทำงานของโค้ดและเซนเซอร์ในไฟล์นี้')"
+                    >
+                      อธิบายโค้ดนี้
+                    </button>
+                    <button type="button" (click)="useSuggestion('เพิ่มระบบเชื่อมต่อ Wi-Fi ใหม่')">
+                      เพิ่มการเชื่อมต่อ Wi-Fi ใหม่
+                    </button>
+                    <button type="button" (click)="useSuggestion('สร้าง API สำหรับหน้าแดชบอร์ด')">
+                      สร้าง Dashboard API
+                    </button>
+                  </div>
+                </div>
+              } @else {
+                @for (message of messages(); track message.id) {
+                  <article class="chat-message" [class.user-message]="message.role === 'user'">
+                    @if (message.role === 'assistant') {
+                      <app-ai-assistant-avatar />
+                    } @else {
+                      <span class="message-avatar" aria-hidden="true">
+                        <span>ค</span>
+                      </span>
+                    }
+                    <div class="message-content">
+                      <span class="message-role">{{
+                        message.role === 'assistant' ? assistantName : 'คุณ'
+                      }}</span>
+                      @if (message.role === 'assistant') {
+                        <div class="markdown-content" [innerHTML]="message.text | markdown"></div>
+                      } @else {
+                        <p>{{ message.text }}</p>
+                      }
+
+                      @if (message.plan; as plan) {
+                        <section class="ai-plan" aria-label="การเปลี่ยนแปลงที่ผู้ช่วยเสนอ">
+                          <h3>ผู้ช่วยต้องการ</h3>
+                          @for (group of planGroups(plan); track group.title) {
+                            <div class="ai-plan-group">
+                              <strong>{{ group.title }}</strong>
+                              <ul>
+                                @for (line of group.lines; track line) {
+                                  <li>{{ line }}</li>
+                                }
+                              </ul>
+                            </div>
+                          }
+
+                          @if (plan.warnings.length) {
+                            <div class="ai-plan-warnings" role="note">
+                              @for (warning of plan.warnings; track warning) {
+                                <p>{{ warning }}</p>
+                              }
+                            </div>
+                          }
+
+                          @switch (message.planState) {
+                            @case ('applied') {
+                              <p class="ai-plan-status ai-plan-status-done">
+                                ใช้การเปลี่ยนแปลงแล้ว
+                              </p>
+                            }
+                            @case ('applying') {
+                              <p class="ai-plan-status" aria-live="polite">
+                                กำลังใช้การเปลี่ยนแปลง…
+                              </p>
+                            }
+                            @default {
+                              @if (message.planError) {
+                                <p class="ai-plan-status ai-plan-status-error" role="alert">
+                                  {{ message.planError }}
+                                </p>
+                              }
+                              <div class="ai-plan-actions">
+                                <button type="button" (click)="applyPlan(message.id)">
+                                  ใช้การเปลี่ยนแปลง
+                                </button>
+                                <button
+                                  type="button"
+                                  class="ai-plan-dismiss"
+                                  (click)="dismissPlan(message.id)"
+                                >
+                                  ไม่ใช้
+                                </button>
+                              </div>
+                            }
+                          }
+                        </section>
+                      }
+                    </div>
+                  </article>
+                }
+              }
+              @if (sending()) {
+                <div class="typing-status" aria-label="AI กำลังประมวลผล">
+                  <span></span><span></span><span></span>
+                </div>
+                <p class="ai-wait-status">{{ aiWaitingMessage() }}</p>
+              }
+            </div>
+
+            <footer class="chat-composer-area">
+              @if (project()?.description) {
+                <div class="suggestions">
+                  <button
+                    type="button"
+                    [disabled]="sending() || preparingAiSetup()"
+                    (click)="generateFromDescription()"
+                  >
+                    {{
+                      preparingAiSetup() ? 'กำลังสร้างแผนโปรเจกต์…' : 'สร้างแผนจากคำอธิบายโปรเจกต์'
+                    }}
+                  </button>
+                </div>
+              }
+              <div class="chat-composer">
+                <label for="ai-prompt" class="sr-only">พิมพ์คำถามถึงผู้ช่วยเขียนโค้ด AI</label>
+                <textarea
+                  id="ai-prompt"
+                  rows="1"
+                  placeholder="ถามเกี่ยวกับโค้ด เซนเซอร์ หรือข้อผิดพลาด…"
+                  [value]="prompt()"
+                  [readOnly]="preparingAiSetup()"
+                  (input)="updatePrompt($event)"
+                  (keydown)="handleComposerKeydown($event)"
+                ></textarea>
+                <button
+                  type="button"
+                  aria-label="ส่งข้อความ"
+                  [disabled]="!prompt().trim() || sending() || preparingAiSetup()"
+                  (click)="sendMessage()"
+                >
+                  <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                    <path
+                      d="M10 15V5M6.5 8.5 10 5l3.5 3.5"
+                      stroke="currentColor"
+                      stroke-width="1.5"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                </button>
+              </div>
+              <p>
+                AI อาจตอบผิดพลาดได้ · <kbd>Enter</kbd> ส่ง · <kbd>Shift+Enter</kbd> ขึ้นบรรทัดใหม่
+              </p>
+            </footer>
+          </aside>
+        }
+      </div>
+    }
+    @if (librariesOpen()) {
+      <div
+        class="library-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="library-manager-title"
+      >
+        <app-library-manager
+          [projectId]="currentProject.id"
+          [board]="currentProject.board"
+          (changed)="libraryFilesChanged()"
+          (closed)="librariesOpen.set(false)"
+        />
+      </div>
+      <button
+        type="button"
+        class="library-backdrop"
+        aria-label="ปิด Library Manager"
+        (click)="librariesOpen.set(false)"
+      ></button>
+    }
+  </section>
+  @if (pageLoading()) {
+    <!-- The workspace mounts underneath so the editor starts while the files arrive. -->
+    <app-workspace-skeleton class="page-overlay" [style.--ws-ai-width.px]="aiPanelWidth()" />
+  }
+} @else if (projectsLoading() || (!projectsLoaded() && !projectLoadError())) {
+  <!-- The workspace's own outline, so the page keeps its shape as the project arrives. -->
+  <app-workspace-skeleton [style.--ws-ai-width.px]="aiPanelWidth()" />
+} @else if (projectLoadError()) {
+  <section class="missing-project" role="alert">
+    <span aria-hidden="true">!</span>
+    <h1>Could not load project</h1>
+    <p>{{ projectLoadError() }}</p>
+    <a routerLink="/user/projects">Back to projects</a>
+  </section>
+} @else {
+  <section class="missing-project">
+    <span aria-hidden="true">404</span>
+    <h1>Project not found</h1>
+    <p>This project does not exist or you do not have access.</p>
+    <a routerLink="/user/projects">Back to projects</a>
+  </section>
+}
+
+@if (pendingDeleteFile(); as pendingFile) {
+  <button
+    type="button"
+    class="fixed inset-0 z-80 bg-slate-950/25 backdrop-blur-[2px]"
+    aria-label="ยกเลิกการลบไฟล์"
+    (click)="cancelFileDeletion()"
+  ></button>
+  <section
+    class="fixed top-1/2 left-1/2 z-81 w-[min(26rem,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl"
+    role="alertdialog"
+    aria-modal="true"
+    aria-labelledby="delete-file-title"
+    aria-describedby="delete-file-help"
+  >
+    <p class="text-[0.65rem] font-bold tracking-widest text-red-500 uppercase">Source code</p>
+    <h2 id="delete-file-title" class="mt-1 text-base font-semibold text-slate-900">
+      ลบ {{ pendingFile }} ?
+    </h2>
+    <p id="delete-file-help" class="mt-1 text-xs leading-relaxed text-slate-500">
+      การปิดแท็บคือการลบไฟล์ออกจากโปรเจกต์ โค้ดในไฟล์นี้จะหายไปและกู้คืนไม่ได้
+    </p>
+
+    <div class="mt-5 flex justify-end gap-2">
+      <button
+        #deleteDialogCancel
+        type="button"
+        class="h-9 rounded-xl border border-slate-200 px-4 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+        (click)="cancelFileDeletion()"
+      >
+        ยกเลิก
+      </button>
+      <button
+        type="button"
+        class="h-9 rounded-xl bg-red-600 px-4 text-xs font-semibold text-white hover:bg-red-500"
+        (click)="confirmFileDeletion()"
+      >
+        ลบไฟล์
+      </button>
+    </div>
+  </section>
+}

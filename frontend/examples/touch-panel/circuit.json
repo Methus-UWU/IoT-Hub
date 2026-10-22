@@ -1,0 +1,14 @@
+{
+  "devices": [
+    { "instanceId": "board", "deviceId": "esp32-devkit-v1" },
+    { "instanceId": "display", "deviceId": "tft-ili9341-touch" }
+  ],
+  "wires": [
+    ["board", "3V3", "display", "VCC"], ["board", "GND-L", "display", "GND"],
+    ["board", "3V3", "display", "LED"], ["board", "3V3", "display", "RST"],
+    ["board", "GPIO5", "display", "CS"], ["board", "GPIO27", "display", "DC"],
+    ["board", "GPIO18", "display", "SCK"], ["board", "GPIO23", "display", "MOSI"], ["board", "GPIO19", "display", "MISO"],
+    ["board", "GPIO26", "display", "T_CS"], ["board", "GPIO18", "display", "T_CLK"],
+    ["board", "GPIO23", "display", "T_DIN"], ["board", "GPIO19", "display", "T_DO"]
+  ]
+}

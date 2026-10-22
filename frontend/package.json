@@ -1,0 +1,40 @@
+{
+  "name": "frontend",
+  "version": "0.0.0",
+  "scripts": {
+    "ng": "ng",
+    "start": "ng serve",
+    "build": "ng build",
+    "watch": "ng build --watch --configuration development",
+    "test": "node scripts/verify-all.mjs",
+    "test:e2e": "npm run build && playwright test"
+  },
+  "private": true,
+  "packageManager": "npm@11.15.0",
+  "dependencies": {
+    "@angular/common": "^22.2.0",
+    "@angular/compiler": "^22.2.0",
+    "@angular/core": "^22.2.0",
+    "@angular/forms": "^22.2.0",
+    "@angular/platform-browser": "^22.2.0",
+    "@angular/router": "^22.2.0",
+    "@supabase/supabase-js": "^2.112.4",
+    "@tailwindcss/postcss": "^4.3.2",
+    "esptool-js": "0.7.0",
+    "marked": "^18.0.6",
+    "monaco-editor": "^0.57.0",
+    "postcss": "^8.5.28",
+    "rxjs": "~7.8.0",
+    "tailwindcss": "^4.3.2",
+    "tslib": "^2.3.0"
+  },
+  "devDependencies": {
+    "@angular/build": "^22.2.0",
+    "@angular/cli": "^22.2.0",
+    "@angular/compiler-cli": "^22.2.0",
+    "@playwright/test": "^1.63.0",
+    "@types/w3c-web-serial": "^1.0.8",
+    "prettier": "^3.8.1",
+    "typescript": "~6.0.2"
+  }
+}

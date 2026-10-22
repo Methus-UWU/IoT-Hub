@@ -1,0 +1,148 @@
+/* Page-level pieces around the device inspector: where the panel docks over the
+   canvas, the findings dock, and the canvas highlight for flagged parts. The
+   panel's own controls are styled in device-inspector/device-inspector.css. */
+
+/* Dock for the inspector under the minimal layout.
+   `.editor-body` is `display: block` there and the canvas fills it absolutely,
+   so the panel floats over the canvas instead of claiming a grid column. That
+   keeps the topbar and sidebar geometry untouched. */
+.property-panel {
+  position: absolute;
+  z-index: 20;
+  top: 0.7rem;
+  right: 0.7rem;
+  bottom: 0.7rem;
+  width: 19rem;
+  max-width: calc(100% - 1.4rem);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  border: 1px solid #e1e1e1;
+  border-radius: 0.9rem;
+  background: #fff;
+  box-shadow: 0 10px 30px rgb(15 23 42 / 0.12);
+}
+
+@media (max-width: 760px) {
+  .property-panel {
+    top: auto;
+    right: 0.5rem;
+    bottom: 0.5rem;
+    left: 0.5rem;
+    width: auto;
+    max-height: 55%;
+  }
+}
+
+.issue-severity {
+  padding: 0.02rem 0.3rem;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #334155;
+  font-size: 0.48rem;
+  font-weight: 700;
+}
+
+/* Findings dock — a persistent, low-noise indicator over the canvas so a
+   problem is visible without first selecting the offending part. Bottom-left
+   keeps it clear of the inspector on the right. */
+.issue-dock {
+  position: absolute;
+  z-index: 19;
+  bottom: 0.85rem;
+  left: 0.85rem;
+  max-width: min(22rem, calc(100% - 1.7rem));
+}
+
+.issue-dock-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid #f0c9c9;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 4px 14px rgb(15 23 42 / 0.12);
+  color: #7f1d1d;
+  font-size: 0.55rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.issue-dock-toggle:hover {
+  border-color: #e5a3a3;
+}
+
+.issue-dock-count {
+  display: grid;
+  min-width: 1.1rem;
+  height: 1.1rem;
+  place-items: center;
+  border-radius: 999px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 0.5rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.issue-dock-list {
+  margin: 0.4rem 0 0;
+  padding: 0.3rem;
+  max-height: 13rem;
+  overflow-y: auto;
+  border: 1px solid #e2e6ea;
+  border-radius: 0.6rem;
+  background: #fff;
+  box-shadow: 0 8px 24px rgb(15 23 42 / 0.14);
+  list-style: none;
+}
+
+.issue-dock-list li + li {
+  margin-top: 0.15rem;
+}
+
+.issue-dock-list button {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.4rem;
+  border: 0;
+  border-radius: 0.4rem;
+  background: none;
+  color: #334155;
+  font-size: 0.53rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.issue-dock-list button:hover,
+.issue-dock-list button:focus-visible {
+  background: #f1f5f9;
+}
+
+/* Canvas highlight for parts and wires named by an open finding. Dashes carry
+   the signal so it still reads without relying on the amber tint, and the
+   animation is dropped for anyone who asked for reduced motion. */
+.hardware-flagged .selection-box {
+  fill: rgb(217 119 6 / 0.07);
+  stroke: #d97706;
+  stroke-dasharray: 4 3;
+}
+
+.wire-flagged {
+  stroke-dasharray: 9 5;
+  animation: flagged-wire-flow 1.1s linear infinite;
+}
+
+@keyframes flagged-wire-flow {
+  to {
+    stroke-dashoffset: -14;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wire-flagged {
+    animation: none;
+  }
+}

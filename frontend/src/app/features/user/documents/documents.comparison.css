@@ -1,0 +1,35 @@
+.device-details-button {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.7rem;
+  width: 100%;
+  text-align: left;
+}
+.device-card-selected {
+  border-color: var(--color-primary);
+}
+.device-compare-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 2.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  color: var(--color-ink-muted);
+  font-size: 0.85rem;
+}
+.device-compare-button:hover:not(:disabled) {
+  background: var(--color-surface-muted);
+  color: var(--color-ink);
+}
+.device-compare-button[aria-pressed='true'] {
+  background: var(--color-primary-dark);
+  color: var(--color-surface);
+  border-color: var(--color-primary-dark);
+}
+.device-compare-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

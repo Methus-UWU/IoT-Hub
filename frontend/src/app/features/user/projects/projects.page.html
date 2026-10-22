@@ -1,0 +1,303 @@
+﻿<section class="projects-page" aria-labelledby="projects-heading">
+  <div class="projects-container">
+    <header class="page-heading">
+      <div>
+        <span class="eyebrow">พื้นที่ทำงานของคุณ</span>
+        <div class="heading-title">
+          <h1 id="projects-heading">โปรเจกต์</h1>
+          @if (hasLoaded() && !loadError()) {
+            <span class="project-count" aria-label="จำนวนโปรเจกต์ทั้งหมด">{{
+              projects().length
+            }}</span>
+          } @else if (loadingProjects()) {
+            <span class="skeleton skeleton-count" aria-hidden="true"></span>
+          }
+        </div>
+        <p>รวมทุกไอเดียของคุณไว้ที่เดียว กลับมาทำต่อจากจุดเดิมได้ทันที</p>
+      </div>
+      <button
+        #newProjectButton
+        type="button"
+        class="new-project-button"
+        (click)="openCreateDialog()"
+      >
+        <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+          <path
+            d="M10 4v12M4 10h12"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+          />
+        </svg>
+        สร้างโปรเจกต์
+      </button>
+    </header>
+
+    <p role="status" class="action-notice" [class.sr-only]="!actionNotice()">
+      {{ actionNotice() }}
+    </p>
+    <div class="projects-layout">
+      <div class="project-browser">
+        <div class="project-toolbar">
+          <label class="project-search">
+            <span class="sr-only">ค้นหาโปรเจกต์</span>
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle cx="10.5" cy="10.5" r="6.5" stroke="currentColor" stroke-width="1.7" />
+              <path
+                d="m15.5 15.5 4.5 4.5"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+              />
+            </svg>
+            <input
+              type="search"
+              placeholder="ค้นหาโปรเจกต์"
+              [value]="searchQuery()"
+              (input)="updateSearch($event)"
+            />
+          </label>
+
+          <app-custom-select
+            class="status-control"
+            [options]="statusFilterOptions"
+            [value]="statusFilter()"
+            textWeight="normal"
+            [compact]="true"
+            ariaLabel="กรองโปรเจกต์ตามสถานะ"
+            (valueChange)="updateStatus($event)"
+          />
+
+          <app-custom-select
+            class="sort-control"
+            [options]="sortOptions"
+            [value]="sortOption()"
+            textWeight="normal"
+            [compact]="true"
+            ariaLabel="เรียงลำดับโปรเจกต์"
+            (valueChange)="updateSort($event)"
+          />
+
+          <div class="view-switcher" role="group" aria-label="รูปแบบการแสดงผล">
+            <button
+              type="button"
+              aria-label="แสดงแบบตาราง"
+              [class.view-active]="viewMode() === 'grid'"
+              [attr.aria-pressed]="viewMode() === 'grid'"
+              (click)="setViewMode('grid')"
+            >
+              <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                <rect
+                  x="3.5"
+                  y="3.5"
+                  width="5"
+                  height="5"
+                  rx=".8"
+                  stroke="currentColor"
+                  stroke-width="1.3"
+                />
+                <rect
+                  x="11.5"
+                  y="3.5"
+                  width="5"
+                  height="5"
+                  rx=".8"
+                  stroke="currentColor"
+                  stroke-width="1.3"
+                />
+                <rect
+                  x="3.5"
+                  y="11.5"
+                  width="5"
+                  height="5"
+                  rx=".8"
+                  stroke="currentColor"
+                  stroke-width="1.3"
+                />
+                <rect
+                  x="11.5"
+                  y="11.5"
+                  width="5"
+                  height="5"
+                  rx=".8"
+                  stroke="currentColor"
+                  stroke-width="1.3"
+                />
+              </svg>
+            </button>
+            <button
+              type="button"
+              aria-label="แสดงแบบรายการ"
+              [class.view-active]="viewMode() === 'list'"
+              [attr.aria-pressed]="viewMode() === 'list'"
+              (click)="setViewMode('list')"
+            >
+              <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                <path
+                  d="M6.5 5h10M6.5 10h10M6.5 15h10"
+                  stroke="currentColor"
+                  stroke-width="1.4"
+                  stroke-linecap="round"
+                />
+                <circle cx="3.5" cy="5" r=".8" fill="currentColor" />
+                <circle cx="3.5" cy="10" r=".8" fill="currentColor" />
+                <circle cx="3.5" cy="15" r=".8" fill="currentColor" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        @if (loadError()) {
+          <div class="load-error" role="alert">
+            <div>
+              <h2>โหลดโปรเจกต์ไม่สำเร็จ</h2>
+              <p>{{ loadError() }}</p>
+            </div>
+            <button type="button" [disabled]="loadingProjects()" (click)="retryLoad()">
+              ลองอีกครั้ง
+            </button>
+          </div>
+        }
+        <p class="results-summary" role="status">
+          @if (hasLoaded() && !loadError()) {
+            แสดง {{ filteredProjects().length }} จาก {{ projects().length }} โปรเจกต์
+          }
+        </p>
+        @if (filteredProjects().length) {
+          <div class="project-list" [class.project-list-rows]="viewMode() === 'list'">
+            @for (project of filteredProjects(); track project.id) {
+              <article class="project-card">
+                <button
+                  type="button"
+                  class="project-card-main"
+                  [attr.aria-label]="'เปิด ' + project.name"
+                  (click)="openProject(project.id)"
+                >
+                  <span class="project-card-header">
+                    <span class="project-icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" fill="none">
+                        <path
+                          d="M8 4h8v4h4v8h-4v4H8v-4H4V8h4V4Z"
+                          stroke="currentColor"
+                          stroke-width="1.35"
+                        />
+                        <path
+                          d="M9 9h6v6H9zM11 1.5v2.5M11 20v2.5M1.5 11H4M20 11h2.5"
+                          stroke="currentColor"
+                          stroke-width="1.35"
+                          stroke-linecap="round"
+                        />
+                      </svg>
+                    </span>
+                    <span class="project-title-row">
+                      <strong>{{ project.name }}</strong>
+                    </span>
+                  </span>
+                  <span class="project-description">{{
+                    project.description || 'พื้นที่ว่างสำหรับไอเดียถัดไปของคุณ'
+                  }}</span>
+                  <span class="project-meta">
+                    <span>{{ project.board }}</span>
+                    <i aria-hidden="true"></i>
+                    <span>{{ project.framework }}</span>
+                  </span>
+                  <span class="project-footer">
+                    <span class="project-updated"
+                      >อัปเดต {{ project.updatedAt | date: 'd MMM' }}</span
+                    >
+                    <span
+                      class="deployment-label"
+                      [class.deployment-live]="project.status === 'online'"
+                      [class.deployment-building]="project.status === 'building'"
+                    >
+                      <i aria-hidden="true"></i>{{ statusLabels[project.status] }}
+                    </span>
+                  </span>
+                </button>
+                <app-project-actions-menu [project]="project" (deleted)="projectDeleted()" />
+              </article>
+            }
+          </div>
+        } @else if (loadingProjects()) {
+          <!-- Placeholder cards in the real card layout, so nothing jumps when the
+               projects arrive. Screen readers get the text instead. -->
+          <div
+            class="project-list"
+            [class.project-list-rows]="viewMode() === 'list'"
+            role="status"
+          >
+            <span class="sr-only">กำลังโหลดโปรเจกต์…</span>
+            @for (placeholder of skeletonCards; track placeholder) {
+              <div class="project-card skeleton-card" aria-hidden="true">
+                <div class="project-card-main">
+                  <span class="project-card-header">
+                    <span class="skeleton skeleton-icon"></span>
+                    <span class="skeleton skeleton-title"></span>
+                  </span>
+                  <span class="skeleton skeleton-line"></span>
+                  <span class="skeleton skeleton-line skeleton-line-short"></span>
+                  <span class="skeleton skeleton-meta"></span>
+                  <span class="project-footer">
+                    <span class="skeleton skeleton-date"></span>
+                    <span class="skeleton skeleton-status"></span>
+                  </span>
+                </div>
+              </div>
+            }
+          </div>
+        } @else if (!loadError() && projects().length) {
+          <!-- Projects exist, but none match the current search or filter. -->
+          <div class="empty-projects">
+            <span aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path
+                  d="m12 3 7.5 4.3v8.8L12 20.5l-7.5-4.4V7.3L12 3Z"
+                  stroke="currentColor"
+                  stroke-width="1.35"
+                />
+                <path
+                  d="m4.8 7.5 7.2 4.2 7.2-4.2M12 11.7v8.4"
+                  stroke="currentColor"
+                  stroke-width="1.35"
+                />
+              </svg>
+            </span>
+            <h2>ไม่พบโปรเจกต์</h2>
+            <p>ลองค้นหาด้วยคำอื่น หรือล้างตัวกรอง</p>
+            <button type="button" (click)="clearFilters()">ล้างตัวกรอง</button>
+          </div>
+        } @else if (!loadError()) {
+          <!-- A genuinely empty account. Never seeded with sample projects. -->
+          <div class="empty-projects">
+            <span aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path
+                  d="m12 3 7.5 4.3v8.8L12 20.5l-7.5-4.4V7.3L12 3Z"
+                  stroke="currentColor"
+                  stroke-width="1.35"
+                />
+                <path
+                  d="m4.8 7.5 7.2 4.2 7.2-4.2M12 11.7v8.4"
+                  stroke="currentColor"
+                  stroke-width="1.35"
+                />
+              </svg>
+            </span>
+            <h2>ยังไม่มีโปรเจกต์</h2>
+            <p>สร้างโปรเจกต์ IoT แรกของคุณ แล้วเริ่มต่ออุปกรณ์เข้าระบบได้เลย</p>
+            <button type="button" (click)="openCreateDialog()">+ สร้างโปรเจกต์</button>
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+</section>
+
+@if (createDialogOpen()) {
+  <app-create-project-dialog
+    [creating]="creating()"
+    [error]="createError()"
+    (created)="addProject($event)"
+    (closed)="closeCreateDialog()"
+  />
+}

@@ -1,0 +1,401 @@
+<div class="min-h-full bg-gray-50 px-4 py-6 sm:px-6 lg:px-8">
+  <div class="mb-4 flex justify-end">
+    <button
+      type="button"
+      class="rounded-lg bg-gray-900 px-4 py-2 text-sm font-normal text-white hover:bg-gray-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900"
+      (click)="creatingUser.set(true)"
+    >
+      + เพิ่มผู้ใช้งาน
+    </button>
+  </div>
+  <section
+    aria-labelledby="user-filters-heading"
+    class="mb-6 rounded-2xl border border-gray-200/80 bg-white p-5 shadow-[0_1px_3px_rgb(15_23_42/0.04)]"
+  >
+    <div class="mb-3 flex items-center justify-between gap-4">
+      <div>
+        <h2 id="user-filters-heading" class="text-base font-normal text-gray-900">ตัวกรอง</h2>
+        <p class="text-xs text-gray-500">ค้นหาและกรองรายการบัญชีผู้ใช้งาน</p>
+      </div>
+      @if (store.hasActiveFilters()) {
+        <button
+          type="button"
+          class="rounded-lg px-3 py-1.5 text-xs font-normal text-gray-600 hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-500"
+          (click)="clearFilters()"
+        >
+          ล้างตัวกรอง
+        </button>
+      }
+    </div>
+
+    <div class="grid gap-3 md:grid-cols-2 lg:grid-cols-[minmax(14rem,1fr)_13rem_13rem_10rem]">
+      <div>
+        <label for="user-keyword" class="mb-1.5 block text-xs font-normal text-gray-600"
+          >คำค้นหา</label
+        >
+        <div class="relative h-10">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
+            aria-hidden="true"
+          >
+            <circle cx="11" cy="11" r="6.5" stroke="currentColor" stroke-width="1.6" />
+            <path d="m16 16 4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+          </svg>
+          <input
+            id="user-keyword"
+            type="search"
+            class="user-text-field h-full w-full appearance-none bg-white pl-9 pr-3 text-sm text-gray-900 placeholder:text-gray-400 [&::-webkit-search-cancel-button]:appearance-none [&::-webkit-search-decoration]:appearance-none"
+            placeholder="ค้นหาชื่อหรืออีเมล"
+            [value]="store.search()"
+            (input)="onSearchInput($event)"
+          />
+        </div>
+      </div>
+
+      <div>
+        <p class="mb-1.5 block text-xs font-normal text-gray-600">บทบาท</p>
+        <app-custom-select
+          [options]="roleFilterOptions()"
+          [value]="store.roleFilter()"
+          textWeight="normal"
+          ariaLabel="กรองผู้ใช้งานตามบทบาท"
+          (valueChange)="onRoleFilterChange($event)"
+        />
+      </div>
+
+      <div>
+        <p class="mb-1.5 block text-xs font-normal text-gray-600">สถานะ</p>
+        <app-custom-select
+          [options]="statusFilterOptions"
+          [value]="store.statusFilter()"
+          textWeight="normal"
+          ariaLabel="กรองผู้ใช้งานตามสถานะ"
+          (valueChange)="onStatusFilterChange($event)"
+        />
+      </div>
+
+      <div>
+        <p class="mb-1.5 block text-xs font-normal text-gray-600">จำนวนต่อหน้า</p>
+        <app-custom-select
+          [options]="pageSizeOptions"
+          [value]="pageSize().toString()"
+          textWeight="normal"
+          ariaLabel="เลือกจำนวนรายการต่อหน้า"
+          (valueChange)="onPageSizeChange($event)"
+        />
+      </div>
+    </div>
+  </section>
+
+  @if (store.error(); as error) {
+    <div
+      role="alert"
+      class="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+    >
+      {{ error }}
+    </div>
+  }
+
+  <div class="rounded-2xl border border-gray-200/80 bg-white shadow-[0_1px_3px_rgb(15_23_42/0.04)]">
+    @if (store.loading()) {
+      <div class="space-y-3 p-4" aria-label="กำลังโหลดผู้ใช้งาน" role="status">
+        @for (placeholder of [1, 2, 3, 4]; track placeholder) {
+          <div class="h-10 animate-pulse rounded-lg bg-gray-100" aria-hidden="true"></div>
+        }
+      </div>
+    } @else if (store.filteredUsers().length === 0) {
+      <div class="p-8 text-center">
+        <p class="text-sm font-normal text-gray-600">ไม่พบผู้ใช้งานที่ตรงกับตัวกรอง</p>
+        @if (store.hasActiveFilters()) {
+          <button
+            type="button"
+            class="mt-2 text-sm font-normal text-gray-900 underline underline-offset-4"
+            (click)="clearFilters()"
+          >
+            ล้างตัวกรอง
+          </button>
+        }
+      </div>
+    } @else {
+      <div class="overflow-x-auto">
+        <table class="min-w-[80rem] table-fixed divide-y divide-gray-100 text-xs xl:min-w-full">
+          <caption class="sr-only">
+            รายการผู้ใช้งาน
+          </caption>
+          <colgroup>
+            <col class="w-[14%]" />
+            <col class="w-[20%]" />
+            <col class="w-[12%]" />
+            <col class="w-[14%]" />
+            <col class="w-[16%]" />
+            <col class="w-[12%]" />
+            <col class="w-[12%]" />
+          </colgroup>
+          <thead>
+            <tr class="h-12 bg-gray-50/50 text-center text-xs font-normal text-gray-500">
+              <th scope="col" class="px-4 py-0">ชื่อผู้ใช้</th>
+              <th scope="col" class="px-4 py-0">อีเมล</th>
+              <th scope="col" class="px-4 py-0">สิทธิ์ (บทบาท)</th>
+              <th scope="col" class="px-4 py-0">IP ล่าสุด</th>
+              <th scope="col" class="px-4 py-0">เวลาเข้าสู่ระบบล่าสุด</th>
+              <th scope="col" class="px-4 py-0">เวลาสร้างบัญชี</th>
+              <th scope="col" class="px-4 py-0">การจัดการ</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            @for (user of paginatedUsers(); track user.id) {
+              <tr class="transition-colors hover:bg-gray-50/50">
+                <td class="break-words px-4 py-3 text-center font-normal text-gray-900">
+                  {{ user.username }}
+                </td>
+                <td class="break-all px-4 py-3 text-center text-gray-600">
+                  {{ user.email }}
+                </td>
+                <td class="whitespace-nowrap px-4 py-3 text-center text-gray-600">
+                  {{ roleLabel(user.role) }}
+                </td>
+                <td class="break-all px-4 py-3 text-center font-mono text-gray-600">
+                  @if (user.lastLoginIp) {
+                    {{ user.lastLoginIp }}
+                  } @else {
+                    <span class="font-sans text-gray-400">—</span>
+                  }
+                </td>
+                <td class="whitespace-nowrap px-4 py-3 text-center text-gray-600">
+                  @if (user.lastLoginAvailable === false) {
+                    <span class="text-amber-600">ไม่สามารถตรวจสอบได้</span>
+                  } @else if (user.lastLoginAt) {
+                    {{ formatThaiDate(user.lastLoginAt, true) }}
+                  } @else {
+                    <span class="text-gray-400">ยังไม่เคยเข้าสู่ระบบ</span>
+                  }
+                </td>
+                <td class="whitespace-nowrap px-4 py-3 text-center text-gray-600">
+                  {{ formatThaiDate(user.createdAt) }}
+                </td>
+                <td class="px-4 py-3">
+                  <div class="flex items-center justify-center gap-2.5">
+                    @if (store.busyUserId() === user.id) {
+                      <span
+                        class="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-gray-700"
+                        role="status"
+                        aria-label="กำลังอัปเดตผู้ใช้งาน"
+                      ></span>
+                    } @else {
+                      <button
+                        type="button"
+                        class="rounded-lg px-2.5 py-1.5 text-xs font-normal text-gray-700 ring-1 ring-inset ring-gray-300 transition-colors hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-gray-500"
+                        (click)="openEdit(user)"
+                        [attr.aria-label]="'แก้ไข ' + user.username"
+                      >
+                        แก้ไข
+                      </button>
+
+                      @if (user.status === 'active') {
+                        <button
+                          type="button"
+                          class="rounded-lg px-2.5 py-1.5 text-xs font-normal text-red-600 ring-1 ring-inset ring-red-200 transition-colors hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-red-500"
+                          (click)="store.setStatus(user.id, 'suspended')"
+                          [attr.aria-label]="'ระงับ ' + user.username"
+                        >
+                          ระงับ
+                        </button>
+                      } @else {
+                        <button
+                          type="button"
+                          class="rounded-lg px-2.5 py-1.5 text-xs font-normal text-emerald-700 ring-1 ring-inset ring-emerald-200 transition-colors hover:bg-emerald-50 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-emerald-600"
+                          (click)="store.setStatus(user.id, 'active')"
+                          [attr.aria-label]="'ปลดระงับ ' + user.username"
+                        >
+                          ปลดระงับ
+                        </button>
+                      }
+                      <button
+                        type="button"
+                        class="rounded-lg px-2.5 py-1.5 text-xs font-normal text-red-700 ring-1 ring-inset ring-red-200 transition-colors hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-red-500"
+                        (click)="deletingUser.set(user)"
+                        [attr.aria-label]="'ลบบัญชี ' + user.username"
+                      >
+                        ลบ
+                      </button>
+                    }
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <div
+        class="flex min-h-14 flex-col gap-2 border-t border-gray-100 bg-gray-50/30 px-5 py-2 sm:flex-row sm:items-center sm:justify-between"
+      >
+        <p class="text-xs text-gray-500">
+          แสดง {{ rangeStart() }}–{{ rangeEnd() }} จาก {{ store.filteredUsers().length }} รายการ
+        </p>
+
+        <div class="flex flex-wrap items-center gap-3">
+          <nav class="flex items-center gap-2" aria-label="เปลี่ยนหน้ารายการผู้ใช้งาน">
+            <button
+              type="button"
+              class="grid h-8 w-8 place-items-center rounded-lg text-gray-500 ring-1 ring-inset ring-gray-200/80 transition-colors hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-gray-400 disabled:cursor-not-allowed disabled:opacity-30"
+              [disabled]="displayPage() <= 1"
+              (click)="previousPage()"
+              aria-label="หน้าก่อนหน้า"
+            >
+              <svg viewBox="0 0 20 20" fill="none" class="h-4 w-4" aria-hidden="true">
+                <path
+                  d="m12 5-5 5 5 5"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </button>
+            <span class="min-w-12 text-center text-xs text-gray-600">
+              {{ displayPage() }} / {{ totalPages() }}
+            </span>
+            <button
+              type="button"
+              class="grid h-8 w-8 place-items-center rounded-lg text-gray-500 ring-1 ring-inset ring-gray-200/80 transition-colors hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-gray-400 disabled:cursor-not-allowed disabled:opacity-30"
+              [disabled]="displayPage() >= totalPages()"
+              (click)="nextPage()"
+              aria-label="หน้าถัดไป"
+            >
+              <svg viewBox="0 0 20 20" fill="none" class="h-4 w-4" aria-hidden="true">
+                <path
+                  d="m8 5 5 5-5 5"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </button>
+          </nav>
+        </div>
+      </div>
+    }
+  </div>
+</div>
+
+@if (editingUser(); as user) {
+  <div
+    class="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-gray-950/40 p-4 backdrop-blur-sm"
+    (click)="closeEdit()"
+  >
+    <section
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="edit-user-title"
+      class="w-full max-w-lg rounded-2xl border border-gray-200 bg-white shadow-2xl"
+      (click)="$event.stopPropagation()"
+    >
+      <div class="flex items-start justify-between border-b border-gray-100 px-5 py-4">
+        <div>
+          <h2 id="edit-user-title" class="text-base font-normal text-gray-900">แก้ไขผู้ใช้งาน</h2>
+          <p class="mt-0.5 text-xs text-gray-500">แก้ไขข้อมูลบัญชีและบทบาทการเข้าถึง</p>
+        </div>
+        <button
+          type="button"
+          class="grid h-8 w-8 place-items-center rounded-lg text-gray-500 hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-500"
+          (click)="closeEdit()"
+          aria-label="ปิดหน้าต่างแก้ไขผู้ใช้งาน"
+        >
+          <svg viewBox="0 0 20 20" fill="none" class="h-4 w-4" aria-hidden="true">
+            <path
+              d="m5 5 10 10M15 5 5 15"
+              stroke="currentColor"
+              stroke-width="1.6"
+              stroke-linecap="round"
+            />
+          </svg>
+        </button>
+      </div>
+
+      <form class="space-y-4 p-5" novalidate (submit)="$event.preventDefault(); saveEdit()">
+        <div>
+          <label for="edit-username" class="block text-sm font-normal text-gray-600"
+            >ชื่อผู้ใช้งาน</label
+          >
+          <input
+            #editUsernameInput
+            id="edit-username"
+            type="text"
+            autocomplete="off"
+            class="user-text-field mt-1.5 h-10 w-full px-3 text-sm text-gray-900"
+            [formField]="editForm.username"
+            [attr.aria-invalid]="
+              editForm.username().touched() && editForm.username().invalid() ? true : null
+            "
+            [attr.aria-describedby]="
+              editForm.username().touched() && editForm.username().invalid()
+                ? 'edit-username-error'
+                : null
+            "
+          />
+          @if (editForm.username().touched() && editForm.username().invalid()) {
+            <p id="edit-username-error" class="mt-1 text-xs font-normal text-red-600">
+              {{ editForm.username().errors()[0]?.message }}
+            </p>
+          }
+        </div>
+
+        <div>
+          <p class="block text-sm font-normal text-gray-600">อีเมล</p>
+          <p class="mt-1.5 text-sm text-gray-900">{{ user.email }}</p>
+          <p class="mt-1 text-[11px] text-gray-500">
+            อีเมลและรหัสผ่านเปลี่ยนได้โดยเจ้าของบัญชีเท่านั้น ที่หน้าตั้งค่าบัญชี
+          </p>
+        </div>
+
+        <div>
+          <p class="block text-sm font-normal text-gray-600">บทบาท</p>
+          <app-custom-select
+            class="mt-1.5"
+            [options]="editRoleOptions()"
+            [value]="editForm.role().value()"
+            textWeight="normal"
+            ariaLabel="เลือกบทบาทผู้ใช้งาน"
+            [disabled]="savingEdit()"
+            (valueChange)="onEditRoleChange($event)"
+          />
+        </div>
+
+        <div class="flex justify-end gap-3 border-t border-gray-100 pt-4">
+          <button
+            type="button"
+            class="rounded-lg px-4 py-2 text-sm font-normal text-gray-700 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-500"
+            (click)="closeEdit()"
+            [disabled]="savingEdit()"
+          >
+            ยกเลิก
+          </button>
+          <button
+            type="submit"
+            class="rounded-lg bg-gray-900 px-4 py-2 text-sm font-normal text-white hover:bg-gray-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900 disabled:cursor-not-allowed disabled:opacity-50"
+            [disabled]="savingEdit() || editForm().invalid()"
+          >
+            {{ savingEdit() ? 'กำลังบันทึก...' : 'บันทึกการเปลี่ยนแปลง' }}
+          </button>
+        </div>
+      </form>
+    </section>
+  </div>
+}
+
+@if (creatingUser()) {
+  <app-create-user-dialog [roleOptions]="editRoleOptions()" (closed)="creatingUser.set(false)" />
+}
+
+@if (deletingUser(); as user) {
+  <app-delete-user-dialog
+    [user]="user"
+    [busy]="store.busyUserId() === user.id"
+    (confirmed)="confirmDelete()"
+    (cancelled)="deletingUser.set(null)"
+  />
+}

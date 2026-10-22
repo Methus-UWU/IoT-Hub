@@ -1,0 +1,223 @@
+<header class="section-heading">
+  <h2 id="ai-profiles-title">AI Profiles</h2>
+  <p class="settings-help">
+    ตั้งค่าว่าผู้ช่วย AI จะใช้โมเดลไหน คิดละเอียดแค่ไหน และมีคำสั่งเพิ่มเติมอะไร
+    แล้วเลือกใช้ในแต่ละบทสนทนาได้ เปลี่ยนโปรไฟล์เมื่อไรก็ได้โดยประวัติแชทไม่หาย
+  </p>
+</header>
+
+@if (status(); as current) {
+  <p class="ai-status" [class.error]="current.kind === 'error'" role="status">{{ current.text }}</p>
+}
+
+@if (loading()) {
+  <app-settings-skeleton />
+} @else if (failed()) {
+  <div class="settings-load-error">
+    <p class="settings-help">โหลด AI Profile ไม่สำเร็จ</p>
+    <button type="button" class="settings-button secondary" (click)="retry()">ลองอีกครั้ง</button>
+  </div>
+} @else {
+  @if (editing() !== null) {
+    <form class="ai-profile-form" novalidate (submit)="$event.preventDefault(); save()">
+      <fieldset class="settings-section" [disabled]="busy()">
+        <legend>{{ editing() ? 'แก้ไขโปรไฟล์' : 'โปรไฟล์ใหม่' }}</legend>
+
+        @if (!editing() && isAdmin()) {
+          <label for="ai-profile-scope">ใครใช้ได้</label>
+          <select
+            id="ai-profile-scope"
+            class="profile-input"
+            [value]="profileForm.scope().value()"
+            (change)="setScope($any($event.target).value)"
+          >
+            <option value="personal">เฉพาะฉัน</option>
+            <option value="system">โปรไฟล์ระบบ — ผู้ใช้ทุกคนเลือกได้</option>
+          </select>
+        }
+
+        <label for="ai-profile-name">ชื่อ</label>
+        <input
+          id="ai-profile-name"
+          type="text"
+          class="profile-input"
+          placeholder="เช่น Debug Assistant"
+          [formField]="profileForm.name"
+          [attr.aria-invalid]="profileForm.name().touched() && profileForm.name().invalid()"
+          aria-describedby="ai-profile-name-error"
+        />
+        <div id="ai-profile-name-error">
+          @if (profileForm.name().touched() && profileForm.name().invalid()) {
+            <app-field-error [message]="profileForm.name().errors()[0]?.message ?? ''" />
+          }
+        </div>
+
+        <label for="ai-profile-description">คำอธิบาย</label>
+        <input
+          id="ai-profile-description"
+          type="text"
+          class="profile-input"
+          placeholder="ใช้ทำอะไร"
+          [formField]="profileForm.description"
+          aria-describedby="ai-profile-description-error"
+        />
+        <div id="ai-profile-description-error">
+          @if (profileForm.description().invalid()) {
+            <app-field-error [message]="profileForm.description().errors()[0]?.message ?? ''" />
+          }
+        </div>
+
+        <label for="ai-profile-tier">ระดับการคิด</label>
+        <select
+          id="ai-profile-tier"
+          class="profile-input"
+          [value]="profileForm.tier().value()"
+          (change)="setTier($any($event.target).value)"
+        >
+          @for (tier of tiers; track tier) {
+            <option [value]="tier">{{ tierLabels[tier] }}</option>
+          }
+        </select>
+
+        <label for="ai-profile-model">โมเดล (ไม่บังคับ)</label>
+        <input
+          id="ai-profile-model"
+          type="text"
+          class="profile-input"
+          placeholder="เว้นว่างให้ระบบเลือกโมเดลที่เหมาะสม"
+          [formField]="profileForm.model"
+          [attr.aria-invalid]="profileForm.model().invalid()"
+          aria-describedby="ai-profile-model-help ai-profile-model-error"
+        />
+        <p id="ai-profile-model-help" class="settings-help">
+          รหัสจากแคตตาล็อกโมเดล เช่น <code>vendor/model</code> ถ้าโมเดลถูกถอดออก
+          ผู้ช่วยจะแจ้งให้แก้โปรไฟล์
+        </p>
+        <div id="ai-profile-model-error">
+          @if (profileForm.model().invalid()) {
+            <app-field-error [message]="profileForm.model().errors()[0]?.message ?? ''" />
+          }
+        </div>
+
+        <label for="ai-profile-instructions">คำสั่งเพิ่มเติม</label>
+        <textarea
+          id="ai-profile-instructions"
+          class="profile-input ai-instructions"
+          rows="5"
+          placeholder="เช่น อธิบายเป็นภาษาไทยสั้นๆ และหาสาเหตุของบั๊กก่อนเสนอโค้ด"
+          [formField]="profileForm.instructions"
+          aria-describedby="ai-profile-instructions-help ai-profile-instructions-error"
+        ></textarea>
+        <p id="ai-profile-instructions-help" class="settings-help">
+          ต่อท้ายคำสั่งของระบบ ใช้กำหนดสไตล์และจุดเน้นได้
+          แต่ข้ามกฎความปลอดภัยหรือเข้าถึงโปรเจกต์อื่นไม่ได้
+        </p>
+        <div id="ai-profile-instructions-error">
+          @if (profileForm.instructions().invalid()) {
+            <app-field-error [message]="profileForm.instructions().errors()[0]?.message ?? ''" />
+          }
+        </div>
+      </fieldset>
+      <footer class="settings-footer">
+        <button type="button" class="settings-button text-button" (click)="cancel()">ยกเลิก</button>
+        <button
+          type="submit"
+          class="settings-button"
+          [disabled]="busy() || profileForm().invalid()"
+        >
+          {{ busy() ? 'กำลังบันทึก…' : 'บันทึกโปรไฟล์' }}
+        </button>
+      </footer>
+    </form>
+  }
+
+  <section class="ai-profile-group" aria-labelledby="ai-system-profiles-title">
+    <div class="ai-group-head">
+      <h3 id="ai-system-profiles-title">โปรไฟล์ระบบ</h3>
+      @if (isAdmin() && editing() === null) {
+        <button type="button" class="settings-button secondary" (click)="startCreate('system')">
+          เพิ่มโปรไฟล์ระบบ
+        </button>
+      }
+    </div>
+    @if (systemProfiles().length === 0) {
+      <p class="settings-help">ยังไม่มีโปรไฟล์ระบบ</p>
+    } @else {
+      <ul class="ai-profile-list">
+        @for (profile of systemProfiles(); track profile.id) {
+          <ng-container *ngTemplateOutlet="profileRow; context: { $implicit: profile }" />
+        }
+      </ul>
+    }
+  </section>
+
+  <section class="ai-profile-group" aria-labelledby="ai-personal-profiles-title">
+    <div class="ai-group-head">
+      <h3 id="ai-personal-profiles-title">โปรไฟล์ของคุณ</h3>
+      @if (editing() === null) {
+        <button type="button" class="settings-button" (click)="startCreate()">สร้างโปรไฟล์</button>
+      }
+    </div>
+    @if (personalProfiles().length === 0) {
+      <p class="settings-help">
+        ยังไม่มี ลองสร้าง เช่น IoT Assistant, Code Assistant หรือ Debug Assistant
+      </p>
+    } @else {
+      <ul class="ai-profile-list">
+        @for (profile of personalProfiles(); track profile.id) {
+          <ng-container *ngTemplateOutlet="profileRow; context: { $implicit: profile }" />
+        }
+      </ul>
+    }
+  </section>
+}
+
+<ng-template #profileRow let-profile>
+  <li>
+    <div class="ai-profile-meta">
+      <strong>{{ profile.name }}</strong>
+      <small> {{ tierLabel(profile.tier) }} · {{ profile.model ?? 'ระบบเลือกโมเดลให้' }} </small>
+      @if (profile.description) {
+        <p>{{ profile.description }}</p>
+      }
+    </div>
+    @if (profile.editable) {
+      <div class="ai-profile-actions">
+        @if (confirmingDelete() === profile.id) {
+          <button
+            type="button"
+            class="settings-button danger"
+            [disabled]="busy()"
+            (click)="remove(profile)"
+          >
+            ยืนยันลบ
+          </button>
+          <button
+            type="button"
+            class="settings-button text-button"
+            (click)="confirmingDelete.set(null)"
+          >
+            ยกเลิก
+          </button>
+        } @else {
+          <button
+            type="button"
+            class="settings-button secondary"
+            [disabled]="busy() || editing() !== null"
+            (click)="startEdit(profile)"
+          >
+            แก้ไข
+          </button>
+          <button
+            type="button"
+            class="settings-button text-button"
+            [disabled]="busy()"
+            (click)="confirmingDelete.set(profile.id)"
+          >
+            ลบ
+          </button>
+        }
+      </div>
+    }
+  </li>
+</ng-template>

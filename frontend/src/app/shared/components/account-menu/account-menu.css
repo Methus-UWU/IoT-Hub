@@ -1,0 +1,130 @@
+:host {
+  display: contents;
+}
+
+.account-menu-trigger {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  flex: none;
+  place-items: center;
+  border-radius: 0.6rem;
+  color: #808080;
+  transition:
+    color 120ms ease,
+    background-color 120ms ease;
+}
+
+.account-menu-trigger:hover,
+.account-menu-trigger[aria-expanded='true'] {
+  color: #2b2b2b;
+  background: #f1f1f1;
+}
+
+.account-menu-trigger:focus-visible,
+.account-menu-item:focus-visible {
+  outline: 2px solid #afafaf;
+  outline-offset: 1px;
+}
+
+.account-menu-trigger svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.account-popover {
+  position: absolute;
+  z-index: 70;
+  right: 0;
+  bottom: calc(100% + 0.45rem);
+  left: 0;
+  overflow: hidden;
+  border: 1px solid #e1e1e1;
+  border-radius: 0.9rem;
+  background: #ffffff;
+  box-shadow: 0 16px 40px rgb(43 43 43 / 0.14);
+  text-align: left;
+  animation: account-menu-in 120ms ease-out;
+}
+
+.account-popover-header {
+  padding: 0.625rem 0.75rem;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.account-popover-name,
+.account-popover-detail {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-popover-name {
+  color: #1f2937;
+  font-size: 0.75rem;
+}
+
+.account-popover-detail {
+  margin-top: 0.125rem;
+  color: #6b7280;
+  font-size: 0.625rem;
+}
+
+.account-popover-items {
+  padding: 0.375rem;
+}
+
+.account-menu-item {
+  display: flex;
+  width: 100%;
+  min-height: 2.25rem;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: 0.6rem;
+  color: #545454;
+  font-size: 0.72rem;
+  text-align: left;
+  transition:
+    color 120ms ease,
+    background-color 120ms ease;
+}
+
+.account-menu-item:hover {
+  color: #2b2b2b;
+  background: #f5f5f5;
+}
+
+.account-menu-item-danger:hover {
+  color: #b91c1c;
+  background: #fef2f2;
+}
+
+.account-menu-item:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.account-menu-item svg {
+  width: 1rem;
+  height: 1rem;
+  flex: none;
+}
+
+@keyframes account-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.25rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .account-menu-trigger,
+  .account-menu-item {
+    transition: none;
+  }
+
+  .account-popover {
+    animation: none;
+  }
+}

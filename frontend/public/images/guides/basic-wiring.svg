@@ -1,0 +1,103 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="1140" viewBox="0 0 960 1140" role="img" aria-labelledby="title desc">
+  <title id="title">ตัวอย่างการต่อ ESP32 กับ LED ปุ่มกด และเซนเซอร์เสียง</title>
+  <desc id="desc">แผนผังแสดงเฉพาะขาที่ใช้ ไม่ใช่ตำแหน่งขาจริง วงจรหนึ่งต่อ GPIO 23 ผ่านตัวต้านทาน 220 โอห์มและ LED ลงกราวด์ วงจรสองต่อ GPIO 18 ผ่านปุ่มกดลงกราวด์โดยใช้ INPUT_PULLUP วงจรสามจ่ายไฟ 3.3V ให้ KY-038 ต่อ DO ไป GPIO 19 และใช้วงจร LED เดิม โดยต่อกราวด์ร่วมกัน</desc>
+  <defs>
+    <style>
+      text { font-family: Tahoma, Arial, sans-serif; fill: #172b40; font-size: 18px; }
+      .heading { font-size: 24px; font-weight: 700; }
+      .note { font-size: 16px; }
+      .pin { fill: #ffffff; font-size: 17px; }
+      .board { fill: #173c50; }
+      .wire { fill: none; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; }
+      .signal { stroke: #2563a6; }
+      .ground { stroke: #263442; }
+      .power { stroke: #bc3030; }
+      .input { stroke: #b56a00; }
+    </style>
+    <g id="resistor">
+      <path d="M0 0h20m80 0h20" class="wire signal"/>
+      <rect x="20" y="-12" width="80" height="24" rx="3" fill="#e7d6b0" stroke="#655437" stroke-width="2"/>
+      <path d="M38-11v22m12-22v22" stroke="#a52e2e" stroke-width="6"/>
+      <path d="M64-11v22" stroke="#76502d" stroke-width="6"/>
+      <path d="M86-11v22" stroke="#8c7027" stroke-width="4"/>
+      <text x="60" y="-24" text-anchor="middle">220 Ω</text>
+    </g>
+    <g id="led">
+      <path d="M0 0h25m45 0h25" class="wire ground"/>
+      <path d="M25-19h28a17 17 0 0 1 0 38H25Z" fill="#db495d" stroke="#91243b" stroke-width="2"/>
+      <path d="M65-16v32" stroke="#91243b" stroke-width="3"/>
+      <text x="47" y="-32" text-anchor="middle">LED</text>
+      <text x="10" y="35" text-anchor="middle" class="note">A (+)</text>
+      <text x="85" y="35" text-anchor="middle" class="note">K (−)</text>
+    </g>
+  </defs>
+  <rect width="960" height="1140" rx="20" fill="#ffffff"/>
+  <text x="36" y="40" class="heading">ESP32 · ตัวอย่างการต่ออุปกรณ์พื้นฐาน</text>
+  <text x="36" y="70" class="note">ดูชื่อขาเป็นหลัก · ตำแหน่งในภาพไม่ใช่ตำแหน่งขาจริง · จ่ายไฟบอร์ดผ่าน USB</text>
+
+  <g transform="translate(0 95)">
+    <rect x="24" y="0" width="912" height="290" rx="14" fill="#f3f6f8"/>
+    <text x="48" y="38" class="heading">1. LED และตัวต้านทาน</text>
+    <rect x="60" y="70" width="210" height="170" rx="12" class="board"/>
+    <text x="80" y="105" class="pin">ESP32</text>
+    <text x="252" y="145" text-anchor="end" class="pin">GPIO 23</text>
+    <text x="252" y="215" text-anchor="end" class="pin">GND</text>
+    <path d="M270 140H360" class="wire signal"/>
+    <use href="#resistor" x="360" y="140"/>
+    <path d="M480 140H580" class="wire signal"/>
+    <use href="#led" x="580" y="140"/>
+    <path d="M675 140H820V210H270" class="wire ground"/>
+    <circle cx="270" cy="140" r="6" fill="#2563a6"/>
+    <circle cx="270" cy="210" r="6" fill="#263442"/>
+    <text x="48" y="270" class="note">GPIO 23 → 220 Ω → A ของ LED · K ของ LED → GND</text>
+  </g>
+
+  <g transform="translate(0 405)">
+    <rect x="24" y="0" width="912" height="280" rx="14" fill="#f3f6f8"/>
+    <text x="48" y="38" class="heading">2. ปุ่มกด · INPUT_PULLUP</text>
+    <rect x="60" y="70" width="210" height="155" rx="12" class="board"/>
+    <text x="80" y="103" class="pin">ESP32</text>
+    <text x="252" y="140" text-anchor="end" class="pin">GPIO 18</text>
+    <text x="252" y="205" text-anchor="end" class="pin">GND</text>
+    <path d="M270 135H530" class="wire signal"/>
+    <circle cx="530" cy="135" r="6" fill="#263442"/>
+    <circle cx="645" cy="135" r="6" fill="#263442"/>
+    <path d="M530 135L635 100" class="wire ground"/>
+    <path d="M585 77V96" class="wire ground"/>
+    <text x="580" y="67" text-anchor="middle">ปุ่มกด</text>
+    <path d="M645 135H820V200H270" class="wire ground"/>
+    <circle cx="270" cy="135" r="6" fill="#2563a6"/>
+    <circle cx="270" cy="200" r="6" fill="#263442"/>
+    <text x="48" y="256" class="note">ปล่อยปุ่ม = HIGH · กดปุ่ม = LOW · ใช้หน้าสัมผัสคนละชุด</text>
+  </g>
+
+  <g transform="translate(0 705)">
+    <rect x="24" y="0" width="912" height="410" rx="14" fill="#f3f6f8"/>
+    <text x="48" y="38" class="heading">3. เซนเซอร์เสียงควบคุม LED</text>
+    <rect x="60" y="90" width="210" height="250" rx="12" class="board"/>
+    <text x="80" y="120" class="pin">ESP32</text>
+    <text x="252" y="155" text-anchor="end" class="pin">GPIO 23</text>
+    <text x="252" y="205" text-anchor="end" class="pin">3V3</text>
+    <text x="252" y="260" text-anchor="end" class="pin">GPIO 19</text>
+    <text x="252" y="320" text-anchor="end" class="pin">GND</text>
+    <path d="M270 150H350" class="wire signal"/>
+    <use href="#resistor" x="350" y="150"/>
+    <path d="M470 150H590" class="wire signal"/>
+    <use href="#led" x="590" y="150"/>
+    <path d="M685 150H850V355H310V315H270" class="wire ground"/>
+    <rect x="510" y="200" width="230" height="115" rx="10" fill="#176275"/>
+    <text x="625" y="225" text-anchor="middle" class="pin">KY-038</text>
+    <text x="525" y="251" class="pin">+ / VCC</text>
+    <text x="525" y="285" class="pin">DO</text>
+    <text x="615" y="302" text-anchor="middle" class="pin">GND</text>
+    <text x="710" y="302" text-anchor="middle" class="pin">AO</text>
+    <path d="M270 200H335V245H510" class="wire power"/>
+    <path d="M270 255H400V280H510" class="wire input"/>
+    <path d="M615 315V355" class="wire ground"/>
+    <circle cx="615" cy="355" r="6" fill="#263442"/>
+    <path d="M710 315V327" class="wire ground"/>
+    <text x="725" y="340" class="note">ไม่ต่อ</text>
+    <text x="365" y="231" class="note">3.3V</text>
+    <text x="48" y="390" class="note">ใช้โค้ดอ่าน GPIO 19 แล้วสั่ง GPIO 23 · ต่อกราวด์ร่วมกัน · ห้ามป้อน 5V เข้า GPIO</text>
+  </g>
+</svg>

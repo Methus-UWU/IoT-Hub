@@ -1,0 +1,121 @@
+<section class="canvas-shell" [class.canvas-preview-mode]="!editMode()">
+  <div class="canvas-scroll" #canvasScroll>
+    <div
+      class="device-frame"
+      [class.device-tablet]="breakpoint() === 'tablet'"
+      [class.device-mobile]="breakpoint() === 'mobile'"
+      [style.width.px]="previewWidth()"
+    >
+      @if (!editMode()) {
+        <div class="preview-dashboard-header">
+          <div>
+            <span class="preview-mark"><app-dashboard-icon name="grid" /></span>
+            <span
+              ><strong>{{ dashboardName() }}</strong
+              ><small>Live dashboard</small></span
+            >
+          </div>
+          <span class="preview-live"><i></i> Live</span>
+        </div>
+      }
+
+      <div
+        #gridSurface
+        class="grid-surface"
+        role="region"
+        [class.grid-drag-over]="dragOver()"
+        [class.grid-preview]="!editMode()"
+        [style.grid-template-columns]="'repeat(' + columns() + ', minmax(0, 1fr))'"
+        [style.grid-auto-rows.px]="gridRowHeight()"
+        [style.min-height.px]="minimumGridHeight()"
+        [attr.aria-label]="
+          breakpointConfig().label + ' dashboard canvas, ' + columns() + ' columns'
+        "
+        (pointerdown)="clearSelection($event)"
+        (dragover)="allowLibraryDrop($event)"
+        (dragleave)="leaveLibraryDrop($event)"
+        (drop)="completeLibraryDrop($event)"
+      >
+        <div
+          class="grid-cells"
+          [style.grid-template-columns]="'repeat(' + columns() + ', minmax(0, 1fr))'"
+          [style.grid-auto-rows.px]="gridRowHeight()"
+          aria-hidden="true"
+        >
+          @for (cell of gridCellIndexes(); track cell) {
+            <span></span>
+          }
+        </div>
+
+        @if (!widgets().length) {
+          <!-- A project with no dashboard yet. Never seeded with sample charts. -->
+          <div class="dashboard-empty">
+            <h2>No widgets yet</h2>
+            <p>Add a widget from the panel to start building this dashboard.</p>
+          </div>
+        }
+
+        @for (widget of widgets(); track widget.id; let order = $index) {
+          <div
+            class="widget-grid-item"
+            [class.grid-item-moving]="movingWidgetId() === widget.id"
+            [style.grid-column]="gridColumn(widget)"
+            [style.grid-row]="gridRow(widget)"
+            [style.transform]="movingTransform(widget.id)"
+            [style.z-index]="
+              movingWidgetId() === widget.id ? 30 : isSelected(widget.id) ? 10 : order + 1
+            "
+          >
+            <app-dashboard-widget
+              [widget]="widget"
+              [layout]="layoutFor(widget)"
+              [selected]="isSelected(widget.id)"
+              [editMode]="editMode()"
+              [series]="liveMode() ? (series()[widget.datasource] ?? []) : null"
+              [moving]="movingWidgetId() === widget.id"
+              [invalid]="movingWidgetId() === widget.id && invalidDrop()"
+              (selectRequested)="selectWidget($event)"
+              (moveStarted)="beginMove($event)"
+              (resizeStarted)="beginResize($event)"
+              (keyboardLayoutRequested)="handleKeyboardLayout($event)"
+              (actionRequested)="widgetActionRequested.emit($event)"
+              (settingChanged)="widgetSettingChanged.emit($event)"
+            />
+          </div>
+        }
+
+        @if (dropPreview(); as drop) {
+          <div
+            class="drop-placeholder"
+            [class.drop-placeholder-invalid]="invalidDrop()"
+            [style.grid-column]="dropGridColumn()"
+            [style.grid-row]="dropGridRow()"
+            aria-hidden="true"
+          >
+            <app-dashboard-icon [name]="definitionFor(drop.type).icon" />
+            <span>{{ dropLabel() }}</span>
+          </div>
+        }
+
+        @if (widgets().length === 0) {
+          <div class="canvas-empty">
+            <span><app-dashboard-icon name="grid" /></span>
+            <h2>Add your first widget</h2>
+            <p>Open the widget library and choose a card to add it to this grid.</p>
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+
+  @if (editMode()) {
+    <footer class="canvas-statusbar">
+      <span><i></i> Snap to grid</span>
+      <span>{{ columns() }} columns</span>
+      <span>{{ gridRowHeight() }} px rows</span>
+      <span class="statusbar-spacer"></span>
+      <span><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> Move</span>
+      <span><kbd>Shift</kbd> + arrows Resize</span>
+    </footer>
+  }
+</section>

@@ -1,0 +1,370 @@
+<div class="settings-page">
+  <header class="settings-header">
+    <p class="settings-eyebrow">บัญชีของคุณ</p>
+    <div class="settings-title">
+      <button
+        type="button"
+        class="settings-back"
+        aria-label="ย้อนกลับ"
+        title="ย้อนกลับ"
+        (click)="goBack()"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 6-6 6 6 6M8 12h12" /></svg>
+      </button>
+      <h1>ตั้งค่าบัญชี</h1>
+    </div>
+    <p class="settings-help">ดูแลโปรไฟล์และความปลอดภัยของบัญชีในที่เดียว</p>
+  </header>
+  <div class="pointer-events-none fixed right-4 top-4 z-[100]">
+    @if (error(); as message) {
+      <app-toast
+        class="pointer-events-auto"
+        [message]="message"
+        tone="error"
+        (dismissed)="dismissNotifications()"
+      />
+    } @else if (saved()) {
+      <app-toast
+        class="pointer-events-auto"
+        message="บันทึกโปรไฟล์เรียบร้อยแล้ว"
+        tone="success"
+        (dismissed)="dismissNotifications()"
+      />
+    } @else if (passwordError(); as message) {
+      <app-toast
+        class="pointer-events-auto"
+        [message]="message"
+        tone="error"
+        (dismissed)="dismissNotifications()"
+      />
+    } @else if (passwordSaved()) {
+      <app-toast
+        class="pointer-events-auto"
+        message="เปลี่ยนรหัสผ่านเรียบร้อยแล้ว"
+        tone="success"
+        (dismissed)="dismissNotifications()"
+      />
+    }
+  </div>
+  <div class="settings-layout">
+    <nav class="settings-nav" aria-label="หมวดการตั้งค่า">
+      <button
+        type="button"
+        [class.selected]="activeSection() === 'profile'"
+        [attr.aria-current]="activeSection() === 'profile' ? 'page' : null"
+        (click)="openSection('profile')"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="8" r="4" />
+          <path d="M4 21v-2a8 8 0 0 1 16 0v2" />
+        </svg>
+        โปรไฟล์
+      </button>
+      <button
+        type="button"
+        [class.selected]="activeSection() === 'security'"
+        [attr.aria-current]="activeSection() === 'security' ? 'page' : null"
+        (click)="openSection('security')"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="5" y="10" width="14" height="11" rx="2" />
+          <path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3" />
+        </svg>
+        อีเมลและรหัสผ่าน
+      </button>
+      <button
+        type="button"
+        [class.selected]="activeSection() === 'logins'"
+        [attr.aria-current]="activeSection() === 'logins' ? 'page' : null"
+        (click)="openSection('logins')"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 7v5l3 2" />
+        </svg>
+        ประวัติการเข้าสู่ระบบ
+      </button>
+    </nav>
+    @if (pageLoading()) {
+      <div class="settings-panel"><app-settings-skeleton layout="profile" /></div>
+    } @else if (!profileLoaded()) {
+      <section class="settings-panel settings-load-error" aria-label="โหลดบัญชีไม่สำเร็จ">
+        <h2>โหลดข้อมูลบัญชีไม่สำเร็จ</h2>
+        <p class="settings-help">ตรวจสอบการเชื่อมต่อ แล้วลองโหลดอีกครั้ง</p>
+        <button type="button" class="settings-button secondary" (click)="loadProfile()">
+          ลองอีกครั้ง
+        </button>
+      </section>
+    } @else {
+      <div class="settings-content">
+        <section
+          class="settings-panel"
+          [hidden]="activeSection() !== 'profile'"
+          aria-labelledby="profile-heading"
+        >
+          <header class="section-heading">
+            <h2 id="profile-heading">โปรไฟล์ของคุณ</h2>
+            <p class="settings-help">เลือกรูปและชื่อที่ใช้แสดงในบัญชีของคุณ</p>
+          </header>
+          <app-avatar-editor [initials]="initials()" />
+          <form novalidate (submit)="$event.preventDefault(); saveProfile()">
+            <fieldset class="settings-section profile-fields" [disabled]="saving()">
+              <legend class="sr-only">ข้อมูลโปรไฟล์</legend>
+              <div class="profile-details-grid">
+                <div>
+                  <label for="profile-display-name">ชื่อที่แสดง</label>
+                  <input
+                    id="profile-display-name"
+                    type="text"
+                    autocomplete="nickname"
+                    class="profile-input"
+                    [formField]="profileForm.displayName"
+                    [attr.aria-invalid]="
+                      profileForm.displayName().touched() && profileForm.displayName().invalid()
+                    "
+                    aria-describedby="profile-display-name-help profile-display-name-error"
+                  />
+                  <p id="profile-display-name-help" class="settings-help">
+                    ไม่เกิน 60 ตัวอักษร ใช้ภาษาไทยได้ · เว้นว่างเพื่อใช้ชื่อผู้ใช้งาน
+                  </p>
+                  <div id="profile-display-name-error">
+                    @if (
+                      profileForm.displayName().touched() && profileForm.displayName().invalid()
+                    ) {
+                      <app-field-error
+                        [message]="profileForm.displayName().errors()[0]?.message ?? ''"
+                      />
+                    }
+                  </div>
+                </div>
+                <div>
+                  <label for="profile-username">ชื่อผู้ใช้งาน</label>
+                  <input
+                    id="profile-username"
+                    type="text"
+                    autocomplete="username"
+                    class="profile-input"
+                    [formField]="profileForm.username"
+                    [attr.aria-invalid]="
+                      profileForm.username().touched() && profileForm.username().invalid()
+                    "
+                    aria-describedby="profile-username-help profile-username-error"
+                  />
+                  <p id="profile-username-help" class="settings-help">
+                    2–40 ตัวอักษร ใช้ภาษาอังกฤษ ตัวเลข จุด ขีดล่าง หรือขีดกลาง
+                  </p>
+                  <div id="profile-username-error">
+                    @if (profileForm.username().touched() && profileForm.username().invalid()) {
+                      <app-field-error
+                        [message]="profileForm.username().errors()[0]?.message ?? ''"
+                      />
+                    }
+                  </div>
+                </div>
+              </div>
+              <div class="profile-bio-field">
+                <label for="profile-bio">แนะนำตัว</label>
+                <textarea
+                  id="profile-bio"
+                  rows="3"
+                  class="profile-input"
+                  [formField]="profileForm.bio"
+                  [attr.aria-invalid]="profileForm.bio().touched() && profileForm.bio().invalid()"
+                  aria-describedby="profile-bio-help profile-bio-error"
+                ></textarea>
+                <p id="profile-bio-help" class="settings-help field-help-row">
+                  <span>เล่าเกี่ยวกับตัวคุณหรือสิ่งที่สนใจใน IoT</span
+                  ><span>{{ profileForm.bio().value().length }} / 280</span>
+                </p>
+                <div id="profile-bio-error">
+                  @if (profileForm.bio().touched() && profileForm.bio().invalid()) {
+                    <app-field-error [message]="profileForm.bio().errors()[0]?.message ?? ''" />
+                  }
+                </div>
+              </div>
+              <dl class="account-facts">
+                <div>
+                  <dt>อีเมล</dt>
+                  <dd>{{ emailAddress() }}</dd>
+                </div>
+                <div>
+                  <dt>ประเภทบัญชี</dt>
+                  <dd>{{ roleLabel() }}</dd>
+                </div>
+              </dl>
+              <button type="button" class="inline-link" (click)="openSection('security')">
+                จัดการอีเมลและรหัสผ่าน →
+              </button>
+            </fieldset>
+            <footer class="settings-footer">
+              <p class="settings-help">ชื่อจะแสดงในโปรไฟล์และแถบบัญชี</p>
+              <button
+                type="button"
+                class="settings-button secondary"
+                [disabled]="saving() || !hasProfileChanges()"
+                (click)="resetProfile()"
+              >
+                ยกเลิกการแก้ไข
+              </button>
+              <button
+                type="submit"
+                class="settings-button"
+                [disabled]="
+                  !profileLoaded() || saving() || profileForm().invalid() || !hasProfileChanges()
+                "
+              >
+                {{ saving() ? 'กำลังบันทึก…' : 'บันทึกการเปลี่ยนแปลง' }}
+              </button>
+            </footer>
+          </form>
+        </section>
+        <section
+          class="settings-panel"
+          [hidden]="activeSection() !== 'security'"
+          aria-label="ความปลอดภัยของบัญชี"
+        >
+          @if (!credentialSettingsReady()) {
+            <app-settings-skeleton />
+          } @else if (!canEditCredentials()) {
+            <header class="section-heading">
+              <h2>
+                {{
+                  usesExternalLogin()
+                    ? 'บัญชีที่เข้าสู่ระบบผ่าน Google / GitHub'
+                    : 'การเปลี่ยนอีเมลและรหัสผ่าน'
+                }}
+              </h2>
+              <p class="settings-help email-current">อีเมลปัจจุบัน: {{ emailAddress() }}</p>
+              <p class="settings-help">
+                @if (usesExternalLogin()) {
+                  บัญชีนี้เข้าสู่ระบบผ่านผู้ให้บริการภายนอก จึงเปลี่ยนอีเมลและรหัสผ่านใน IoT Hub
+                  ไม่ได้ กรุณาจัดการข้อมูลที่ Google หรือ GitHub โดยตรง
+                } @else {
+                  กรุณาเข้าสู่ระบบด้วยอีเมลและรหัสผ่านก่อนเปลี่ยนข้อมูลเหล่านี้
+                }
+              </p>
+              <p class="settings-help">
+                คุณยังเปลี่ยนชื่อผู้ใช้งานและรูปโปรไฟล์ใน IoT Hub ได้ตามปกติ
+              </p>
+            </header>
+          } @else {
+            <app-email-settings />
+            <form
+              class="password-section"
+              novalidate
+              (submit)="$event.preventDefault(); changePassword()"
+            >
+              <header class="section-heading">
+                <h2>เปลี่ยนรหัสผ่าน</h2>
+                <p class="settings-help">
+                  ใช้รหัสผ่านอย่างน้อย 8 ตัวอักษร พร้อมตัวพิมพ์ใหญ่และอักขระพิเศษ
+                </p>
+              </header>
+              <label class="password-visibility"
+                ><input
+                  type="checkbox"
+                  [checked]="showPasswords()"
+                  (change)="showPasswords.set(!showPasswords())"
+                />แสดงรหัสผ่าน</label
+              >
+              <fieldset class="password-fields profile-fields" [disabled]="passwordSaving()">
+                <legend class="sr-only">เปลี่ยนรหัสผ่าน</legend>
+                <div>
+                  <label for="current-password">รหัสผ่านปัจจุบัน</label>
+                  <input
+                    id="current-password"
+                    [type]="showPasswords() ? 'text' : 'password'"
+                    autocomplete="current-password"
+                    class="profile-input"
+                    [formField]="passwordForm.currentPassword"
+                    aria-describedby="current-password-error"
+                    [attr.aria-invalid]="
+                      passwordForm.currentPassword().touched() &&
+                      passwordForm.currentPassword().invalid()
+                    "
+                  />
+                  <div id="current-password-error">
+                    @if (
+                      passwordForm.currentPassword().touched() &&
+                      passwordForm.currentPassword().invalid()
+                    ) {
+                      <app-field-error
+                        [message]="passwordForm.currentPassword().errors()[0]?.message ?? ''"
+                      />
+                    }
+                  </div>
+                </div>
+                <div>
+                  <label for="new-password">รหัสผ่านใหม่</label>
+                  <input
+                    id="new-password"
+                    [type]="showPasswords() ? 'text' : 'password'"
+                    autocomplete="new-password"
+                    class="profile-input"
+                    [formField]="passwordForm.newPassword"
+                    aria-describedby="new-password-error"
+                    [attr.aria-invalid]="
+                      passwordForm.newPassword().touched() && passwordForm.newPassword().invalid()
+                    "
+                  />
+                  <div id="new-password-error">
+                    @if (
+                      passwordForm.newPassword().touched() && passwordForm.newPassword().invalid()
+                    ) {
+                      <app-field-error
+                        [message]="passwordForm.newPassword().errors()[0]?.message ?? ''"
+                      />
+                    }
+                  </div>
+                </div>
+                <div>
+                  <label for="confirm-new-password">ยืนยันรหัสผ่านใหม่</label>
+                  <input
+                    id="confirm-new-password"
+                    [type]="showPasswords() ? 'text' : 'password'"
+                    autocomplete="new-password"
+                    class="profile-input"
+                    [formField]="passwordForm.confirmNewPassword"
+                    aria-describedby="confirm-new-password-error"
+                    [attr.aria-invalid]="
+                      passwordForm.confirmNewPassword().touched() &&
+                      passwordForm.confirmNewPassword().invalid()
+                    "
+                  />
+                  <div id="confirm-new-password-error">
+                    @if (
+                      passwordForm.confirmNewPassword().touched() &&
+                      passwordForm.confirmNewPassword().invalid()
+                    ) {
+                      <app-field-error
+                        [message]="passwordForm.confirmNewPassword().errors()[0]?.message ?? ''"
+                      />
+                    }
+                  </div>
+                </div>
+              </fieldset>
+              <footer class="settings-footer">
+                <button
+                  type="submit"
+                  class="settings-button"
+                  [disabled]="passwordSaving() || passwordForm().invalid()"
+                >
+                  {{ passwordSaving() ? 'กำลังเปลี่ยนรหัสผ่าน…' : 'เปลี่ยนรหัสผ่าน' }}
+                </button>
+              </footer>
+            </form>
+          }
+        </section>
+        @if (historyOpened()) {
+          <section
+            class="settings-panel"
+            [hidden]="activeSection() !== 'logins'"
+            aria-labelledby="login-history-title"
+          >
+            <app-login-history-settings />
+          </section>
+        }
+      </div>
+    }
+  </div>
+</div>

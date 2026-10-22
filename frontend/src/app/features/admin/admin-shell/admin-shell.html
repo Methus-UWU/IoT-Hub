@@ -1,0 +1,243 @@
+<div class="flex h-full min-h-0 overflow-hidden bg-slate-50">
+  @if (sidebarOpen()) {
+    <div
+      class="fixed inset-0 z-30 bg-slate-950/25 backdrop-blur-[1px] md:hidden"
+      (click)="closeSidebar()"
+      aria-hidden="true"
+    ></div>
+  }
+
+  <aside
+    class="admin-sidebar fixed inset-y-0 left-0 z-40 flex w-60 -translate-x-full flex-col border-r border-[#E1E1E1] bg-[#FCFCFC] transition-transform duration-200 md:static md:h-full md:translate-x-0"
+    [class.translate-x-0]="sidebarOpen()"
+  >
+    <div class="flex h-[4.25rem] shrink-0 items-center gap-3 px-4">
+      <span
+        class="flex h-9 w-9 items-center justify-center rounded-xl bg-[#2B2B2B] text-xs font-semibold tracking-wide text-white shadow-sm shadow-black/15"
+      >
+        IH
+      </span>
+      <span class="min-w-0">
+        <span class="block truncate text-[13px] font-semibold tracking-tight text-[#2B2B2B]"
+          >IoT Hub</span
+        >
+        <span class="block text-[10px] font-medium text-[#808080]">ระบบผู้ดูแล</span>
+      </span>
+    </div>
+
+    <nav
+      class="scrollbar-thin flex-1 space-y-7 overflow-y-auto px-3 py-5"
+      aria-label="เมนูผู้ดูแลระบบ"
+    >
+      @for (group of navGroups; track group.label) {
+        <div role="group" [attr.aria-label]="group.label">
+          <p
+            class="px-2.5 pb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#808080]"
+          >
+            {{ group.label }}
+          </p>
+          <div class="space-y-0.5">
+            @for (item of group.items; track item.path) {
+              <a
+                [routerLink]="item.path"
+                routerLinkActive="admin-nav-active"
+                class="admin-nav-link"
+                (click)="closeSidebar()"
+              >
+                <span class="admin-nav-indicator" aria-hidden="true"></span>
+                <span class="admin-nav-icon" aria-hidden="true">
+                  @switch (item.icon) {
+                    @case ('dashboard') {
+                      <svg viewBox="0 0 24 24" fill="none" class="h-5 w-5">
+                        <rect
+                          x="3"
+                          y="3"
+                          width="7.5"
+                          height="7.5"
+                          rx="1.5"
+                          stroke="currentColor"
+                          stroke-width="1.6"
+                        />
+                        <rect
+                          x="13.5"
+                          y="3"
+                          width="7.5"
+                          height="7.5"
+                          rx="1.5"
+                          stroke="currentColor"
+                          stroke-width="1.6"
+                        />
+                        <rect
+                          x="3"
+                          y="13.5"
+                          width="7.5"
+                          height="7.5"
+                          rx="1.5"
+                          stroke="currentColor"
+                          stroke-width="1.6"
+                        />
+                        <rect
+                          x="13.5"
+                          y="13.5"
+                          width="7.5"
+                          height="7.5"
+                          rx="1.5"
+                          stroke="currentColor"
+                          stroke-width="1.6"
+                        />
+                      </svg>
+                    }
+                    @case ('server') {
+                      <svg viewBox="0 0 24 24" fill="none" class="h-5 w-5">
+                        <rect
+                          x="4"
+                          y="4"
+                          width="16"
+                          height="6"
+                          rx="1.3"
+                          stroke="currentColor"
+                          stroke-width="1.6"
+                        />
+                        <rect
+                          x="4"
+                          y="14"
+                          width="16"
+                          height="6"
+                          rx="1.3"
+                          stroke="currentColor"
+                          stroke-width="1.6"
+                        />
+                        <circle cx="7.5" cy="7" r="0.9" fill="currentColor" />
+                        <circle cx="7.5" cy="17" r="0.9" fill="currentColor" />
+                      </svg>
+                    }
+                    @case ('database') {
+                      <svg viewBox="0 0 24 24" fill="none" class="h-5 w-5">
+                        <ellipse
+                          cx="12"
+                          cy="6.5"
+                          rx="8"
+                          ry="3"
+                          stroke="currentColor"
+                          stroke-width="1.6"
+                        />
+                        <path
+                          d="M4 6.5v11c0 1.66 3.58 3 8 3s8-1.34 8-3v-11"
+                          stroke="currentColor"
+                          stroke-width="1.6"
+                          stroke-linecap="round"
+                        />
+                        <path
+                          d="M4 12c0 1.66 3.58 3 8 3s8-1.34 8-3"
+                          stroke="currentColor"
+                          stroke-width="1.6"
+                        />
+                      </svg>
+                    }
+                    @case ('logs') {
+                      <svg viewBox="0 0 24 24" fill="none" class="h-5 w-5">
+                        <path
+                          d="M4 6h16M4 12h16M4 18h10"
+                          stroke="currentColor"
+                          stroke-width="1.6"
+                          stroke-linecap="round"
+                        />
+                      </svg>
+                    }
+                    @case ('users') {
+                      <svg viewBox="0 0 24 24" fill="none" class="h-5 w-5">
+                        <circle cx="12" cy="8" r="3.2" stroke="currentColor" stroke-width="1.6" />
+                        <path
+                          d="M5 20c0-3.87 3.13-7 7-7s7 3.13 7 7"
+                          stroke="currentColor"
+                          stroke-width="1.6"
+                          stroke-linecap="round"
+                        />
+                      </svg>
+                    }
+                    @case ('integrations') {
+                      <svg viewBox="0 0 24 24" fill="none" class="h-5 w-5">
+                        <circle
+                          cx="14.5"
+                          cy="9.5"
+                          r="4.5"
+                          stroke="currentColor"
+                          stroke-width="1.6"
+                        />
+                        <path
+                          d="m11.5 12.5-6.3 6.3M7 17l1.8 1.8M9.5 14.5l1.8 1.8"
+                          stroke="currentColor"
+                          stroke-width="1.6"
+                          stroke-linecap="round"
+                        />
+                      </svg>
+                    }
+                    @case ('ai') {
+                      <svg viewBox="0 0 24 24" fill="none" class="h-5 w-5">
+                        <path
+                          d="M12 3.5 14 9l5.5 2-5.5 2-2 5.5-2-5.5-5.5-2L10 9l2-5.5Z"
+                          stroke="currentColor"
+                          stroke-width="1.5"
+                          stroke-linejoin="round"
+                        />
+                      </svg>
+                    }
+                  }
+                </span>
+                <span class="min-w-0 flex-1 truncate">{{ item.label }}</span>
+              </a>
+            }
+          </div>
+        </div>
+      }
+    </nav>
+
+    <div class="shrink-0 px-3 pb-3">
+      <div class="profile-card">
+        <span class="profile-avatar" aria-hidden="true"
+          ><app-account-avatar [initials]="profileInitials()"
+        /></span>
+        <span class="min-w-0 flex-1">
+          <span class="block truncate text-xs text-[#2B2B2B]">{{ username() }}</span>
+          <span class="mt-0.5 block truncate text-[10px] text-[#808080]">{{ roleLabel() }}</span>
+        </span>
+        <app-account-menu
+          [name]="username()"
+          [detail]="user()?.email ?? roleLabel()"
+          profileLink="/admin/profile"
+          [loggingOut]="loggingOut()"
+          (logout)="logout()"
+          (navigated)="closeSidebar()"
+        />
+      </div>
+    </div>
+  </aside>
+
+  <div class="flex min-w-0 flex-1 flex-col overflow-hidden">
+    <header
+      class="flex h-[3.75rem] shrink-0 items-center gap-3 border-b border-slate-200/80 bg-white/90 px-4 backdrop-blur-xl md:hidden"
+    >
+      <button
+        type="button"
+        class="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900"
+        (click)="toggleSidebar()"
+        [attr.aria-expanded]="sidebarOpen()"
+        aria-label="เปิดหรือปิดเมนู"
+      >
+        <svg viewBox="0 0 24 24" fill="none" class="h-5 w-5">
+          <path
+            d="M4 6h16M4 12h16M4 18h16"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+          />
+        </svg>
+      </button>
+      <span class="text-sm font-semibold tracking-tight text-slate-900">IoT Hub ผู้ดูแลระบบ</span>
+    </header>
+
+    <main class="scrollbar-thin relative min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain">
+      <router-outlet />
+    </main>
+  </div>
+</div>

@@ -1,0 +1,153 @@
+/* Keep load failures inside the canvas row, without resizing the editor shell. */
+.canvas-load-error {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  place-items: center;
+  overflow-y: auto;
+  padding: 2rem 1.25rem;
+  background: var(--color-surface-soft);
+  color: var(--color-ink);
+}
+
+.canvas-error-content {
+  width: min(100%, 28rem);
+  text-align: center;
+  animation: canvas-error-enter 180ms ease-out both;
+}
+
+.canvas-error-art {
+  display: grid;
+  width: 6rem;
+  height: 6rem;
+  place-items: center;
+  margin: 0 auto 1.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 24px;
+  background: var(--color-surface);
+}
+
+.canvas-error-art svg {
+  width: 5rem;
+  height: 5rem;
+}
+.error-chip {
+  fill: var(--color-surface-soft);
+  stroke: var(--color-border-strong);
+}
+.error-trace {
+  stroke: var(--color-border-strong);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
+.error-symbol {
+  stroke: var(--color-error);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+.canvas-error-eyebrow {
+  color: var(--color-ink-muted);
+  font-size: 0.75rem;
+}
+
+.canvas-error-content h1 {
+  margin: 0.5rem 0 0;
+  color: var(--color-ink);
+  font-family: var(--font-display);
+  font-size: clamp(1.375rem, 2.5vw, 1.75rem);
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: -0.025em;
+}
+
+.canvas-error-description {
+  margin: 0.75rem 0 0;
+  color: var(--color-ink-muted);
+  font-size: 0.8125rem;
+  line-height: 1.9;
+  text-wrap: balance;
+}
+
+.canvas-error-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+.canvas-error-actions button,
+.canvas-error-actions a {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 160ms ease;
+}
+
+.canvas-error-actions .canvas-retry {
+  border-color: var(--color-primary-dark);
+  background: var(--color-primary-dark);
+  color: var(--color-surface);
+}
+.canvas-error-actions .canvas-retry:hover:not(:disabled) {
+  background: var(--color-primary);
+}
+.canvas-error-actions a:hover {
+  background: var(--color-surface-muted);
+}
+.canvas-error-actions svg {
+  width: 1rem;
+  height: 1rem;
+}
+.canvas-error-actions button:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+.canvas-error-actions :is(button, a):focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 4px;
+}
+.canvas-retry-status {
+  min-height: 1.5rem;
+  margin: 1rem 0 0;
+  color: var(--color-ink-muted);
+  font-size: 0.75rem;
+  line-height: 1.7;
+}
+.editor-topbar[inert] .topbar-tools {
+  opacity: 0.45;
+}
+
+@keyframes canvas-error-enter {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+}
+@media (max-height: 32rem) {
+  .canvas-load-error {
+    place-items: start center;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .canvas-error-content {
+    animation: none;
+  }
+  .canvas-error-actions :is(button, a) {
+    transition: none;
+  }
+}

@@ -1,0 +1,483 @@
+/*
+ * Thread page.
+ *
+ * Aggregator chrome — vote rail on a tinted strip, tight 0.5rem corners, a
+ * thread line down each reply, collapsible answers — over reading-grade type:
+ * Compact body text with generous line height, measure capped near 70 characters. The genre
+ * usually runs prose the full width of the card and greys the meta line below
+ * 4.5:1; neither is copied here.
+ */
+:host {
+  display: block;
+  min-height: 100%;
+  color: #1c1c1c;
+  background: #f6f7f8;
+}
+.thread-page {
+  min-height: 100%;
+}
+.thread-container {
+  width: min(100%, 52rem);
+  margin-inline: auto;
+  padding: 1.25rem 1.25rem 4rem;
+}
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.35rem 0.7rem 0.35rem 0.5rem;
+  border-radius: 999px;
+  color: #5c5c5c;
+  font-size: 0.84rem;
+  font-weight: 700;
+  text-decoration: none;
+  transition:
+    color 0.15s ease,
+    background 0.15s ease;
+}
+.back-link:hover {
+  color: #1c1c1c;
+  background: #e9eaeb;
+}
+.back-link:focus-visible {
+  outline: 2px solid #1c1c1c;
+  outline-offset: 2px;
+}
+.back-link svg {
+  width: 1rem;
+  height: 1rem;
+}
+.thread-skeleton {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+.thread-post {
+  display: grid;
+  grid-template-columns: 2.75rem minmax(0, 1fr);
+  overflow: hidden;
+  margin-top: 0.75rem;
+  border: 1px solid #dcdcdc;
+  border-radius: 0.5rem;
+  background: #fff;
+}
+.thread-vote {
+  display: flex;
+  justify-content: center;
+  padding: 0.75rem 0;
+  background: #f8f9fa;
+}
+.thread-body {
+  min-width: 0;
+  padding: 0.85rem 1.1rem 1rem;
+}
+.thread-meta,
+.answer-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  color: #767676;
+  font-size: 0.79rem;
+}
+.dot {
+  color: #a8a8a8;
+}
+.post-kind {
+  margin-left: auto;
+  padding: 0.12rem 0.5rem;
+  border-radius: 0.25rem;
+  color: #475569;
+  background: #f1f5f9;
+  font-size: 0.71rem;
+  font-weight: 700;
+}
+.post-kind[data-kind='question'] {
+  color: #1e40af;
+  background: #eff6ff;
+}
+.post-kind[data-kind='showcase'] {
+  color: #6d28d9;
+  background: #f5f3ff;
+}
+.thread-title {
+  margin: 0.45rem 0 0.8rem;
+  max-width: 34ch;
+  font-size: clamp(1.125rem, 2.2vw, 1.375rem);
+  font-weight: 700;
+  letter-spacing: -0.028em;
+  line-height: 1.35;
+}
+.markdown-body {
+  max-width: 70ch;
+  color: #333;
+  font-size: 0.875rem;
+  line-height: 1.75;
+  overflow-wrap: anywhere;
+}
+.thread-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 1rem;
+}
+.thread-tag {
+  padding: 0.12rem 0.5rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 0.25rem;
+  color: #5c5c5c;
+  background: #f6f7f8;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.owner-actions,
+.answer-actions,
+.composer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.75rem;
+}
+.owner-actions {
+  padding-top: 0.75rem;
+  border-top: 1px solid #f0f0f0;
+}
+.quiet-link,
+.danger-link {
+  padding: 0.3rem 0.55rem;
+  border: 0;
+  border-radius: 0.25rem;
+  background: transparent;
+  font: inherit;
+  font-size: 0.79rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    color 0.12s ease,
+    background 0.12s ease;
+}
+.quiet-link {
+  color: #5c5c5c;
+}
+.quiet-link:hover {
+  color: #1c1c1c;
+  background: #f1f2f3;
+}
+.danger-link {
+  color: #b42318;
+}
+.danger-link:hover {
+  background: #fdf1f0;
+}
+.quiet-link:focus-visible,
+.danger-link:focus-visible {
+  outline: 2px solid #1c1c1c;
+  outline-offset: 1px;
+}
+.confirm-text {
+  padding-left: 0.25rem;
+  color: #5c5c5c;
+  font-size: 0.79rem;
+}
+.answers {
+  margin-top: 0.75rem;
+  padding: 1rem 1.1rem 1.25rem;
+  border: 1px solid #dcdcdc;
+  border-radius: 0.5rem;
+  background: #fff;
+}
+.answers h2 {
+  margin: 0 0 0.85rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.answer {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.75rem;
+  padding: 0.85rem 0;
+  border-top: 1px solid #f0f0f0;
+}
+.answer:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+/* The solving answer is why most readers opened the page. An edge accent marks
+   it without tinting the block, which would fight the code an answer contains. */
+.answer-accepted {
+  margin-left: -1.1rem;
+  padding-left: 1.1rem;
+  border-left: 3px solid #059669;
+  background: #fbfefc;
+}
+.answer .markdown-body {
+  font-size: 0.875rem;
+  line-height: 1.72;
+}
+.answer-vote {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+}
+/* Folded, an answer is one line: arrows and the accept control would otherwise
+   take more height than the summary they sit beside. */
+.answer-collapsed {
+  grid-template-columns: minmax(0, 1fr);
+  padding: 0.5rem 0;
+}
+.answer-collapsed .answer-vote {
+  display: none;
+}
+.collapse-toggle {
+  display: grid;
+  width: 1.15rem;
+  height: 1.15rem;
+  flex: none;
+  place-items: center;
+  border: 1px solid #dcdcdc;
+  border-radius: 0.25rem;
+  color: #5c5c5c;
+  background: #fff;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+.collapse-toggle:hover {
+  color: #1c1c1c;
+  border-color: #9c9c9c;
+  background: #f1f2f3;
+}
+.collapse-toggle:focus-visible {
+  outline: 2px solid #1c1c1c;
+  outline-offset: 1px;
+}
+.collapsed-hint {
+  color: #767676;
+  font-size: 0.76rem;
+  font-style: italic;
+}
+.accept-button,
+.accept-mark {
+  display: grid;
+  width: 1.7rem;
+  height: 1.7rem;
+  place-items: center;
+  border: 1px solid #e0e0e0;
+  border-radius: 0.3rem;
+  color: #8a8a8a;
+  background: #fff;
+  cursor: pointer;
+  transition:
+    color 0.12s ease,
+    border-color 0.12s ease,
+    background 0.12s ease;
+}
+.accept-button svg,
+.accept-mark svg {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+.accept-button:hover {
+  color: #046c4e;
+  border-color: #b7e4cd;
+  background: #f0fdf7;
+}
+.accept-button:focus-visible {
+  outline: 2px solid #1c1c1c;
+  outline-offset: 2px;
+}
+.accept-button-active,
+.accept-mark {
+  color: #fff;
+  border-color: #059669;
+  background: #059669;
+}
+.accept-button-active:hover {
+  color: #fff;
+  border-color: #047857;
+  background: #047857;
+}
+.accept-mark {
+  cursor: default;
+}
+.accepted-pill {
+  padding: 0.1rem 0.45rem;
+  border-radius: 0.25rem;
+  color: #046c4e;
+  background: #e7f7ef;
+  font-size: 0.71rem;
+  font-weight: 700;
+}
+/* The thread line: one rule doing the job of the whole indent convention. */
+.reply {
+  margin: 0.85rem 0 0 0.35rem;
+  padding: 0 0 0 0.9rem;
+  border-left: 2px solid #e4e6e7;
+}
+.reply:hover {
+  border-left-color: #c9cccf;
+}
+.reply-body {
+  font-size: 0.92rem;
+}
+.reply-composer,
+.answer-composer {
+  margin-top: 1rem;
+}
+.answer-composer {
+  margin-top: 1.25rem;
+  padding-top: 1.1rem;
+  border-top: 1px solid #f0f0f0;
+}
+.answer-composer label {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: #454545;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+.composer-input {
+  width: 100%;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid #dedede;
+  border-radius: 0.35rem;
+  color: #1c1c1c;
+  background: #fff;
+  font-family: ui-monospace, 'SFMono-Regular', 'Menlo', monospace;
+  font-size: 0.87rem;
+  line-height: 1.7;
+  resize: vertical;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+.composer-input::placeholder {
+  color: #8a8a8a;
+}
+.composer-input:focus {
+  border-color: #b5b5b5;
+  outline: none;
+  box-shadow: 0 0 0 3px rgb(28 28 28 / 0.06);
+}
+.primary-button {
+  margin-top: 0.7rem;
+  padding: 0.5rem 1.3rem;
+  border: 0;
+  border-radius: 999px;
+  color: #fff;
+  background: #1c1c1c;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.primary-button:hover:not(:disabled) {
+  background: #000;
+}
+.primary-button:disabled {
+  background: #c4c4c4;
+  cursor: not-allowed;
+}
+.primary-button:focus-visible {
+  outline: 2px solid #1c1c1c;
+  outline-offset: 3px;
+}
+.composer-actions .primary-button {
+  margin-top: 0;
+}
+.answers-empty {
+  margin: 0;
+  padding: 2rem 1.5rem;
+  color: #5c5c5c;
+  font-size: 0.9rem;
+  text-align: center;
+}
+.thread-error {
+  margin: 0.5rem 0;
+  color: #b42318;
+  font-size: 0.85rem;
+}
+.signin-prompt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+  padding-top: 1.1rem;
+  border-top: 1px solid #f0f0f0;
+}
+.signin-prompt p {
+  margin: 0;
+  color: #5c5c5c;
+  font-size: 0.9rem;
+}
+.signin-prompt a {
+  padding: 0.5rem 1.2rem;
+  border-radius: 999px;
+  color: #fff;
+  background: #1c1c1c;
+  font-size: 0.86rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+.signin-prompt a:hover {
+  background: #000;
+}
+.signin-prompt a:focus-visible {
+  outline: 2px solid #1c1c1c;
+  outline-offset: 3px;
+}
+.thread-missing {
+  margin-top: 0.75rem;
+  padding: 4rem 1.5rem;
+  border: 1px solid #dcdcdc;
+  border-radius: 0.5rem;
+  background: #fff;
+  text-align: center;
+}
+.thread-missing h1 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+.thread-missing p {
+  margin: 0.5rem 0 1.2rem;
+  color: #5c5c5c;
+  font-size: 0.92rem;
+}
+.thread-missing a {
+  display: inline-block;
+  padding: 0.55rem 1.3rem;
+  border-radius: 999px;
+  color: #fff;
+  background: #1c1c1c;
+  font-size: 0.87rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+@media (max-width: 40rem) {
+  .thread-container {
+    padding: 0.9rem 0.75rem 3rem;
+  }
+  .thread-body {
+    padding: 0.75rem 0.85rem 0.85rem;
+  }
+  .answers {
+    padding: 0.85rem 0.85rem 1rem;
+  }
+  .answer-accepted {
+    margin-left: -0.85rem;
+    padding-left: 0.85rem;
+  }
+  .thread-title {
+    max-width: none;
+  }
+}

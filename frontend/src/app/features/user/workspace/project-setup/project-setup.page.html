@@ -1,0 +1,251 @@
+﻿<div class="setup">
+  <section
+    class="setup-card"
+    [attr.data-phase]="phase()"
+    [class.motion-paused]="motionPaused()"
+    aria-labelledby="setup-title"
+  >
+    <div class="setup-topline">
+      <span class="setup-eyebrow">IOT HUB <span aria-hidden="true">/</span> สร้างด้วย AI</span>
+      @if (busy()) {
+        <button
+          type="button"
+          class="motion-toggle"
+          [attr.aria-pressed]="motionPaused()"
+          (click)="motionPaused.set(!motionPaused())"
+        >
+          <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            @if (motionPaused()) {
+              <path d="m6 3 6 5-6 5V3Z" fill="currentColor" />
+            } @else {
+              <path
+                d="M6 4v8M10 4v8"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+              />
+            }
+          </svg>
+          หยุดภาพเคลื่อนไหว
+        </button>
+      }
+    </div>
+    <header class="setup-head">
+      <div class="creation-art" aria-hidden="true">
+        <svg class="circuit-art" viewBox="0 0 240 152" fill="none">
+          <g class="circuit-traces" stroke-linecap="round" stroke-linejoin="round">
+            <path
+              d="M20 42h38l24 24h18M8 106h52l22-22h18M220 42h-38l-24 24h-18M232 106h-52l-22-22h-18"
+            />
+            <path d="M80 18v12l24 24M160 134v-12l-24-24" />
+            <circle cx="20" cy="42" r="4" />
+            <circle cx="8" cy="106" r="4" />
+            <circle cx="220" cy="42" r="4" />
+            <circle cx="232" cy="106" r="4" />
+            <circle cx="80" cy="14" r="4" />
+            <circle cx="160" cy="138" r="4" />
+          </g>
+          <g class="circuit-signals" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 42h38l24 24h18" pathLength="100" />
+            <path d="M232 106h-52l-22-22h-18" pathLength="100" />
+            <path d="M220 42h-38l-24 24h-18" pathLength="100" />
+            <path d="M8 106h52l22-22h18" pathLength="100" />
+          </g>
+          <rect class="chip-halo" x="81" y="37" width="78" height="78" rx="25" />
+          <rect class="chip-outline" x="87" y="43" width="66" height="66" rx="20" />
+          <rect class="chip-core" x="94" y="50" width="52" height="52" rx="15" />
+          @switch (phase()) {
+            @case ('done') {
+              <path class="chip-symbol" d="m109 76 7 7 15-15" />
+            }
+            @case ('failed') {
+              <path class="chip-symbol" d="M120 64v15m0 7v1" />
+            }
+            @default {
+              <path
+                class="chip-symbol sparkle"
+                d="m120 62 3.8 10.2L134 76l-10.2 3.8L120 90l-3.8-10.2L106 76l10.2-3.8L120 62Z"
+              />
+            }
+          }
+        </svg>
+      </div>
+      <h1 id="setup-title">
+        @switch (phase()) {
+          @case ('waiting') {
+            เตรียมสร้างไอเดียของคุณ
+          }
+          @case ('done') {
+            {{ applied() ? 'โปรเจกต์พร้อมแล้ว' : 'ไม่มีการเปลี่ยนแปลง' }}
+          }
+          @case ('failed') {
+            สร้างโปรเจกต์ไม่สำเร็จ
+          }
+          @default {
+            กำลังเปลี่ยนไอเดียให้เป็นจริง
+          }
+        }
+      </h1>
+      <p class="setup-subtitle">
+        @if (busy()) {
+          AI กำลังเตรียมอุปกรณ์ วงจร และโค้ดให้คุณ
+        } @else if (phase() === 'done') {
+          ตรวจสอบผลลัพธ์ แล้วเริ่มพัฒนาต่อได้เลย
+        } @else if (phase() === 'failed') {
+          ลองอีกครั้ง หรือเปิดโปรเจกต์เพื่อทำต่อด้วยตัวเอง
+        } @else {
+          เริ่มจากคำอธิบาย แล้วให้ AI ช่วยลงมือทำ
+        }
+      </p>
+      @if (project(); as current) {
+        <span class="setup-name">
+          <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path
+              d="M2.5 4h4l1.5 1.5h5.5v7h-11V4Z"
+              stroke="currentColor"
+              stroke-width="1.2"
+              stroke-linejoin="round"
+            />
+          </svg>
+          {{ current.name }}
+        </span>
+      }
+    </header>
+    @if (phase() === 'waiting') {
+      @if (project()?.description) {
+        <p class="setup-note">{{ project()?.description }}</p>
+        <div class="setup-actions centered-actions">
+          <button type="button" class="primary" (click)="generate()">เริ่มสร้างด้วย AI</button>
+          <a [routerLink]="['/user/projects', projectId, 'ide']">ไปที่ IDE</a>
+        </div>
+      } @else {
+        <p class="setup-note">กำลังโหลดโปรเจกต์…</p>
+      }
+    } @else {
+      @if (phase() !== 'done') {
+        <ol class="milestones" aria-label="ขั้นตอนการสร้างโปรเจกต์">
+          @for (milestone of milestones; track milestone.id) {
+            <li
+              [attr.data-state]="milestoneState(milestone.id)"
+              [attr.aria-current]="milestoneState(milestone.id) === 'active' ? 'step' : null"
+            >
+              <span class="marker" aria-hidden="true">
+                @if (milestoneState(milestone.id) === 'done') {
+                  <svg viewBox="0 0 16 16" fill="none">
+                    <path
+                      d="m4 8 2.5 2.5L12 5"
+                      stroke="currentColor"
+                      stroke-width="1.5"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                } @else {
+                  {{ $index + 1 }}
+                }
+              </span>
+              <span>{{ milestone.label }}</span>
+            </li>
+          }
+        </ol>
+      }
+      @if (busy()) {
+        <div class="work-status">
+          <div class="status-heading">
+            <span class="status-label"
+              ><span class="status-indicator" aria-hidden="true"></span>กำลังดำเนินการ</span
+            >
+            <!-- Keep the clock outside live regions. -->
+            <span class="elapsed">{{ elapsedText() }}</span>
+          </div>
+          <p class="status-copy" role="status">{{ activeText() }}</p>
+          <div class="activity-track" aria-hidden="true"><span></span></div>
+          @if (recentLog().length) {
+            <ul class="recent-log" aria-label="กิจกรรมล่าสุด">
+              @for (entry of recentLog(); track entry.id) {
+                <li [attr.data-status]="entry.status">
+                  <span class="log-dot" aria-hidden="true"></span
+                  ><span class="log-text">{{ entry.text }}</span
+                  ><small>{{ entry.statusText }}</small>
+                </li>
+              }
+            </ul>
+          } @else {
+            <p class="work-hint">
+              เริ่มจากทำความเข้าใจไอเดีย แล้วเลือกสิ่งที่เหมาะกับโปรเจกต์ของคุณ
+            </p>
+          }
+        </div>
+      }
+      @if (log().length) {
+        <details class="activity">
+          <summary>
+            <span>ดูรายละเอียดทั้งหมด</span
+            ><span class="activity-count">{{ log().length }} รายการ</span>
+          </summary>
+          <p class="activity-note">
+            กิจกรรมระหว่างเตรียมโปรเจกต์ จำนวนอุปกรณ์และสายที่บันทึกจะแสดงเมื่อเสร็จ
+          </p>
+          <ul class="log" aria-label="ขั้นตอนที่ AI ทำ" tabindex="0">
+            @for (entry of log(); track entry.id) {
+              <li [attr.data-status]="entry.status">
+                <span>{{ entry.text }}</span
+                ><small>{{ entry.statusText }}</small>
+              </li>
+            }
+          </ul>
+        </details>
+      }
+      @if (phase() === 'failed') {
+        <p class="setup-error" role="alert">{{ error() }}</p>
+        <div class="setup-actions centered-actions">
+          <button type="button" class="primary" (click)="generate()">ลองใหม่</button>
+          <a [routerLink]="['/user/projects', projectId, 'ide']">ไปที่ IDE</a>
+        </div>
+      }
+      @if (phase() === 'done') {
+        @if (applied(); as result) {
+          <p class="setup-result">
+            เพิ่มอุปกรณ์ {{ result.componentsAdded }} ชิ้น · ต่อสาย
+            {{ result.connectionsAdded }} เส้น
+            @if (result.filesWritten.length) {
+              · เขียนไฟล์ {{ result.filesWritten.join(', ') }}
+            }
+            <span class="elapsed">ใช้เวลา {{ elapsedText() }}</span>
+          </p>
+        } @else {
+          <p class="setup-result">AI ไม่ได้เปลี่ยนแปลงโปรเจกต์</p>
+        }
+        <div class="setup-actions centered-actions">
+          <a class="primary" [routerLink]="['/user/projects', projectId, 'virtual-device']"
+            >เปิดวงจร</a
+          >
+          <a [routerLink]="['/user/projects', projectId, 'ide']">ดูโค้ด</a>
+        </div>
+        @if (warnings().length) {
+          <div class="setup-warning" role="status">
+            <p>จุดที่ยังต้องตรวจสอบ</p>
+            <ul>
+              @for (warning of warnings(); track $index) {
+                <li>{{ warning }}</li>
+              }
+            </ul>
+          </div>
+        }
+        @if (summary()) {
+          <div class="summary markdown-content" [innerHTML]="summary() | markdown"></div>
+        }
+      }
+      @if (busy()) {
+        <footer class="setup-footer">
+          <span>งานที่ซับซ้อนอาจใช้เวลาสักครู่</span>
+          @if (phase() === 'generating') {
+            <button type="button" class="cancel-button" (click)="cancel()">ยกเลิกการสร้าง</button>
+          } @else {
+            <span class="saving-note">กำลังบันทึกโปรเจกต์…</span>
+          }
+        </footer>
+      }
+    }
+  </section>
+</div>

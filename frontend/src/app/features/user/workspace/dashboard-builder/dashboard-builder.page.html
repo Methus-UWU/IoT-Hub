@@ -1,0 +1,424 @@
+<section
+  #builderRoot
+  class="dashboard-builder"
+  [class.builder-preview]="!editMode()"
+  [class.builder-library-closed]="!libraryOpen()"
+  [class.builder-inspector-closed]="!inspectorOpen()"
+>
+  <header
+    class="builder-toolbar"
+    [attr.inert]="overlayPanelOpen() ? '' : null"
+    [attr.aria-hidden]="overlayPanelOpen() ? true : null"
+  >
+    <div class="toolbar-identity">
+      @if (editMode()) {
+        <button
+          #libraryTrigger
+          type="button"
+          class="panel-trigger"
+          [class.trigger-active]="libraryOpen()"
+          [attr.aria-pressed]="libraryOpen()"
+          aria-controls="widget-library-panel"
+          aria-label="Open widget library"
+          title="Add widget"
+          (click)="toggleLibrary($event)"
+        >
+          <app-dashboard-icon name="library" />
+        </button>
+      }
+      <div class="dashboard-name-wrap">
+        <div class="builder-breadcrumb">
+          <a routerLink="/user/projects">Projects</a>
+          <span>/</span>
+          <span>{{ projectName() }}</span>
+        </div>
+        <label>
+          <span class="sr-only">Dashboard name</span>
+          <input
+            type="text"
+            maxlength="80"
+            [disabled]="!editMode()"
+            [value]="dashboardName()"
+            (focus)="beginDashboardNameEdit()"
+            (input)="setDashboardName($event)"
+            (blur)="finishDashboardNameEdit()"
+          />
+          <app-dashboard-icon name="edit" aria-hidden="true" />
+        </label>
+      </div>
+      <span class="save-status" [class.save-status-unsaved]="saveState() !== 'saved'">
+        <i aria-hidden="true"></i>
+        {{ saveLabel() }}
+      </span>
+    </div>
+
+    <div class="device-switcher" role="radiogroup" aria-label="Dashboard layout">
+      @for (option of breakpointOptions; track option.id; let optionIndex = $index) {
+        <button
+          type="button"
+          role="radio"
+          [class.device-active]="activeBreakpoint() === option.id"
+          [attr.aria-checked]="activeBreakpoint() === option.id"
+          [attr.tabindex]="activeBreakpoint() === option.id ? 0 : -1"
+          [attr.aria-label]="option.label + ', ' + option.columns + ' columns'"
+          [attr.title]="option.label + ' · ' + option.columns + ' columns'"
+          (click)="selectBreakpoint(option.id)"
+          (keydown)="handleBreakpointKeydown($event, optionIndex)"
+        >
+          <app-dashboard-icon [name]="option.icon" />
+          <span>{{ option.label }}</span>
+        </button>
+      }
+    </div>
+
+    <div class="toolbar-actions">
+      @if (editMode()) {
+        <div class="history-actions" role="group" aria-label="Edit history">
+          <button
+            type="button"
+            aria-label="Undo"
+            title="Undo (Ctrl+Z)"
+            [disabled]="!canUndo()"
+            (click)="undo()"
+          >
+            <app-dashboard-icon name="undo" />
+          </button>
+          <button
+            type="button"
+            aria-label="Redo"
+            title="Redo (Ctrl+Shift+Z)"
+            [disabled]="!canRedo()"
+            (click)="redo()"
+          >
+            <app-dashboard-icon name="redo" />
+          </button>
+        </div>
+
+        <button
+          type="button"
+          class="toolbar-icon-button lock-button"
+          [class.toolbar-button-active]="layoutLocked()"
+          [attr.aria-pressed]="layoutLocked()"
+          [attr.aria-label]="layoutLocked() ? 'Unlock layout' : 'Lock layout'"
+          [attr.title]="layoutLocked() ? 'Unlock layout' : 'Lock layout'"
+          (click)="toggleLayoutLock()"
+        >
+          <app-dashboard-icon [name]="layoutLocked() ? 'lock' : 'unlock'" />
+        </button>
+      }
+
+      <button
+        type="button"
+        class="preview-button"
+        [class.preview-button-active]="!editMode()"
+        [attr.aria-label]="editMode() ? 'Preview dashboard' : 'Back to dashboard editor'"
+        (click)="togglePreview()"
+      >
+        <app-dashboard-icon [name]="editMode() ? 'eye' : 'edit'" />
+        <span>{{ editMode() ? 'Preview' : 'Back to editor' }}</span>
+      </button>
+
+      @if (editMode()) {
+        <button
+          type="button"
+          class="save-button"
+          [attr.aria-label]="saveState() === 'saving' ? 'Saving dashboard' : 'Save dashboard'"
+          [disabled]="saveState() === 'saving'"
+          (click)="saveDashboard()"
+        >
+          <app-dashboard-icon name="save" />
+          <span>{{ saveState() === 'saving' ? 'Saving…' : 'Save' }}</span>
+        </button>
+        <button
+          type="button"
+          class="publish-button"
+          [attr.aria-label]="publishing() ? 'Publishing dashboard' : 'Publish dashboard'"
+          [disabled]="publishing()"
+          (click)="publishDashboard()"
+        >
+          <app-dashboard-icon [name]="published() ? 'check' : 'publish'" />
+          <span>{{ publishing() ? 'Publishing…' : published() ? 'Published' : 'Publish' }}</span>
+        </button>
+
+        <div class="toolbar-more-wrap">
+          <button
+            #toolbarMenuTrigger
+            type="button"
+            class="toolbar-icon-button"
+            aria-label="More dashboard actions"
+            aria-controls="dashboard-more-actions"
+            [attr.aria-expanded]="toolbarMenuOpen()"
+            (click)="toggleToolbarMenu($event)"
+          >
+            <app-dashboard-icon name="more" />
+          </button>
+          @if (toolbarMenuOpen()) {
+            <div
+              id="dashboard-more-actions"
+              class="toolbar-menu"
+              role="group"
+              aria-label="More dashboard actions"
+              (click)="$event.stopPropagation()"
+            >
+              <button type="button" (click)="openDashboardSettings()">
+                <app-dashboard-icon name="settings" /><span
+                  ><strong>Dashboard settings</strong><small>Defaults and data scope</small></span
+                >
+              </button>
+              <span class="toolbar-menu-divider"></span>
+              <button
+                type="button"
+                class="compact-history-action"
+                [disabled]="!canUndo()"
+                (click)="undo(); closeToolbarMenu(true)"
+              >
+                <app-dashboard-icon name="undo" /><span
+                  ><strong>Undo</strong><small>Revert the last dashboard change</small></span
+                >
+              </button>
+              <button
+                type="button"
+                class="compact-history-action"
+                [disabled]="!canRedo()"
+                (click)="redo(); closeToolbarMenu(true)"
+              >
+                <app-dashboard-icon name="redo" /><span
+                  ><strong>Redo</strong><small>Restore the reverted change</small></span
+                >
+              </button>
+              <button
+                type="button"
+                class="compact-lock-action"
+                (click)="toggleLayoutLock(); closeToolbarMenu(true)"
+              >
+                <app-dashboard-icon [name]="layoutLocked() ? 'unlock' : 'lock'" /><span
+                  ><strong>{{ layoutLocked() ? 'Unlock layout' : 'Lock layout' }}</strong
+                  ><small>Control canvas editing</small></span
+                >
+              </button>
+              <span class="compact-menu-divider toolbar-menu-divider"></span>
+              <button type="button" [disabled]="layoutLocked()" (click)="compactCurrentLayout()">
+                <app-dashboard-icon name="compact" /><span
+                  ><strong>Compact layout</strong><small>Remove unused vertical space</small></span
+                >
+              </button>
+              <button type="button" (click)="openDevices()">
+                <app-dashboard-icon name="data" /><span
+                  ><strong>Devices</strong><small>Boards, tokens, and live data</small></span
+                >
+              </button>
+              <button type="button" (click)="openTemplates()">
+                <app-dashboard-icon name="grid" /><span
+                  ><strong>Templates</strong><small>Save, reuse, and share dashboards</small></span
+                >
+              </button>
+              <button type="button" (click)="reloadDashboard(); closeToolbarMenu(true)">
+                <app-dashboard-icon name="redo" /><span
+                  ><strong>Reload</strong
+                  ><small>Discard unsaved edits and load the saved dashboard</small></span
+                >
+              </button>
+              <button type="button" (click)="exportDashboard()">
+                <app-dashboard-icon name="publish" /><span
+                  ><strong>Export JSON</strong><small>Download this dashboard</small></span
+                >
+              </button>
+              <button type="button" [disabled]="layoutLocked()" (click)="resetDashboard()">
+                <app-dashboard-icon name="redo" /><span
+                  ><strong>Restore starter</strong><small>Return to the sample layout</small></span
+                >
+              </button>
+              <span class="toolbar-menu-divider"></span>
+              <button
+                type="button"
+                class="toolbar-menu-danger"
+                [disabled]="layoutLocked()"
+                (click)="clearDashboard()"
+              >
+                <app-dashboard-icon name="trash" /><span
+                  ><strong>Clear canvas</strong><small>Remove every widget</small></span
+                >
+              </button>
+            </div>
+          }
+        </div>
+      }
+    </div>
+  </header>
+
+  <div class="builder-workspace">
+    <div
+      #libraryPanel
+      id="widget-library-panel"
+      class="library-panel"
+      role="dialog"
+      [attr.aria-modal]="libraryOpen() ? true : null"
+      aria-label="Widget library"
+      [class.panel-closed]="!libraryOpen()"
+      [attr.inert]="!libraryOpen() || !editMode() ? '' : null"
+      [attr.aria-hidden]="!libraryOpen() || !editMode() ? true : null"
+    >
+      <app-widget-library (widgetAdded)="addWidget($event)" (closeRequested)="closeLibrary()" />
+    </div>
+
+    @if (loadingDashboard()) {
+      <div class="canvas-skeleton" role="status" aria-live="polite">
+        <span class="sr-only">Loading the dashboard…</span>
+        @for (tile of [3, 3, 6, 4, 4, 4]; track $index) {
+          <span
+            class="canvas-skeleton-tile"
+            [style.grid-column]="'span ' + tile"
+            aria-hidden="true"
+          ></span>
+        }
+      </div>
+    } @else if (loadFailed()) {
+      <div class="canvas-load-error" role="alert">
+        <p>The dashboard could not be loaded.</p>
+        <button type="button" (click)="reloadDashboard()">Retry</button>
+      </div>
+    } @else {
+      <app-dashboard-canvas
+        [attr.inert]="overlayPanelOpen() ? '' : null"
+        [widgets]="canvasWidgets()"
+        [series]="chartSeries()"
+        [liveMode]="liveActive()"
+        [dashboardName]="dashboardName()"
+        [breakpoint]="activeBreakpoint()"
+        [editMode]="editMode()"
+        [layoutLocked]="layoutLocked()"
+        [selectedIds]="selectedIds()"
+        (selectionChanged)="updateSelection($event)"
+        (widgetDropped)="addWidget($event)"
+        (layoutsCommitted)="commitLayouts($event)"
+        (widgetActionRequested)="handleWidgetAction($event)"
+        (widgetSettingChanged)="handleWidgetSetting($event)"
+        (interactionMessage)="relayMessage($event)"
+      />
+    }
+
+    <div
+      #inspectorPanel
+      id="widget-inspector-panel"
+      class="inspector-panel"
+      role="dialog"
+      [attr.aria-modal]="inspectorOpen() ? true : null"
+      [attr.aria-label]="primarySelectedWidget() ? 'Widget settings' : 'Dashboard settings'"
+      [class.panel-closed]="!inspectorOpen()"
+      [attr.inert]="!inspectorOpen() || !editMode() ? '' : null"
+      [attr.aria-hidden]="!inspectorOpen() || !editMode() ? true : null"
+    >
+      <app-widget-inspector
+        [widget]="primarySelectedWidget()"
+        [selectionCount]="selectedIds().length"
+        [breakpoint]="activeBreakpoint()"
+        [layoutLocked]="layoutLocked()"
+        [deviceScope]="deviceScope()"
+        [devices]="live.devices()"
+        [dateRange]="dateRange()"
+        [datastreams]="datastreams()"
+        [components]="components()"
+        (datastreamCreated)="createDatastream($event)"
+        (widgetPatched)="patchWidget($event)"
+        (layoutChanged)="updateWidgetLayout($event)"
+        (actionRequested)="handleWidgetAction($event)"
+        (bulkActionRequested)="handleBulkAction($event)"
+        (dashboardSettingsChanged)="updateDashboardSettings($event)"
+        (closeRequested)="closeInspector()"
+      />
+    </div>
+
+    @if (!editMode()) {
+      <p class="live-banner" role="status">
+        @if (selectedDevice(); as device) {
+          <span class="live-dot" [class.online]="device.online" aria-hidden="true"></span>
+          {{ device.name }} · {{ device.online ? 'Online' : 'Offline' }}
+          @if (live.failed()) {
+            · reading values failed, retrying
+          }
+        } @else {
+          Preview without a device. Choose one under Devices to see live values.
+        }
+      </p>
+    }
+
+    @if (devicesOpen()) {
+      <div
+        class="templates-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="devices-panel-title"
+      >
+        <app-devices-panel
+          [projectId]="projectId()"
+          [datastreams]="datastreams()"
+          [selectedDeviceId]="selectedDevice()?.id ?? ''"
+          (deviceSelected)="selectDevice($event)"
+          (closed)="devicesOpen.set(false)"
+        />
+      </div>
+      <button
+        type="button"
+        class="panel-backdrop"
+        aria-label="Close devices"
+        (click)="devicesOpen.set(false)"
+      ></button>
+    }
+
+    @if (templatesOpen()) {
+      <div class="templates-panel" role="dialog" aria-modal="true" aria-label="Dashboard templates">
+        <app-dashboard-templates
+          [projectId]="projectId()"
+          [open]="templatesOpen()"
+          [hasWidgets]="widgets().length > 0"
+          [replacesWidgets]="widgets().length > 0"
+          [dashboardVersion]="dashboardVersion()"
+          (applied)="applyTemplate($event)"
+          (message)="showPanelMessage($event)"
+          (closed)="templatesOpen.set(false)"
+        />
+      </div>
+      <button
+        type="button"
+        class="panel-backdrop"
+        aria-label="Close templates"
+        (click)="templatesOpen.set(false)"
+      ></button>
+    }
+
+    @if (libraryOpen() || inspectorOpen()) {
+      <button
+        type="button"
+        class="panel-backdrop"
+        aria-label="Close dashboard modal"
+        (click)="closePanels()"
+      ></button>
+    }
+  </div>
+
+  <p class="sr-only" aria-live="polite" aria-atomic="true">{{ announcement() }}</p>
+
+  @if (toast(); as currentToast) {
+    <div
+      class="builder-toast"
+      [class.toast-success]="currentToast.kind === 'success'"
+      [class.toast-warning]="currentToast.kind === 'warning'"
+      role="status"
+    >
+      <span
+        ><app-dashboard-icon
+          [name]="
+            currentToast.kind === 'success'
+              ? 'check'
+              : currentToast.kind === 'warning'
+                ? 'info'
+                : 'grid'
+          "
+      /></span>
+      <p>{{ currentToast.text }}</p>
+      <button type="button" aria-label="Dismiss notification" (click)="toast.set(null)">
+        <app-dashboard-icon name="close" />
+      </button>
+    </div>
+  }
+</section>

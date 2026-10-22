@@ -1,0 +1,153 @@
+<div
+  class="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-gray-950/40 p-4 backdrop-blur-sm"
+  (click)="close()"
+>
+  <section
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="create-user-title"
+    class="w-full max-w-lg rounded-2xl border border-gray-200 bg-white shadow-2xl"
+    (click)="$event.stopPropagation()"
+  >
+    <div class="flex items-start justify-between border-b border-gray-100 px-5 py-4">
+      <div>
+        <h2 id="create-user-title" class="text-base font-normal text-gray-900">เพิ่มผู้ใช้งาน</h2>
+        <p class="mt-0.5 text-xs text-gray-500">
+          สร้างบัญชีที่ยืนยันแล้ว ผู้ใช้เข้าสู่ระบบด้วยอีเมลและรหัสผ่านนี้ได้ทันที
+        </p>
+      </div>
+      <button
+        type="button"
+        class="grid h-8 w-8 place-items-center rounded-lg text-gray-500 hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-500"
+        (click)="close()"
+        aria-label="ปิดหน้าต่างเพิ่มผู้ใช้งาน"
+      >
+        <svg viewBox="0 0 20 20" fill="none" class="h-4 w-4" aria-hidden="true">
+          <path d="m5 5 10 10M15 5 5 15" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+        </svg>
+      </button>
+    </div>
+
+    <form class="space-y-4 p-5" novalidate (submit)="$event.preventDefault(); save()">
+      <div>
+        <label for="create-email" class="block text-sm font-normal text-gray-600">อีเมล</label>
+        <input
+          #emailInput
+          id="create-email"
+          type="email"
+          autocomplete="off"
+          class="user-text-field mt-1.5 h-10 w-full px-3 text-sm text-gray-900"
+          [formField]="userForm.email"
+          [attr.aria-invalid]="userForm.email().touched() && userForm.email().invalid() ? true : null"
+          [attr.aria-describedby]="
+            userForm.email().touched() && userForm.email().invalid() ? 'create-email-error' : null
+          "
+        />
+        @if (userForm.email().touched() && userForm.email().invalid()) {
+          <p id="create-email-error" class="mt-1 text-xs font-normal text-red-600">
+            {{ userForm.email().errors()[0]?.message }}
+          </p>
+        }
+      </div>
+
+      <div>
+        <label for="create-username" class="block text-sm font-normal text-gray-600">ชื่อผู้ใช้งาน</label>
+        <input
+          id="create-username"
+          type="text"
+          autocomplete="off"
+          class="user-text-field mt-1.5 h-10 w-full px-3 text-sm text-gray-900"
+          [formField]="userForm.username"
+          [attr.aria-invalid]="
+            userForm.username().touched() && userForm.username().invalid() ? true : null
+          "
+          [attr.aria-describedby]="
+            userForm.username().touched() && userForm.username().invalid()
+              ? 'create-username-error'
+              : null
+          "
+        />
+        @if (userForm.username().touched() && userForm.username().invalid()) {
+          <p id="create-username-error" class="mt-1 text-xs font-normal text-red-600">
+            {{ userForm.username().errors()[0]?.message }}
+          </p>
+        }
+      </div>
+
+      <div>
+        <label for="create-password" class="block text-sm font-normal text-gray-600">รหัสผ่าน</label>
+        <div class="relative mt-1.5">
+          <input
+            id="create-password"
+            [type]="showPassword() ? 'text' : 'password'"
+            autocomplete="new-password"
+            class="user-text-field h-10 w-full px-3 pr-16 text-sm text-gray-900"
+            [formField]="userForm.password"
+            [attr.aria-invalid]="
+              userForm.password().touched() && userForm.password().invalid() ? true : null
+            "
+            [attr.aria-describedby]="
+              userForm.password().touched() && userForm.password().invalid()
+                ? 'create-password-error'
+                : 'create-password-hint'
+            "
+          />
+          <button
+            type="button"
+            class="absolute inset-y-0 right-0 px-3 text-xs text-gray-500 hover:text-gray-800 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-gray-500"
+            [attr.aria-pressed]="showPassword()"
+            (click)="showPassword.set(!showPassword())"
+          >
+            {{ showPassword() ? 'ซ่อน' : 'แสดง' }}
+          </button>
+        </div>
+        @if (userForm.password().touched() && userForm.password().invalid()) {
+          <p id="create-password-error" class="mt-1 text-xs font-normal text-red-600">
+            {{ userForm.password().errors()[0]?.message }}
+          </p>
+        } @else {
+          <p id="create-password-hint" class="mt-1 text-[11px] text-gray-500">
+            อย่างน้อย 8 ตัวอักษร มีตัวพิมพ์ใหญ่และอักขระพิเศษ
+          </p>
+        }
+      </div>
+
+      <div>
+        <p class="block text-sm font-normal text-gray-600">บทบาท</p>
+        <app-custom-select
+          class="mt-1.5"
+          [options]="roleOptions()"
+          [value]="userForm.role().value()"
+          textWeight="normal"
+          ariaLabel="เลือกบทบาทผู้ใช้งานใหม่"
+          [disabled]="saving()"
+          (valueChange)="onRoleChange($event)"
+        />
+      </div>
+
+      @if (error(); as message) {
+        <p class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700" role="alert">
+          {{ message }}
+        </p>
+      }
+
+      <div class="flex justify-end gap-3 border-t border-gray-100 pt-4">
+        <button
+          type="button"
+          class="rounded-lg px-4 py-2 text-sm font-normal text-gray-700 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-500"
+          (click)="close()"
+          [disabled]="saving()"
+        >
+          ยกเลิก
+        </button>
+        <button
+          type="submit"
+          class="rounded-lg bg-gray-900 px-4 py-2 text-sm font-normal text-white hover:bg-gray-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900 disabled:cursor-not-allowed disabled:opacity-50"
+          [disabled]="saving() || userForm().invalid()"
+        >
+          {{ saving() ? 'กำลังสร้างบัญชี...' : 'สร้างบัญชี' }}
+        </button>
+      </div>
+    </form>
+  </section>
+</div>

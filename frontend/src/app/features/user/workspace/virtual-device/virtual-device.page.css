@@ -1,0 +1,1596 @@
+:host {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  color: #e5e7eb;
+  background: #252525;
+}
+
+.simulator-editor {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  min-height: 42rem;
+  grid-template-rows: 3.75rem minmax(0, 1fr);
+  overflow: hidden;
+  background: #292929;
+}
+
+.editor-topbar {
+  position: relative;
+  z-index: 30;
+  display: grid;
+  grid-template-columns: minmax(12rem, 1fr) auto minmax(12rem, 1fr);
+  align-items: center;
+  gap: 1rem;
+  padding: 0 0.8rem;
+  border-bottom: 1px solid #454545;
+  background: #202020;
+  box-shadow: 0 2px 10px rgb(0 0 0 / 0.22);
+}
+.topbar-tools {
+  display: flex;
+  align-items: center;
+}
+
+.topbar-tools {
+  justify-content: flex-end;
+  gap: 0.25rem;
+}
+
+.topbar-tools button,
+.tool-rail button,
+.zoom-controls button {
+  display: grid;
+  place-items: center;
+  color: #b3b3b3;
+  border-radius: 0.48rem;
+}
+
+.topbar-tools button {
+  width: 2.15rem;
+  height: 2.15rem;
+}
+
+.topbar-tools button:hover,
+.topbar-tools button.tool-active {
+  color: #fff;
+  background: #3d3d3d;
+}
+
+.topbar-tools svg,
+.tool-rail svg,
+.zoom-controls svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.editor-body {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  grid-template-columns: 3.45rem minmax(0, 1fr) auto;
+  overflow: hidden;
+}
+
+.tool-rail {
+  z-index: 15;
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.55rem 0.4rem;
+  border-right: 1px solid #484848;
+  background: #242424;
+}
+
+.tool-rail button {
+  width: 2.35rem;
+  height: 2.35rem;
+}
+
+.tool-rail button:hover:not(:disabled),
+.tool-rail button.tool-active {
+  color: #fff;
+  background: #414141;
+}
+
+.tool-rail button:disabled {
+  cursor: not-allowed;
+  opacity: 0.28;
+}
+.tool-rail .add-part-button {
+  color: #fff;
+  background: #2563eb;
+}
+.tool-rail .add-part-button:hover {
+  background: #1d4ed8;
+}
+
+.canvas-workspace {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: #303030;
+}
+
+.canvas-viewport {
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-color: #606060 #303030;
+  scrollbar-width: thin;
+}
+
+.circuit-canvas {
+  display: block;
+  min-width: 56rem;
+  min-height: 40rem;
+  height: auto;
+  margin: auto;
+  touch-action: none;
+  user-select: none;
+}
+
+.wire,
+.wire-hit {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  shape-rendering: geometricPrecision;
+  vector-effect: non-scaling-stroke;
+}
+
+/*
+ * Wires stay selectable without competing with the hardware.
+ *
+ * Two things make that work. The hit stroke is narrow enough that it does not
+ * reach out and grab clicks aimed near a part — it was 16 px, which swallowed
+ * the pointer well before it arrived. And the device layer is painted after the
+ * wire layer, so wherever the two overlap the device wins the hit test outright.
+ * Wire-edit mode widens the target for deliberate rerouting.
+ */
+.wire-hit {
+  stroke: transparent;
+  stroke-width: 9;
+  cursor: pointer;
+  pointer-events: stroke;
+}
+
+.wire-editing .wire-hit {
+  stroke-width: 16;
+  cursor: crosshair;
+}
+
+/* The visible strokes live in their own layer painted after the hardware, so
+   they read as wires lying on top of the parts — and so a click on the wire
+   over a part still reaches the wire. Only the drawn stroke is a target: at
+   2.5 px it is the wire itself, not a corridor around it, which is what keeps
+   pins and part bodies clickable where a wire runs across them. The wide
+   transparent hit strokes stay below the parts for grabbing a wire in open
+   space. */
+.wire-ink-layer {
+  pointer-events: none;
+}
+
+.wire {
+  stroke-width: 2.5;
+  cursor: pointer;
+  pointer-events: stroke;
+  transition:
+    filter 120ms ease,
+    stroke-width 120ms ease;
+}
+
+path.wire-preview {
+  opacity: 0.78;
+  cursor: crosshair;
+  pointer-events: none;
+}
+
+.pending-wire-waypoint,
+.wire-control-handle {
+  fill: #fff;
+  stroke: #22c55e;
+  stroke-width: 3;
+  vector-effect: non-scaling-stroke;
+}
+
+.wire-control {
+  cursor: move;
+  outline: none;
+}
+
+.wire-control-hit {
+  fill: transparent;
+  pointer-events: all;
+}
+
+.wire-control:hover .wire-control-handle,
+.wire-control:focus-visible .wire-control-handle {
+  fill: #dcfce7;
+  stroke: #16a34a;
+}
+
+.wire-junction {
+  fill: #22c55e;
+  stroke: #fff;
+  stroke-width: 2.5;
+  cursor: crosshair;
+  outline: none;
+  vector-effect: non-scaling-stroke;
+}
+
+.wire-junction-power {
+  fill: #ef4444;
+}
+
+.wire-junction-ground {
+  fill: #111827;
+}
+
+.wire-junction.wire-junction-selected {
+  fill: #22c55e;
+  stroke: #15803d;
+  stroke-width: 3;
+}
+
+.wire-junction:hover,
+.wire-junction:focus-visible {
+  stroke: #facc15;
+  stroke-width: 3.5;
+}
+
+.board-pin,
+.device-pin {
+  cursor: crosshair;
+  outline: none;
+}
+.board-pin text {
+  fill: #e5e7eb;
+  font-size: 7.5px;
+  font-weight: 700;
+  pointer-events: none;
+}
+.hardware {
+  cursor: grab;
+  outline: none;
+}
+.hardware:active {
+  cursor: grabbing;
+}
+/*
+ * A running board is not editable, so the grab cursor would be a lie. The part
+ * still selects on click, which is why this is not `not-allowed`.
+ */
+.hardware-locked,
+.hardware-locked:active {
+  cursor: default;
+}
+.selection-box {
+  fill: transparent;
+  stroke: transparent;
+  stroke-width: 3;
+  vector-effect: non-scaling-stroke;
+}
+/*
+ * Selection is a hairline, not a box.
+ *
+ * The dashed fill used to sit on top of the hardware and compete with it for
+ * attention — on a dark PCB it read as part of the board. State should be
+ * legible without covering the thing it describes.
+ */
+.hardware:hover .selection-box,
+.hardware:focus-visible .selection-box {
+  fill: none;
+  stroke: rgb(148 163 184 / 0.55);
+  stroke-width: 1;
+  stroke-dasharray: none;
+}
+.hardware-selected .selection-box {
+  fill: none;
+  stroke: #2563eb;
+  stroke-width: 1.25;
+  stroke-dasharray: none;
+}
+
+#lcd-character-pixels rect {
+  fill: #315500;
+  opacity: 0.7;
+}
+
+.wiring-notice {
+  position: absolute;
+  z-index: 12;
+  top: 0.75rem;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid #4b5563;
+  border-radius: 0.55rem;
+  color: #e5e7eb;
+  background: rgb(31 31 31 / 0.95);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.3);
+  font-size: 0.56rem;
+  transform: translateX(-50%);
+}
+
+.wiring-notice > span:last-child {
+  color: #9ca3af;
+}
+.pulse-dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 0 4px rgb(34 197 94 / 0.12);
+}
+
+.zoom-controls {
+  position: absolute;
+  z-index: 10;
+  right: 0.8rem;
+  bottom: 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 0.12rem;
+  padding: 0.2rem;
+  border: 1px solid #4b4b4b;
+  border-radius: 0.55rem;
+  background: rgb(35 35 35 / 0.94);
+  box-shadow: 0 5px 18px rgb(0 0 0 / 0.25);
+}
+
+.zoom-controls button {
+  width: 1.9rem;
+  height: 1.9rem;
+  font-size: 0.85rem;
+}
+.zoom-controls button:hover {
+  color: #fff;
+  background: #494949;
+}
+/* Muted is a state the user has to be able to see without hovering: a circuit
+   that has gone quiet because it was silenced looks the same as one that is not
+   running. */
+.zoom-controls button[aria-pressed='true'] {
+  color: #ff8f6b;
+}
+.zoom-controls span {
+  min-width: 2.8rem;
+  color: #b3b3b3;
+  font-size: 0.52rem;
+  text-align: center;
+}
+
+.property-panel {
+  z-index: 18;
+  width: 19rem;
+  min-height: 0;
+  overflow-y: auto;
+  border-left: 1px solid #484848;
+  color: #d4d4d4;
+  background: #252525;
+  scrollbar-color: #555 transparent;
+  scrollbar-width: thin;
+}
+
+.property-heading {
+  display: flex;
+  min-height: 4.2rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 0.85rem;
+  border-bottom: 1px solid #444;
+}
+
+.property-heading span,
+.property-heading small,
+.property-heading strong {
+  display: block;
+}
+.property-heading small {
+  color: #8f8f8f;
+  font-size: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.property-heading strong {
+  margin-top: 0.18rem;
+  color: #f5f5f5;
+  font-size: 0.69rem;
+}
+.property-heading button {
+  display: grid;
+  width: 1.8rem;
+  height: 1.8rem;
+  place-items: center;
+  border-radius: 0.4rem;
+  color: #aaa;
+  font-size: 1rem;
+}
+
+.property-heading button svg {
+  width: 1rem;
+  height: 1rem;
+}
+.property-heading button:hover {
+  color: #fff;
+  background: #414141;
+}
+
+.wire-property,
+.property-section {
+  padding: 0.85rem;
+  border-bottom: 1px solid #414141;
+}
+.property-section h3 {
+  margin: 0 0 0.65rem;
+  color: #e5e5e5;
+  font-size: 0.59rem;
+}
+.danger-button {
+  min-height: 2.2rem;
+  border: 1px solid #4b4b4b;
+  border-radius: 0.45rem;
+  color: #d4d4d4;
+  background: #333;
+  font-size: 0.56rem;
+}
+.danger-button {
+  color: #fca5a5;
+  border-color: #713737;
+}
+.danger-button {
+  width: calc(100% - 1.7rem);
+  margin: 0.85rem;
+}
+
+.wire-property {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.wire-preview {
+  width: 0.3rem;
+  height: 3rem;
+  flex: none;
+  border-radius: 99px;
+}
+.wire-property p {
+  min-width: 0;
+  margin: 0;
+  color: #ccc;
+  font-size: 0.54rem;
+}
+.wire-property strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wire-property svg {
+  width: 1.2rem;
+  margin: 0.2rem 0;
+  color: #888;
+}
+.color-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 0.3rem;
+}
+.color-grid button {
+  aspect-ratio: 1;
+  border: 2px solid transparent;
+  border-radius: 50%;
+}
+.color-grid button.color-active {
+  border-color: #fff;
+  box-shadow: 0 0 0 2px #555;
+}
+
+.empty-inspector {
+  display: flex;
+  min-height: 18rem;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1.2rem;
+  color: #888;
+  text-align: center;
+}
+.empty-inspector svg {
+  width: 2.2rem;
+  height: 2.2rem;
+}
+.empty-inspector strong {
+  margin-top: 0.7rem;
+  color: #ccc;
+  font-size: 0.66rem;
+}
+.empty-inspector p {
+  max-width: 13rem;
+  margin: 0.3rem 0 0;
+  font-size: 0.54rem;
+  line-height: 1.55;
+}
+
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid #60a5fa;
+  outline-offset: 2px;
+}
+
+@media (max-width: 1100px) {
+  .property-panel {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(19rem, calc(100% - 4rem));
+    box-shadow: -12px 0 32px rgb(0 0 0 / 0.28);
+  }
+  .editor-body {
+    grid-template-columns: 3.45rem minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 700px) {
+  .simulator-editor {
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .editor-topbar {
+    grid-template-columns: 1fr auto;
+    grid-template-areas: 'title tools' 'simulation simulation';
+    gap: 0.45rem;
+    padding: 0.45rem 0.55rem;
+  }
+  .topbar-tools {
+    grid-area: tools;
+  }
+  .tool-rail {
+    padding-inline: 0.25rem;
+  }
+  .property-panel {
+    width: calc(100% - 3.45rem);
+  }
+  .wiring-notice {
+    width: calc(100% - 1rem);
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .wiring-notice > span:last-child {
+    width: 100%;
+    text-align: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wire,
+  .board-pin circle {
+    transition: none;
+  }
+}
+
+/* Keep the original light, three-panel UI while retaining editor interactions. */
+:host {
+  color: #2b2b2b;
+  background: #f7f7f7;
+}
+
+.simulator-editor {
+  grid-template-rows: 5rem auto minmax(0, 1fr);
+  overflow-y: auto;
+  background: #f7f7f7;
+}
+
+.editor-topbar {
+  grid-template-columns: minmax(16rem, 1fr) auto minmax(10rem, 1fr);
+  padding: 0 1.2rem;
+  border-color: #e1e1e1;
+  background: #fff;
+  box-shadow: 0 2px 10px rgb(43 43 43 / 0.04);
+}
+
+.topbar-tools button {
+  color: #707070;
+}
+
+.topbar-tools button:hover,
+.topbar-tools button.tool-active {
+  color: #2b2b2b;
+  background: #f1f1f1;
+}
+
+.summary-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0 0.8rem 0.8rem;
+  overflow: hidden;
+  border: 1px solid #e1e1e1;
+  border-radius: 0.85rem;
+  background: #fff;
+}
+
+.summary-row > div {
+  min-width: 0;
+  padding: 0.72rem 0.9rem;
+}
+
+.summary-row > div + div {
+  border-left: 1px solid #ededed;
+}
+
+.summary-row span,
+.summary-row strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.summary-row span {
+  color: #808080;
+  font-size: 0.53rem;
+}
+
+.summary-row strong {
+  margin-top: 0.15rem;
+  font-size: 0.64rem;
+  font-weight: 650;
+}
+
+.editor-body {
+  grid-template-columns: 15rem minmax(32rem, 1fr) auto;
+  gap: 0.8rem;
+  padding: 0 0.8rem 0.8rem;
+  overflow: visible;
+}
+
+.tool-rail {
+  align-items: stretch;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid #e1e1e1;
+  border-radius: 0.9rem;
+  background: #fff;
+}
+
+.parts-heading {
+  display: flex;
+  min-height: 4.15rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.7rem 0.8rem;
+  border-bottom: 1px solid #ededed;
+}
+
+.parts-heading small,
+.parts-heading strong {
+  display: block;
+}
+
+.parts-heading small {
+  color: #808080;
+  font-size: 0.49rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.parts-heading strong {
+  margin-top: 0.16rem;
+  color: #2b2b2b;
+  font-size: 0.72rem;
+}
+
+.tool-rail .add-part-button {
+  width: 2rem;
+  height: 2rem;
+  flex: none;
+  color: #fff;
+  background: #2b2b2b;
+}
+
+.tool-rail .add-part-button:hover {
+  background: #545454;
+}
+
+.part-list {
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.55rem;
+}
+
+.part-list > button {
+  display: grid;
+  width: 100%;
+  min-height: 3.45rem;
+  grid-template-columns: 2.15rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.42rem;
+  border: 1px solid transparent;
+  border-radius: 0.68rem;
+  color: #545454;
+  text-align: left;
+}
+
+.part-list > button:hover,
+.part-list > button.part-active {
+  color: #2b2b2b;
+  border-color: #d8d8d8;
+  background: #f1f1f1;
+}
+
+.part-icon {
+  display: grid;
+  width: 2.15rem;
+  height: 2.15rem;
+  place-items: center;
+  border-radius: 0.58rem;
+  color: #545454;
+  background: #e7e7e7;
+  font-size: 0.49rem;
+  font-weight: 800;
+}
+
+.part-list strong,
+.part-list small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.part-list strong {
+  font-size: 0.62rem;
+}
+
+.part-list small {
+  margin-top: 0.13rem;
+  color: #808080;
+  font-size: 0.51rem;
+}
+
+.part-list i {
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 50%;
+  background: #16a36a;
+}
+
+.parts-tools {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.3rem;
+  margin: 0 0.55rem;
+  padding-top: 0.55rem;
+  border-top: 1px solid #ededed;
+}
+
+.tool-rail .parts-tools button {
+  width: 100%;
+  height: 2rem;
+  color: #6b6b6b;
+  border: 1px solid #e1e1e1;
+  background: #fafafa;
+  font-size: 0.55rem;
+  font-weight: 700;
+}
+
+.tool-rail .parts-tools button:hover:not(:disabled),
+.tool-rail .parts-tools button.tool-active {
+  color: #2b2b2b;
+  background: #ededed;
+}
+
+.wire-legend {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem 0.55rem;
+  margin: auto 0.55rem 0.55rem;
+  padding: 0.65rem;
+  border-radius: 0.65rem;
+  color: #6b6b6b;
+  background: #f7f7f7;
+  font-size: 0.51rem;
+}
+
+.wire-legend strong {
+  grid-column: 1 / -1;
+  color: #2b2b2b;
+  font-size: 0.55rem;
+}
+
+.wire-legend span {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.wire-legend i {
+  width: 0.75rem;
+  height: 0.16rem;
+  border-radius: 99px;
+}
+
+.legend-power {
+  background: #ef4444;
+}
+.legend-ground {
+  background: #111827;
+}
+.legend-signal {
+  background: #2563eb;
+}
+
+.canvas-workspace {
+  overflow: hidden;
+  border: 1px solid #e1e1e1;
+  border-radius: 0.9rem;
+  background: #f7f7f7;
+}
+
+.canvas-viewport {
+  background: #f7f7f7;
+  scrollbar-color: #c7c7c7 transparent;
+}
+
+/* ---- selection, placement and wire chrome on the canvas ---- */
+
+.hardware:hover .selection-box,
+.hardware:focus-visible .selection-box {
+  stroke: rgb(37 99 235 / 0.5);
+  stroke-dasharray: none;
+}
+
+.hardware-selected .selection-box,
+.hardware-selected:hover .selection-box {
+  fill: none;
+  stroke: #2563eb;
+  stroke-width: 1.25;
+  stroke-dasharray: none;
+}
+
+/* Interactive overlays sit on top of the artwork without altering it. */
+.part-hitbox {
+  fill: transparent;
+  cursor: pointer;
+  outline: none;
+}
+
+/*
+ * Stopped simulation: the operable regions stop intercepting the pointer
+ * entirely, so a press on a button cap or a relay block reaches the part and
+ * drags it. Hiding them behind `pointer-events` rather than removing them from
+ * the DOM keeps the markup stable across start/stop.
+ */
+.component-hitboxes-idle {
+  pointer-events: none;
+}
+
+/* A shaft is dragged round, not clicked — say so before the user tries. */
+.part-hitbox-rotary {
+  cursor: grab;
+}
+
+.part-hitbox-rotary:active {
+  cursor: grabbing;
+}
+
+.part-hitbox:hover {
+  fill: rgb(255 255 255 / 0.12);
+}
+
+.part-hitbox:focus-visible {
+  fill: rgb(37 99 235 / 0.16);
+  stroke: #2563eb;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.placement-ghost {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.ghost-outline {
+  fill: rgb(37 99 235 / 0.06);
+  stroke: #2563eb;
+  stroke-width: 1.5;
+  stroke-dasharray: 6 4;
+  vector-effect: non-scaling-stroke;
+}
+
+.wire {
+  opacity: 0.85;
+}
+
+.wire:hover {
+  opacity: 1;
+}
+
+.wire-selected {
+  opacity: 1;
+  filter: none;
+}
+
+.wire-halo {
+  fill: none;
+  stroke: rgb(37 99 235 / 0.28);
+  stroke-width: 7;
+  stroke-linecap: round;
+  shape-rendering: geometricPrecision;
+  pointer-events: none;
+  vector-effect: non-scaling-stroke;
+}
+
+/* Empty canvas guidance, kept small so it never blocks the workspace. */
+.canvas-empty {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  padding: 0.9rem 1.4rem 1rem;
+  border: 1px solid #e4e4e4;
+  border-radius: 0.75rem;
+  justify-items: center;
+  gap: 0.15rem;
+  background: rgb(245 245 245 / 0.94);
+  box-shadow: 0 6px 20px rgb(43 43 43 / 0.1);
+  pointer-events: none;
+  text-align: center;
+  transform: translate(-50%, -50%);
+}
+
+.canvas-empty strong {
+  color: #2b2b2b;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.canvas-empty p {
+  margin: 0;
+  color: #7a7a7a;
+  font-size: 0.78rem;
+}
+
+.canvas-empty-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.42rem 0.85rem;
+  border-radius: 0.5rem;
+  margin-top: 0.55rem;
+  color: #fff;
+  background: #2563eb;
+  box-shadow: 0 4px 12px rgb(37 99 235 / 0.24);
+  font-size: 0.8rem;
+  font-weight: 650;
+  pointer-events: auto;
+}
+
+.canvas-empty-action:hover {
+  background: #1d4ed8;
+}
+
+.canvas-empty-action svg {
+  width: 0.85rem;
+  height: 0.85rem;
+}
+
+.wiring-notice {
+  color: #2b2b2b;
+  border-color: #d8d8d8;
+  background: rgb(255 255 255 / 0.96);
+  box-shadow: 0 8px 24px rgb(43 43 43 / 0.14);
+}
+
+.wiring-notice > span:last-child {
+  color: #808080;
+}
+
+.zoom-controls {
+  border-color: #d8d8d8;
+  background: rgb(255 255 255 / 0.96);
+  box-shadow: 0 5px 18px rgb(43 43 43 / 0.12);
+}
+
+.zoom-controls button {
+  color: #545454;
+}
+
+.zoom-controls button:hover {
+  color: #2b2b2b;
+  background: #ededed;
+}
+
+.zoom-controls span {
+  color: #6b6b6b;
+}
+
+.property-panel {
+  width: 20rem;
+  border: 1px solid #e1e1e1;
+  border-radius: 0.9rem;
+  color: #545454;
+  background: #fff;
+  scrollbar-color: #ccc transparent;
+}
+
+.property-heading,
+.wire-property,
+.property-section {
+  border-color: #ededed;
+}
+
+.property-heading small {
+  color: #808080;
+}
+
+.property-heading strong,
+.property-section h3 {
+  color: #2b2b2b;
+}
+
+.property-heading button {
+  color: #808080;
+}
+
+.property-heading button:hover {
+  color: #2b2b2b;
+  background: #ededed;
+}
+
+.wire-property p {
+  color: #545454;
+}
+
+@media (max-width: 1200px) {
+  .editor-body {
+    grid-template-columns: 14rem minmax(28rem, 1fr);
+  }
+
+  .property-panel {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(20rem, calc(100% - 4rem));
+    border-radius: 0.9rem 0 0 0.9rem;
+    box-shadow: -12px 0 32px rgb(43 43 43 / 0.16);
+  }
+}
+
+@media (max-width: 760px) {
+  .simulator-editor {
+    grid-template-rows: auto auto minmax(0, 1fr);
+  }
+
+  .editor-topbar {
+    grid-template-columns: 1fr auto;
+    grid-template-areas: 'title tools' 'simulation simulation';
+    gap: 0.45rem;
+    padding: 0.5rem 0.65rem;
+  }
+  .topbar-tools {
+    grid-area: tools;
+  }
+  .summary-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .summary-row > div:nth-child(3) {
+    border-top: 1px solid #ededed;
+    border-left: 0;
+  }
+  .summary-row > div:nth-child(4) {
+    border-top: 1px solid #ededed;
+  }
+  .editor-body {
+    grid-template-columns: 1fr;
+    overflow-y: auto;
+  }
+  .tool-rail {
+    min-height: auto;
+  }
+  .part-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .wire-legend {
+    margin-top: 0.55rem;
+  }
+  .canvas-workspace {
+    min-height: 38rem;
+  }
+  .property-panel {
+    width: calc(100% - 1rem);
+  }
+}
+
+/* Full-canvas mode: all diagram tools live in the top navigation. */
+.simulator-editor {
+  height: 100%;
+  min-height: 0;
+  grid-template-rows: 4.8rem minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.editor-topbar {
+  z-index: 50;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0 0.9rem;
+  border-bottom: 1px solid #e1e1e1;
+  background: #fff;
+  box-shadow: 0 2px 10px rgb(43 43 43 / 0.05);
+}
+
+.topbar-tools {
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.topbar-tools::-webkit-scrollbar {
+  display: none;
+}
+
+.topbar-tools button {
+  flex: none;
+}
+
+.topbar-tools button:disabled {
+  cursor: not-allowed;
+  opacity: 0.32;
+}
+
+.topbar-tools .nav-action {
+  display: flex;
+  width: auto;
+  gap: 0.36rem;
+  padding: 0 0.65rem;
+  color: #fff;
+  background: #2f2f2f;
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+
+.topbar-tools .nav-action:hover {
+  color: #fff;
+  background: #545454;
+}
+
+.topbar-tools .nav-start {
+  display: flex;
+  width: auto;
+  min-width: 5.2rem;
+  margin-right: auto;
+  gap: 0.38rem;
+  padding: 0 0.8rem;
+  color: #fff;
+  background: #16a34a;
+  font-size: 0.7rem;
+  font-weight: 650;
+}
+
+.topbar-tools .nav-start:hover {
+  color: #fff;
+  background: #15803d;
+}
+
+.topbar-tools .nav-start.nav-start-running {
+  background: #dc2626;
+}
+
+.topbar-tools .nav-start.nav-start-running:hover {
+  background: #b91c1c;
+}
+
+.nav-divider {
+  width: 1px;
+  height: 1.4rem;
+  flex: none;
+  margin: 0 0.3rem;
+  background: #3d3d3d;
+}
+
+.nav-zoom {
+  min-width: 3rem;
+  flex: none;
+  color: #b3b3b3;
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+/* The minimal refactor replaced the old rail and toolbars with the topbar.
+   The property panel stays, however — selecting a part has to lead somewhere,
+   and it is the only surface that exposes a device's properties. It is docked
+   over the canvas in `device-inspector.css` rather than taking a grid column,
+   so the topbar and sidebar keep their geometry. */
+.summary-row,
+.tool-rail,
+.canvas-toolbar,
+.zoom-controls {
+  display: none !important;
+}
+
+.editor-body {
+  display: block;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.canvas-workspace {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+}
+
+/* Infinite editor surface: a uniform dot grid that pans and zooms with the
+   diagram, plus a 1:1 SVG plane positioned from the viewport origin. */
+.canvas-viewport {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: #f5f5f5;
+  background-image: none;
+  background-repeat: repeat;
+  cursor: grab;
+  touch-action: none;
+}
+
+.canvas-viewport.canvas-panning {
+  cursor: grabbing;
+}
+
+.canvas-viewport.canvas-placing {
+  cursor: crosshair;
+}
+
+.canvas-viewport:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 1px #b8bec4;
+}
+
+.circuit-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1000px;
+  height: 720px;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  overflow: visible;
+  transform-origin: 0 0;
+}
+
+.board,
+.hardware {
+  cursor: grab;
+}
+
+.board:active,
+.hardware:active {
+  cursor: grabbing;
+}
+
+.wiring-notice {
+  top: 0.75rem;
+}
+
+@media (max-width: 900px) {
+  .editor-topbar {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'tools';
+    height: auto;
+    gap: 0.35rem;
+    padding: 0.45rem 0.55rem;
+  }
+
+  .simulator-editor {
+    grid-template-rows: 6.8rem minmax(0, 1fr);
+  }
+
+  .topbar-tools {
+    grid-area: tools;
+    justify-content: flex-start;
+  }
+}
+
+/* Wire-lock toggle and canvas-level alerts. */
+.wire-mode-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.wire-mode-toggle {
+  align-self: flex-start;
+  border: 1px solid #d4d4d8;
+  border-radius: 8px;
+  background: #fff;
+  padding: 2px 10px;
+  font: inherit;
+  font-weight: 600;
+  color: #52525b;
+  cursor: pointer;
+}
+
+.wire-mode-toggle:hover {
+  border-color: #a1a1aa;
+}
+
+.wire-mode-active {
+  border-color: #2563eb;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.canvas-alert {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 8px 16px 0;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  background: #fef2f2;
+  padding: 8px 12px;
+  color: #b91c1c;
+  font-size: 13px;
+}
+
+.canvas-alert button {
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+/* Placeholder while a project's saved layout is being fetched. */
+.canvas-loading {
+  position: absolute;
+  z-index: 20;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  pointer-events: auto;
+  color: #71717a;
+  background: #f5f5f5;
+  font-size: 13px;
+}
+
+.canvas-loading p {
+  margin: 0;
+}
+
+/* Undo/redo controls in the status strip. */
+.history-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.history-buttons {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.history-buttons button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 22px;
+  border: 1px solid #d4d4d8;
+  border-radius: 7px;
+  background: #fff;
+  color: #52525b;
+  cursor: pointer;
+}
+
+.history-buttons button:hover:not(:disabled) {
+  border-color: #a1a1aa;
+  color: #27272a;
+}
+
+.history-buttons button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.history-buttons svg {
+  width: 14px;
+  height: 14px;
+}
+
+/*
+ * Contextual toolbar for the selected part.
+ *
+ * HTML rather than SVG so the icons stay crisp and the buttons keep normal
+ * focus behaviour. It follows the component in screen space and is translated
+ * up and centred, so it sits clear of the headers being wired.
+ */
+.selection-toolbar {
+  position: absolute;
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  transform: translate(-50%, -100%);
+  padding: 3px;
+  border: 1px solid #e4e4e7;
+  border-radius: 9px;
+  background: #fff;
+  box-shadow: 0 4px 14px rgb(15 23 42 / 0.12);
+}
+
+.selection-toolbar button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: #52525b;
+  cursor: pointer;
+}
+
+.selection-toolbar button:hover {
+  background: #f4f4f5;
+  color: #18181b;
+}
+
+.selection-toolbar button.danger:hover {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.selection-toolbar svg {
+  width: 15px;
+  height: 15px;
+}
+
+.selection-toolbar-divider {
+  width: 1px;
+  height: 16px;
+  margin: 0 2px;
+  background: #e4e4e7;
+}
+
+/* Placement and connection readouts in the properties panel. */
+.placement-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 10px;
+  margin: 0;
+}
+
+.placement-grid > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.placement-grid dt {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #a1a1aa;
+}
+
+.placement-grid dd {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #27272a;
+  font-variant-numeric: tabular-nums;
+}
+
+.connection-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.connection-list li {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: #3f3f46;
+}
+
+.connection-swatch {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: none;
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.15);
+}
+
+.connection-list strong {
+  font-weight: 600;
+  color: #18181b;
+}
+
+.connection-arrow {
+  color: #a1a1aa;
+}
+
+.connection-target {
+  color: #52525b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.connection-empty {
+  margin: 0;
+  font-size: 12px;
+  color: #a1a1aa;
+}
+
+.firmware-status {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 0.35rem;
+  margin: 0 0 0 0.6rem;
+  padding: 0.2rem 0.5rem;
+  overflow: hidden;
+  border-radius: 0.4rem;
+  background: #f1f1f1;
+  color: #545454;
+  font-size: 0.55rem;
+  line-height: 1.4;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.firmware-status strong {
+  font-weight: 650;
+}
+.firmware-status-live {
+  color: #2f6d3f;
+  background: #eaf5ec;
+}
+.firmware-status-error {
+  color: #8a3232;
+  background: #fbeeee;
+}

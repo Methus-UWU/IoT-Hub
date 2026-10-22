@@ -1,0 +1,270 @@
+<header class="manager-head">
+  <div>
+    <h2 id="library-manager-title">Library Manager</h2>
+    <p>ค้นหาและติดตั้ง library จาก PlatformIO Registry ลงใน <code>lib/</code> ของโปรเจกต์</p>
+  </div>
+  <button
+    type="button"
+    class="icon-button"
+    aria-label="ปิด Library Manager"
+    (click)="closed.emit()"
+  >
+    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+      <path
+        d="m6 6 8 8M14 6l-8 8"
+        stroke="currentColor"
+        stroke-width="1.4"
+        stroke-linecap="round"
+      />
+    </svg>
+  </button>
+</header>
+
+<div class="manager-tabs" role="tablist" aria-label="Library Manager views">
+  <button
+    type="button"
+    role="tab"
+    [attr.aria-selected]="tab() === 'browse'"
+    [class.active]="tab() === 'browse'"
+    (click)="tab.set('browse')"
+  >
+    Browse
+  </button>
+  <button
+    type="button"
+    role="tab"
+    [attr.aria-selected]="tab() === 'installed'"
+    [class.active]="tab() === 'installed'"
+    (click)="tab.set('installed')"
+  >
+    Installed
+    @if (!loadingInstalled()) {
+      <span class="count">{{ installed().length }}</span>
+    }
+  </button>
+</div>
+
+@if (status(); as current) {
+  <p class="manager-status" [class.warning]="current.kind === 'warning'" role="status">
+    {{ current.text }}
+  </p>
+}
+
+@if (tab() === 'browse') {
+  <form class="manager-search" role="search" (submit)="submitSearch($event)">
+    <input
+      type="search"
+      name="q"
+      maxlength="100"
+      placeholder="ชื่อ library เช่น PubSubClient, ArduinoJson"
+      aria-label="ค้นหา library"
+      [value]="query()"
+      (input)="query.set($any($event.target).value)"
+    />
+    <select
+      aria-label="เรียงผลลัพธ์"
+      [value]="sort()"
+      (change)="changeSort($any($event.target).value)"
+    >
+      @for (option of sorts; track option.value) {
+        <option [value]="option.value">{{ option.label }}</option>
+      }
+    </select>
+    <button type="submit" class="primary" [disabled]="searching()">Search</button>
+  </form>
+  @if (platform(); as current) {
+    <p class="manager-hint">แสดงเฉพาะ library ที่รองรับ {{ current }} (บอร์ด {{ board() }})</p>
+  }
+
+  <section class="manager-list" aria-label="ผลการค้นหา" [attr.aria-busy]="searching()">
+    @if (searching() && results().length === 0) {
+      @for (row of [1, 2, 3, 4]; track row) {
+        <div class="row-skeleton" aria-hidden="true"><span></span><span></span><span></span></div>
+      }
+    } @else if (searchFailed() && results().length === 0) {
+      <div class="manager-empty">
+        <p>ติดต่อ PlatformIO Registry ไม่ได้</p>
+        <button type="button" (click)="search(1)">ลองใหม่</button>
+      </div>
+    } @else if (results().length === 0) {
+      <p class="manager-empty">ไม่พบ library ที่ตรงกับคำค้น</p>
+    } @else {
+      <ul>
+        @for (library of results(); track key(library)) {
+          <li>
+            <div class="library-meta">
+              <strong>{{ library.name }}</strong>
+              <small>
+                {{ library.owner }} · v{{ library.version }}
+                @if (library.updatedAt) {
+                  · อัปเดต {{ library.updatedAt | date: 'mediumDate' }}
+                }
+              </small>
+              @if (library.description) {
+                <p>{{ library.description }}</p>
+              }
+            </div>
+            <div class="library-actions">
+              @if (installedVersion(library); as version) {
+                <span class="badge">ติดตั้งแล้ว v{{ version }}</span>
+                @if (version !== library.version) {
+                  <button
+                    type="button"
+                    class="primary"
+                    [disabled]="busy() !== null"
+                    (click)="install(library)"
+                  >
+                    {{ busy() === key(library) ? 'Updating…' : 'Update to ' + library.version }}
+                  </button>
+                }
+              } @else {
+                <button
+                  type="button"
+                  class="primary"
+                  [disabled]="busy() !== null"
+                  (click)="install(library)"
+                >
+                  {{ busy() === key(library) ? 'Installing…' : 'Install' }}
+                </button>
+              }
+              <button
+                type="button"
+                [disabled]="busy() !== null"
+                [attr.aria-expanded]="versionsFor()?.name === library.name"
+                (click)="showVersions(library)"
+              >
+                Versions
+              </button>
+            </div>
+            @if (versionsFor(); as details) {
+              @if (details.name === library.name && details.owner === library.owner) {
+                <div class="library-versions">
+                  @if (details.repositoryUrl) {
+                    <a [href]="details.repositoryUrl" target="_blank" rel="noopener noreferrer">
+                      Source repository
+                    </a>
+                  }
+                  @if (details.headers.length) {
+                    <small>Headers: {{ details.headers.slice(0, 6).join(', ') }}</small>
+                  }
+                  <ul>
+                    @for (version of details.versions.slice(0, 12); track version.name) {
+                      <li>
+                        <span>v{{ version.name }}</span>
+                        @if (version.releasedAt) {
+                          <small>{{ version.releasedAt | date: 'mediumDate' }}</small>
+                        }
+                        <button
+                          type="button"
+                          [disabled]="busy() !== null || installedVersion(library) === version.name"
+                          (click)="install(library, version.name)"
+                        >
+                          {{ installedVersion(library) === version.name ? 'Installed' : 'Install' }}
+                        </button>
+                      </li>
+                    }
+                  </ul>
+                </div>
+              }
+            }
+          </li>
+        }
+      </ul>
+      @if (hasMore()) {
+        <button
+          type="button"
+          class="load-more"
+          [disabled]="searching()"
+          (click)="search(page() + 1)"
+        >
+          {{ searching() ? 'Loading…' : 'Load more' }}
+        </button>
+      }
+    }
+  </section>
+} @else {
+  <section
+    class="manager-list"
+    aria-label="Library ที่ติดตั้ง"
+    [attr.aria-busy]="loadingInstalled()"
+  >
+    @if (loadingInstalled() && installed().length === 0) {
+      @for (row of [1, 2]; track row) {
+        <div class="row-skeleton" aria-hidden="true"><span></span><span></span></div>
+      }
+    } @else if (installed().length === 0) {
+      <p class="manager-empty">ยังไม่ได้ติดตั้ง library จาก Registry</p>
+    } @else {
+      <ul>
+        @for (library of installed(); track library.folder) {
+          <li>
+            <div class="library-meta">
+              <strong>{{ library.name }}</strong>
+              <small>
+                {{ library.owner }} · v{{ library.version }} · lib/{{ library.folder }} ·
+                {{ library.fileCount }} ไฟล์ · {{ formatSize(library.sizeBytes) }}
+              </small>
+            </div>
+            <div class="library-actions">
+              @if (confirmingRemove() === library.folder) {
+                <button
+                  type="button"
+                  class="danger"
+                  [disabled]="busy() !== null"
+                  (click)="remove(library)"
+                >
+                  ยืนยันลบ
+                </button>
+                <button type="button" (click)="confirmingRemove.set(null)">ยกเลิก</button>
+              } @else {
+                <button
+                  type="button"
+                  [disabled]="busy() !== null"
+                  [attr.aria-expanded]="versionsFor()?.name === library.name"
+                  (click)="showVersions(library)"
+                >
+                  Change version
+                </button>
+                <button
+                  type="button"
+                  class="danger-text"
+                  [disabled]="busy() !== null"
+                  (click)="confirmingRemove.set(library.folder)"
+                >
+                  {{ busy() === library.folder ? 'Removing…' : 'Remove' }}
+                </button>
+              }
+            </div>
+            @if (versionsFor(); as details) {
+              @if (details.name === library.name && details.owner === library.owner) {
+                <div class="library-versions">
+                  <ul>
+                    @for (version of details.versions.slice(0, 12); track version.name) {
+                      <li>
+                        <span>v{{ version.name }}</span>
+                        @if (version.releasedAt) {
+                          <small>{{ version.releasedAt | date: 'mediumDate' }}</small>
+                        }
+                        <button
+                          type="button"
+                          [disabled]="busy() !== null || library.version === version.name"
+                          (click)="install(library, version.name)"
+                        >
+                          {{ library.version === version.name ? 'Installed' : 'Use this' }}
+                        </button>
+                      </li>
+                    }
+                  </ul>
+                </div>
+              }
+            }
+          </li>
+        }
+      </ul>
+    }
+  </section>
+}
+
+<footer class="manager-foot">
+  Server compile ใช้ library เหล่านี้ได้ทันที · ตัวจำลองในเบราว์เซอร์รองรับเฉพาะ library ที่จำลองไว้
+</footer>

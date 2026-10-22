@@ -1,0 +1,1386 @@
+/* You can add global styles to this file, and also import other style files */
+@import url('https://fonts.googleapis.com/css2?family=Anuphan:wght@500;600;700&family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Thai:wght@400;500;600;700;800&display=swap');
+@import 'tailwindcss';
+
+@theme {
+  --font-sans:
+    'Inter', 'Noto Sans Thai', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji',
+    'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+  --font-display: 'Anuphan', 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --color-primary: #545454;
+  --color-primary-dark: #2b2b2b;
+  --color-primary-light: #808080;
+  --color-error: #dc2626;
+  --color-surface: #ffffff;
+  --color-surface-soft: #fafafa;
+  --color-surface-muted: #f3f3f3;
+  --color-surface-selected: #ededed;
+  --color-border: #e5e5e5;
+  --color-border-strong: #c8c8c8;
+  --color-ink: #202020;
+  --color-ink-muted: #686868;
+  --color-on-dark-muted: #c6c6c6;
+  --color-preview-line: #414141;
+  --shadow-dialog: 0 24px 80px rgb(0 0 0 / 0.16);
+  --shadow-surface: 0 2px 4px rgb(0 0 0 / 0.025), 0 12px 32px rgb(0 0 0 / 0.055);
+  --color-dialog-overlay: rgb(20 20 20 / 0.28);
+}
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+/* The scroll container of a shell whose header sits outside it, so the bar
+   starts below the header instead of running past it. `stable` reserves the
+   gutter up front, and the rest keeps the bar slim instead of the wide legacy
+   one with stepper buttons. */
+.page-scroll {
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: #c8c8c8 transparent;
+}
+
+.page-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.page-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.page-scroll::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 9999px;
+  background-color: #c8c8c8;
+  background-clip: content-box;
+}
+
+.page-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: #a0a0a0;
+}
+
+.page-scroll::-webkit-scrollbar-button,
+.page-scroll::-webkit-scrollbar-corner {
+  display: none;
+}
+
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.scrollbar-thin:hover,
+.scrollbar-thin:focus-within {
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  border-radius: 9999px;
+}
+
+.scrollbar-thin:hover::-webkit-scrollbar-thumb,
+.scrollbar-thin:focus-within::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1;
+}
+
+/* AI model dropdown is global so the floating layer is not constrained by
+   Angular component style encapsulation. */
+app-ai-assistant-page .model-dropdown {
+  position: relative;
+  width: 15rem;
+  max-width: calc(100vw - 1.5rem);
+}
+
+app-ai-assistant-page .model-trigger {
+  position: relative;
+  z-index: 42;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  height: 2.5rem;
+  gap: 0.55rem;
+  padding: 0 0.65rem 0 0.7rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  color: #334155;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.04);
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  transition: 150ms ease;
+}
+
+app-ai-assistant-page .model-trigger > span {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+app-ai-assistant-page .model-trigger:hover:not(:disabled) {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+
+app-ai-assistant-page .model-trigger:focus-visible,
+app-ai-assistant-page .model-trigger[aria-expanded='true'] {
+  border-color: #a5b4fc;
+  outline: none;
+  box-shadow: 0 0 0 3px rgb(99 102 241 / 0.1);
+}
+
+app-ai-assistant-page .model-trigger:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+app-ai-assistant-page .model-chevron {
+  width: 1rem;
+  height: 1rem;
+  flex: none;
+  color: #94a3b8;
+  transition: transform 150ms ease;
+}
+
+app-ai-assistant-page .model-chevron-open {
+  transform: rotate(180deg);
+}
+
+app-ai-assistant-page .provider-icon {
+  flex: none;
+}
+
+app-ai-assistant-page .provider-icon-openai {
+  filter: invert(49%) sepia(65%) saturate(637%) hue-rotate(118deg) brightness(88%) contrast(96%);
+}
+
+app-ai-assistant-page .provider-icon-anthropic {
+  filter: invert(57%) sepia(31%) saturate(1119%) hue-rotate(326deg) brightness(93%) contrast(83%);
+}
+
+/* Keyed by the vendor slugs OpenRouter uses in a model id. */
+app-ai-assistant-page .provider-icon-google {
+  filter: invert(45%) sepia(88%) saturate(1322%) hue-rotate(213deg) brightness(99%) contrast(91%);
+}
+
+app-ai-assistant-page .provider-icon-deepseek {
+  filter: invert(43%) sepia(97%) saturate(3079%) hue-rotate(216deg) brightness(102%) contrast(99%);
+}
+
+app-ai-assistant-page .provider-icon-meta-llama,
+app-ai-assistant-page .provider-icon-nvidia {
+  filter: none;
+}
+
+/* Fallback badge for a catalog vendor with no bundled brand icon. */
+app-ai-assistant-page .provider-initial {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 0.4rem;
+  color: #475569;
+  background: #e2e8f0;
+  font-size: 0.6rem;
+  font-weight: 700;
+}
+
+app-ai-assistant-page .model-group-heading .provider-initial {
+  width: 1rem;
+  height: 1rem;
+  font-size: 0.52rem;
+}
+
+app-ai-assistant-page .model-empty {
+  margin: 0;
+  padding: 0.5rem 0.55rem;
+  color: #94a3b8;
+  font-size: 0.7rem;
+  line-height: 1.6;
+}
+
+app-ai-assistant-page .model-menu-backdrop {
+  position: fixed;
+  z-index: 40;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+}
+
+app-ai-assistant-page .model-menu {
+  position: absolute;
+  z-index: 43;
+  top: calc(100% + 0.5rem);
+  left: 0;
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  max-width: 100%;
+  max-height: min(34rem, calc(100vh - 5.5rem));
+  grid-template-rows: minmax(0, 1fr) auto;
+  overflow: hidden;
+  padding: 0.3rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.9rem;
+  background: rgb(255 255 255 / 0.98);
+  box-shadow:
+    0 18px 45px rgb(15 23 42 / 0.14),
+    0 4px 12px rgb(15 23 42 / 0.06);
+  backdrop-filter: blur(16px);
+  animation: model-menu-in 120ms ease-out;
+}
+
+app-ai-assistant-page .model-list {
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+app-ai-assistant-page .model-list::-webkit-scrollbar {
+  display: none;
+}
+
+app-ai-assistant-page .model-show-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.2rem;
+  gap: 0.35rem;
+  margin-top: 0.25rem;
+  border-top: 1px solid #e2e8f0;
+  border-radius: 0 0 0.65rem 0.65rem;
+  color: #4f46e5;
+  background: #fff;
+  font-size: 0.7rem;
+  font-weight: 650;
+  transition: 120ms ease;
+}
+
+app-ai-assistant-page .model-show-more:hover,
+app-ai-assistant-page .model-show-more:focus-visible {
+  color: #3730a3;
+  background: #f8fafc;
+  outline: none;
+}
+
+app-ai-assistant-page .model-show-more svg {
+  width: 0.9rem;
+  height: 0.9rem;
+  transition: transform 150ms ease;
+}
+
+app-ai-assistant-page .model-show-more-open {
+  transform: rotate(180deg);
+}
+
+app-ai-assistant-page .model-group + .model-group {
+  margin-top: 0.3rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid #f1f5f9;
+}
+
+app-ai-assistant-page .model-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+app-ai-assistant-page .model-group-heading {
+  display: flex;
+  align-items: center;
+  min-height: 1.55rem;
+  gap: 0.45rem;
+  padding: 0 0.45rem;
+  color: #64748b;
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+  margin-bottom: 0.12rem;
+}
+
+app-ai-assistant-page .model-provider-dot {
+  width: 0.36rem;
+  height: 0.36rem;
+  margin-left: auto;
+  border-radius: 999px;
+  background: #f59e0b;
+}
+
+app-ai-assistant-page .model-provider-dot-ready {
+  background: #10b981;
+}
+
+app-ai-assistant-page .model-option {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 1.85rem;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.3rem 0.5rem 0.3rem 1.55rem;
+  border-radius: 0.6rem;
+  color: #475569;
+  font-family: inherit;
+  font-size: 0.73rem;
+  font-weight: 500;
+  text-align: left;
+  transition: 100ms ease;
+  margin: 0;
+}
+
+app-ai-assistant-page .model-option:hover,
+app-ai-assistant-page .model-option:focus-visible {
+  color: #1e293b;
+  background: #f1f5f9;
+  outline: none;
+}
+
+app-ai-assistant-page .model-option-selected {
+  color: #4338ca;
+  background: #eef2ff;
+  font-weight: 600;
+}
+
+app-ai-assistant-page .model-option-selected:hover,
+app-ai-assistant-page .model-option-selected:focus-visible {
+  color: #3730a3;
+  background: #e0e7ff;
+}
+
+app-ai-assistant-page .model-option svg {
+  width: 1rem;
+  height: 1rem;
+  flex: none;
+}
+
+app-ai-assistant-page .model-option > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Two-line option: the model or profile name over its capability summary. */
+app-ai-assistant-page .model-option-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.08rem;
+  overflow: hidden;
+}
+
+app-ai-assistant-page .model-option-main > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+app-ai-assistant-page .model-option-hint {
+  color: #94a3b8;
+  font-size: 0.63rem;
+  font-weight: 500;
+}
+
+app-ai-assistant-page .model-option-selected .model-option-hint {
+  color: #6366f1;
+}
+
+app-ai-assistant-page .message-auto-badge {
+  padding: 0.05rem 0.32rem;
+  border-radius: 0.35rem;
+  color: #4338ca;
+  background: #eef2ff;
+  font-weight: 650;
+}
+
+@keyframes model-menu-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 640px) {
+  app-ai-assistant-page .model-dropdown {
+    width: min(11.5rem, calc(100vw - 7rem));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  app-ai-assistant-page .model-menu {
+    animation: none;
+  }
+}
+
+/* Rendered AI Markdown lives in innerHTML, so these styles must stay global.
+   AI chat and project setup use the same sanitized renderer and typography. */
+:is(app-ai-assistant-page, app-project-workspace-page, app-project-setup-page, app-assistant-page) .markdown-content {
+  min-width: 0;
+  color: #334155;
+  font-size: 0.86rem;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+
+:is(app-ai-assistant-page, app-project-workspace-page, app-project-setup-page, app-assistant-page) .markdown-content > :first-child {
+  margin-top: 0;
+}
+
+:is(app-ai-assistant-page, app-project-workspace-page, app-project-setup-page, app-assistant-page) .markdown-content > :last-child {
+  margin-bottom: 0;
+}
+
+:is(app-ai-assistant-page, app-project-workspace-page, app-project-setup-page, app-assistant-page) .markdown-content p {
+  margin: 0.65rem 0;
+}
+
+:is(app-ai-assistant-page, app-project-workspace-page, app-project-setup-page, app-assistant-page) .markdown-content h1,
+:is(app-ai-assistant-page, app-project-workspace-page, app-project-setup-page, app-assistant-page) .markdown-content h2,
+:is(app-ai-assistant-page, app-project-workspace-page, app-project-setup-page, app-assistant-page) .markdown-content h3,
+:is(app-ai-assistant-page, app-project-workspace-page, app-project-setup-page, app-assistant-page) .markdown-content h4 {
+  margin: 1.25rem 0 0.55rem;
+  color: #0f172a;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+:is(app-ai-assistant-page, app-project-workspace-page, app-project-setup-page, app-assistant-page) .markdown-content h1 {
+  font-size: 1.25rem;
+}
+
+:is(app-ai-assistant-page, app-project-workspace-page, app-project-setup-page, app-assistant-page) .markdown-content h2 {
+  font-size: 1.1rem;
+}
+
+:is(app-ai-assistant-page, app-project-workspace-page, app-project-setup-page, app-assistant-page) .markdown-content h3,
+:is(app-ai-assistant-page, app-project-workspace-page, app-project-setup-page, app-assistant-page) .markdown-content h4 {
+  font-size: 0.96rem;
+}
+
+:is(app-ai-assistant-page, app-project-workspace-page, app-project-setup-page, app-assistant-page) .markdown-content ul,
+:is(app-ai-assistant-page, app-project-workspace-page, app-project-setup-page, app-assistant-page) .markdown-content ol {
+  margin: 0.65rem 0;
+  padding-left: 1.4rem;
+}
+
+:is(app-ai-assistant-page, app-project-workspace-page, app-project-setup-page, app-assistant-page) .markdown-content ul {
+  list-style: disc;
+}
+
+:is(app-ai-assistant-page, app-project-workspace-page, app-project-setup-page, app-assistant-page) .markdown-content ol {
+  list-style: decimal;
+}
+
+:is(app-ai-assistant-page, app-project-workspace-page, app-project-setup-page, app-assistant-page) .markdown-content li {
+  margin: 0.2rem 0;
+  padding-left: 0.15rem;
+}
+
+:is(app-ai-assistant-page, app-project-workspace-page, app-project-setup-page, app-assistant-page) .markdown-content strong {
+  color: #1e293b;
+  font-weight: 700;
+}
+
+:is(app-ai-assistant-page, app-project-workspace-page, app-project-setup-page, app-assistant-page) .markdown-content a {
+  color: #4f46e5;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+}
+
+:is(app-ai-assistant-page, app-project-workspace-page, app-project-setup-page, app-assistant-page) .markdown-content a:hover {
+  color: #3730a3;
+}
+
+:is(app-ai-assistant-page, app-project-workspace-page, app-project-setup-page, app-assistant-page) .markdown-content code {
+  padding: 0.12rem 0.32rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.35rem;
+  color: #be123c;
+  background: #f8fafc;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.82em;
+}
+
+:is(app-ai-assistant-page, app-project-workspace-page, app-project-setup-page, app-assistant-page) .markdown-content pre {
+  max-width: 100%;
+  margin: 0.85rem 0;
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 0.8rem;
+  background: var(--color-surface-soft);
+}
+
+:is(app-ai-assistant-page, app-project-workspace-page, app-project-setup-page, app-assistant-page) .markdown-content pre code {
+  display: block;
+  min-width: max-content;
+  padding: 0.9rem 1rem;
+  border: 0;
+  color: var(--color-ink);
+  background: transparent;
+  font-size: 0.78rem;
+  line-height: 1.65;
+  white-space: pre;
+}
+
+:is(app-ai-assistant-page, app-project-workspace-page, app-project-setup-page, app-assistant-page) .markdown-content blockquote {
+  margin: 0.8rem 0;
+  padding: 0.15rem 0 0.15rem 0.9rem;
+  border-left: 3px solid #a5b4fc;
+  color: #64748b;
+}
+
+:is(app-ai-assistant-page, app-project-workspace-page, app-project-setup-page, app-assistant-page) .markdown-content hr {
+  margin: 1.15rem 0;
+  border: 0;
+  border-top: 1px solid #e2e8f0;
+}
+
+:is(app-ai-assistant-page, app-project-workspace-page, app-project-setup-page, app-assistant-page) .markdown-content table {
+  width: 100%;
+  margin: 0.85rem 0;
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.65rem;
+  font-size: 0.78rem;
+}
+
+:is(app-ai-assistant-page, app-project-workspace-page, app-project-setup-page, app-assistant-page) .markdown-content th,
+:is(app-ai-assistant-page, app-project-workspace-page, app-project-setup-page, app-assistant-page) .markdown-content td {
+  padding: 0.55rem 0.65rem;
+  border-right: 1px solid #e2e8f0;
+  border-bottom: 1px solid #e2e8f0;
+  text-align: left;
+  vertical-align: top;
+}
+
+:is(app-ai-assistant-page, app-project-workspace-page, app-project-setup-page, app-assistant-page) .markdown-content th {
+  color: #1e293b;
+  background: #f8fafc;
+  font-weight: 700;
+}
+
+:is(app-ai-assistant-page, app-project-workspace-page, app-project-setup-page, app-assistant-page) .markdown-content tr:last-child td {
+  border-bottom: 0;
+}
+
+:is(app-ai-assistant-page, app-project-workspace-page, app-project-setup-page, app-assistant-page) .markdown-content th:last-child,
+:is(app-ai-assistant-page, app-project-workspace-page, app-project-setup-page, app-assistant-page) .markdown-content td:last-child {
+  border-right: 0;
+}
+
+/* AI conversation history drawer */
+app-ai-assistant-page .toolbar-leading {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 0.5rem;
+}
+
+app-ai-assistant-page .history-trigger {
+  position: relative;
+  display: grid;
+  width: 2.5rem;
+  height: 2.5rem;
+  flex: none;
+  place-items: center;
+  border: 1px solid #e1e1e1;
+  border-radius: 0.75rem;
+  color: #808080;
+  background: #ffffff;
+  transition: 140ms ease;
+}
+
+app-ai-assistant-page .history-trigger:hover,
+app-ai-assistant-page .history-trigger[aria-expanded='true'] {
+  color: #2b2b2b;
+  border-color: #afafaf;
+  background: #f5f5f5;
+}
+
+app-ai-assistant-page .history-trigger:focus-visible,
+app-ai-assistant-page .history-close:focus-visible,
+app-ai-assistant-page .history-new-chat:focus-visible,
+app-ai-assistant-page .history-open-chat:focus-visible,
+app-ai-assistant-page .history-delete:focus-visible {
+  outline: 2px solid #afafaf;
+  outline-offset: 2px;
+}
+
+app-ai-assistant-page .history-trigger > svg {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+app-ai-assistant-page .history-count {
+  position: absolute;
+  top: -0.3rem;
+  right: -0.3rem;
+  display: grid;
+  min-width: 1.05rem;
+  height: 1.05rem;
+  place-items: center;
+  padding-inline: 0.2rem;
+  border: 2px solid #ffffff;
+  border-radius: 999px;
+  color: #ffffff;
+  background: #545454;
+  font-size: 0.55rem;
+  font-weight: 700;
+}
+
+app-ai-assistant-page .history-backdrop {
+  position: absolute;
+  z-index: 18;
+  inset: 4rem 0 0;
+  background: rgb(43 43 43 / 0.12);
+  backdrop-filter: blur(1px);
+  animation: history-fade-in 140ms ease-out;
+}
+
+app-ai-assistant-page .history-panel {
+  position: absolute;
+  z-index: 19;
+  top: 4rem;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  width: 19rem;
+  max-width: calc(100% - 1.5rem);
+  flex-direction: column;
+  padding: 1rem;
+  border-right: 1px solid #e1e1e1;
+  background: rgb(252 252 252 / 0.98);
+  box-shadow: 16px 0 45px rgb(43 43 43 / 0.12);
+  backdrop-filter: blur(18px);
+  animation: history-slide-in 180ms ease-out;
+}
+
+app-ai-assistant-page .history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.9rem;
+}
+
+app-ai-assistant-page .history-header p {
+  margin: 0 0 0.15rem;
+  color: #808080;
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+app-ai-assistant-page .history-header h2 {
+  margin: 0;
+  color: #2b2b2b;
+  font-size: 0.95rem;
+  font-weight: 650;
+}
+
+app-ai-assistant-page .history-close {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border-radius: 0.6rem;
+  color: #808080;
+  transition: 120ms ease;
+}
+
+app-ai-assistant-page .history-close:hover {
+  color: #2b2b2b;
+  background: #e1e1e1;
+}
+
+app-ai-assistant-page .history-close svg,
+app-ai-assistant-page .history-new-chat svg,
+app-ai-assistant-page .history-delete svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+app-ai-assistant-page .history-new-chat {
+  display: flex;
+  min-height: 2.5rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-bottom: 0.85rem;
+  border: 1px solid #545454;
+  border-radius: 0.75rem;
+  color: #ffffff;
+  background: #2b2b2b;
+  font-size: 0.75rem;
+  font-weight: 600;
+  transition: 140ms ease;
+}
+
+app-ai-assistant-page .history-new-chat:hover {
+  background: #545454;
+}
+
+app-ai-assistant-page .history-list {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 0.15rem;
+}
+
+app-ai-assistant-page .history-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 2rem;
+  align-items: center;
+  gap: 0.2rem;
+  margin-bottom: 0.3rem;
+  border: 1px solid transparent;
+  border-radius: 0.75rem;
+  transition: 120ms ease;
+}
+
+app-ai-assistant-page .history-item:hover {
+  border-color: #e1e1e1;
+  background: #ffffff;
+}
+
+app-ai-assistant-page .history-item-active {
+  border-color: #afafaf;
+  background: #f1f1f1;
+}
+
+app-ai-assistant-page .history-open-chat {
+  min-width: 0;
+  padding: 0.65rem 0.2rem 0.65rem 0.7rem;
+  text-align: left;
+}
+
+app-ai-assistant-page .history-item-title,
+app-ai-assistant-page .history-item-meta {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+app-ai-assistant-page .history-item-title {
+  color: #2b2b2b;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+app-ai-assistant-page .history-item-meta {
+  margin-top: 0.18rem;
+  color: #808080;
+  font-size: 0.58rem;
+}
+
+app-ai-assistant-page .history-delete {
+  display: grid;
+  width: 1.8rem;
+  height: 1.8rem;
+  place-items: center;
+  border-radius: 0.55rem;
+  color: #afafaf;
+  opacity: 0;
+  transition: 120ms ease;
+}
+
+app-ai-assistant-page .history-item:hover .history-delete,
+app-ai-assistant-page .history-delete:focus-visible {
+  opacity: 1;
+}
+
+app-ai-assistant-page .history-delete:hover {
+  color: #b91c1c;
+  background: #fef2f2;
+}
+
+app-ai-assistant-page .history-empty {
+  display: flex;
+  min-height: 13rem;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  color: #afafaf;
+  text-align: center;
+}
+
+app-ai-assistant-page .history-empty svg {
+  width: 2rem;
+  height: 2rem;
+  margin-bottom: 0.65rem;
+}
+
+app-ai-assistant-page .history-empty p {
+  margin: 0;
+  color: #545454;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+app-ai-assistant-page .history-empty span {
+  margin-top: 0.2rem;
+  font-size: 0.62rem;
+}
+
+@keyframes history-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(-0.75rem);
+  }
+}
+
+@keyframes history-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  app-ai-assistant-page .toolbar-leading {
+    gap: 0.35rem;
+  }
+
+  app-ai-assistant-page .history-trigger {
+    width: 2.3rem;
+    height: 2.3rem;
+  }
+
+  app-ai-assistant-page .history-backdrop {
+    inset-block-start: 3.65rem;
+  }
+
+  app-ai-assistant-page .history-panel {
+    top: 3.65rem;
+    width: 18rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  app-ai-assistant-page .history-backdrop,
+  app-ai-assistant-page .history-panel {
+    animation: none;
+  }
+}
+/* Workspace Serial Monitor */
+.serial-panel {
+  display: grid;
+  height: 10.85rem;
+  grid-template-rows: 2.75rem minmax(0, 1fr);
+  border-top: 1px solid #eef1f5;
+  background: #f8fafc;
+}
+.serial-toolbar {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.65rem;
+  overflow-x: auto;
+  padding: 0 0.8rem;
+  border-bottom: 1px solid #e8ecf2;
+  color: #5f6d80;
+  background: #fff;
+  font-size: 0.65rem;
+}
+.serial-status {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-right: 0.25rem;
+  color: #8b96a6;
+  white-space: nowrap;
+}
+.serial-status i {
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 999px;
+  background: #a8b0bd;
+}
+.serial-status-connected {
+  color: #18835b;
+}
+.serial-status-connected i {
+  background: #10b981;
+  box-shadow: 0 0 0 3px rgb(16 185 129 / 0.1);
+}
+.serial-toolbar label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  white-space: nowrap;
+}
+.serial-check input {
+  width: 0.9rem;
+  height: 0.9rem;
+  accent-color: #635bff;
+}
+.serial-toolbar-spacer {
+  flex: 1;
+}
+.serial-toolbar > button {
+  height: 2rem;
+  padding: 0 0.65rem;
+  border: 1px solid #d9dee7;
+  border-radius: 0.5rem;
+  color: #586579;
+  background: #fff;
+  font-size: 0.63rem;
+  font-weight: 600;
+}
+.serial-toolbar > button:hover:not(:disabled) {
+  color: #303b4c;
+  border-color: #b8c0cd;
+  background: #f7f8fb;
+}
+.serial-toolbar > button:disabled {
+  opacity: 0.45;
+}
+.serial-toolbar .serial-connect-button {
+  min-width: 5.5rem;
+  color: #fff;
+  border-color: #2b2b2b;
+  background: #2b2b2b;
+}
+.serial-toolbar .serial-disconnect-button {
+  color: #b83b37;
+  border-color: #efcfcd;
+  background: #fff7f6;
+}
+.serial-output {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: 0.4rem;
+  overflow: auto;
+  padding: 0.85rem 1rem 1rem;
+  color: #3f4d62;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.72rem;
+  font-weight: 500;
+  line-height: 1.55;
+}
+.serial-output time {
+  margin-right: 0.7rem;
+  color: #7f8b9d;
+}
+.serial-output .serial-error-line {
+  color: #b83b37;
+}
+.serial-empty {
+  margin: auto;
+  color: #7f8b9d;
+  font-family: inherit;
+  font-size: 0.72rem;
+  font-weight: 500;
+}
+/* Compact workspace toolbar overflow menu */
+.toolbar-more {
+  position: relative;
+  flex: none;
+}
+.workspace-floating-menu,
+.toolbar-more-menu {
+  transform-origin: top center;
+  animation: workspace-menu-in 140ms ease-out;
+}
+@keyframes workspace-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-0.35rem) scale(0.985);
+  }
+}
+.toolbar-more-menu {
+  position: absolute;
+  z-index: 110;
+  top: calc(100% + 0.45rem);
+  right: 0;
+  display: grid;
+  width: 15rem;
+  gap: 0.45rem;
+  padding: 0.65rem;
+  border: 1px solid #dfe4ec;
+  border-radius: 0.8rem;
+  background: #fff;
+  box-shadow: 0 16px 40px rgb(31 41 55 / 0.14);
+}
+.toolbar-more-file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.toolbar-menu-action {
+  display: flex;
+  min-height: 2.25rem;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0 0.65rem;
+  border-radius: 0.55rem;
+  color: #4b586c;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-align: left;
+}
+.toolbar-menu-action:hover {
+  color: #2b2b2b;
+  background: #f3f5f8;
+}
+.toolbar-menu-action svg {
+  width: 1rem;
+  height: 1rem;
+  flex: none;
+  color: #718096;
+}
+@media (prefers-reduced-motion: reduce) {
+  .workspace-floating-menu,
+  .toolbar-more-menu {
+    animation: none;
+  }
+}
+
+/* Rendered guide Markdown lives in innerHTML, so these styles must stay global. */
+app-documents-page .reader-body {
+  min-width: 0;
+  color: #545454;
+  font-size: 0.66rem;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+
+app-documents-page .reader-body > :first-child {
+  margin-top: 0;
+}
+
+app-documents-page .reader-body > :last-child {
+  margin-bottom: 0;
+}
+
+app-documents-page .reader-body p {
+  margin: 0.7rem 0;
+}
+
+app-documents-page .reader-body h2,
+app-documents-page .reader-body h3,
+app-documents-page .reader-body h4 {
+  margin: 1.5rem 0 0.4rem;
+  color: #2b2b2b;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+app-documents-page .reader-body h2 {
+  font-size: 0.85rem;
+}
+
+app-documents-page .reader-body h3,
+app-documents-page .reader-body h4 {
+  font-size: 0.75rem;
+}
+
+app-documents-page .reader-body ul,
+app-documents-page .reader-body ol {
+  margin: 0.7rem 0;
+  padding-left: 1.3rem;
+}
+
+app-documents-page .reader-body ul {
+  list-style: disc;
+}
+
+app-documents-page .reader-body ol {
+  list-style: decimal;
+}
+
+app-documents-page .reader-body li {
+  margin: 0.25rem 0;
+}
+
+app-documents-page .reader-body strong {
+  color: #2b2b2b;
+  font-weight: 650;
+}
+
+app-documents-page .reader-body a {
+  color: #2b2b2b;
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+
+app-documents-page .reader-body code {
+  padding: 0.1rem 0.3rem;
+  border: 1px solid #e1e1e1;
+  border-radius: 0.35rem;
+  color: #2b2b2b;
+  background: #fafafa;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.85em;
+}
+
+app-documents-page .reader-body pre {
+  max-width: 100%;
+  margin: 0.9rem 0;
+  overflow-x: auto;
+  border-radius: 0.65rem;
+  background: #2b2b2b;
+}
+
+app-documents-page .reader-body pre code {
+  display: block;
+  min-width: max-content;
+  padding: 0.9rem 1rem;
+  border: 0;
+  color: #f5f5f5;
+  background: transparent;
+  font-size: 0.58rem;
+  line-height: 1.65;
+  white-space: pre;
+}
+
+app-documents-page .reader-body blockquote {
+  margin: 0.9rem 0;
+  padding: 0.1rem 0 0.1rem 0.9rem;
+  border-left: 3px solid #d7d7d7;
+  color: #808080;
+}
+
+app-documents-page .reader-body table {
+  display: block;
+  width: 100%;
+  margin: 0.9rem 0;
+  overflow-x: auto;
+  border-collapse: collapse;
+  font-size: 0.6rem;
+}
+
+app-documents-page .reader-body th,
+app-documents-page .reader-body td {
+  padding: 0.45rem 0.6rem;
+  border: 1px solid #e1e1e1;
+  text-align: left;
+  vertical-align: top;
+}
+
+app-documents-page .reader-body th {
+  color: #2b2b2b;
+  background: #fafafa;
+  font-weight: 650;
+}
+
+app-documents-page .reader-body hr {
+  margin: 1.4rem 0;
+  border: 0;
+  border-top: 1px solid #e1e1e1;
+}
+
+/* Community Markdown bodies.
+   Global, like the AI assistant's above, and for the same reason: the nodes are
+   produced by [innerHTML] at runtime, so they carry no component scope
+   attribute and a rule written inside the component's stylesheet would never
+   match them. Scoped to community cards, threads, and the composer preview. */
+app-community-post-card .post-excerpt,
+app-community-post-page .markdown-body,
+app-ask-question-page .markdown-preview {
+  color: #333;
+}
+app-community-post-card .post-excerpt > :first-child,
+app-community-post-page .markdown-body > :first-child,
+app-ask-question-page .markdown-preview > :first-child {
+  margin-top: 0;
+}
+app-community-post-card .post-excerpt > :last-child,
+app-community-post-page .markdown-body > :last-child,
+app-ask-question-page .markdown-preview > :last-child {
+  margin-bottom: 0;
+}
+app-community-post-card .post-excerpt p,
+app-community-post-page .markdown-body p,
+app-community-post-card .post-excerpt ul,
+app-community-post-page .markdown-body ul,
+app-community-post-card .post-excerpt ol,
+app-community-post-page .markdown-body ol,
+app-ask-question-page .markdown-preview p,
+app-ask-question-page .markdown-preview ul,
+app-ask-question-page .markdown-preview ol {
+  margin: 0 0 1rem;
+}
+app-community-post-card .post-excerpt ul,
+app-community-post-page .markdown-body ul,
+app-community-post-card .post-excerpt ol,
+app-community-post-page .markdown-body ol,
+app-ask-question-page .markdown-preview ul,
+app-ask-question-page .markdown-preview ol {
+  padding-left: 1.3rem;
+  list-style: revert;
+}
+app-community-post-card .post-excerpt li,
+app-community-post-page .markdown-body li,
+app-ask-question-page .markdown-preview li {
+  margin-bottom: 0.3rem;
+}
+app-community-post-card .post-excerpt h1,
+app-community-post-page .markdown-body h1,
+app-community-post-card .post-excerpt h2,
+app-community-post-page .markdown-body h2,
+app-community-post-card .post-excerpt h3,
+app-community-post-page .markdown-body h3,
+app-community-post-card .post-excerpt h4,
+app-community-post-page .markdown-body h4,
+app-ask-question-page .markdown-preview h1,
+app-ask-question-page .markdown-preview h2,
+app-ask-question-page .markdown-preview h3,
+app-ask-question-page .markdown-preview h4 {
+  margin: 1.5rem 0 0.55rem;
+  color: #1c1c1c;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.4;
+}
+app-community-post-card .post-excerpt h1,
+app-community-post-page .markdown-body h1,
+app-ask-question-page .markdown-preview h1 {
+  font-size: 1.28em;
+}
+app-community-post-card .post-excerpt h2,
+app-community-post-page .markdown-body h2,
+app-ask-question-page .markdown-preview h2 {
+  font-size: 1.13em;
+}
+app-community-post-card .post-excerpt h3,
+app-community-post-page .markdown-body h3,
+app-community-post-card .post-excerpt h4,
+app-community-post-page .markdown-body h4,
+app-ask-question-page .markdown-preview h3,
+app-ask-question-page .markdown-preview h4 {
+  font-size: 1.01em;
+}
+app-community-post-card .post-excerpt pre,
+app-community-post-page .markdown-body pre,
+app-ask-question-page .markdown-preview pre {
+  overflow-x: auto;
+  margin: 0 0 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid #e4e4e4;
+  border-radius: 0.35rem;
+  background: #f8f9fa;
+  font-size: 0.95em;
+  line-height: 1.65;
+}
+app-community-post-card .post-excerpt code,
+app-community-post-page .markdown-body code,
+app-ask-question-page .markdown-preview code {
+  font-family: ui-monospace, 'SFMono-Regular', 'Menlo', monospace;
+}
+app-community-post-card .post-excerpt :not(pre) > code,
+app-community-post-page .markdown-body :not(pre) > code,
+app-ask-question-page .markdown-preview :not(pre) > code {
+  padding: 0.1rem 0.32rem;
+  border-radius: 0.25rem;
+  color: #b42318;
+  background: #f1f2f3;
+  font-size: 0.88em;
+}
+app-community-post-card .post-excerpt blockquote,
+app-community-post-page .markdown-body blockquote,
+app-ask-question-page .markdown-preview blockquote {
+  margin: 0 0 1rem;
+  padding: 0.1rem 0 0.1rem 0.9rem;
+  border-left: 3px solid #dcdcdc;
+  color: #5c5c5c;
+}
+app-community-post-card .post-excerpt a,
+app-community-post-page .markdown-body a,
+app-ask-question-page .markdown-preview a {
+  color: #1d4ed8;
+  text-underline-offset: 2px;
+}
+app-community-post-card .post-excerpt img,
+app-community-post-page .markdown-body img,
+app-ask-question-page .markdown-preview img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.35rem;
+}
+app-community-post-card .post-excerpt table,
+app-community-post-page .markdown-body table,
+app-ask-question-page .markdown-preview table {
+  display: block;
+  overflow-x: auto;
+  border-collapse: collapse;
+  margin-bottom: 1rem;
+  font-size: 1em;
+}
+app-community-post-card .post-excerpt th,
+app-community-post-page .markdown-body th,
+app-community-post-card .post-excerpt td,
+app-community-post-page .markdown-body td,
+app-ask-question-page .markdown-preview th,
+app-ask-question-page .markdown-preview td {
+  padding: 0.4rem 0.65rem;
+  border: 1px solid #e4e4e4;
+  text-align: left;
+}
+app-community-post-card .post-excerpt th,
+app-community-post-page .markdown-body th,
+app-ask-question-page .markdown-preview th {
+  background: #f8f9fa;
+  font-weight: 700;
+}
+app-community-post-page .answer .markdown-body {
+  font-size: 0.875rem;
+  line-height: 1.72;
+}
+
+/* Community Markdown grows with the page; code and tables wrap without nested scrollbars. */
+:is(app-community-post-card .post-excerpt, app-community-post-page .markdown-body) pre {
+  overflow: visible;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+:is(app-community-post-card .post-excerpt, app-community-post-page .markdown-body) table {
+  display: table;
+  width: 100%;
+  table-layout: fixed;
+  overflow: visible;
+}
+app-community-post-card .post-excerpt > div > :first-child {
+  margin-top: 0;
+}
+app-community-post-card .post-excerpt > div > :last-child {
+  margin-bottom: 0;
+}

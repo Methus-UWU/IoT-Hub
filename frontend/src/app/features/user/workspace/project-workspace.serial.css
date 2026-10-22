@@ -1,0 +1,30 @@
+.serial-baud-field {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.serial-baud-select {
+  width: 7rem;
+}
+
+.serial-panel {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.serial-toolbar {
+  flex-wrap: wrap;
+  overflow: visible;
+  padding-block: 0.4rem;
+}
+
+.serial-toolbar > button,
+.serial-toolbar > label {
+  flex-shrink: 0;
+}
+
+.serial-output > span {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

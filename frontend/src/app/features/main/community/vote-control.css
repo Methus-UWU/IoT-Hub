@@ -1,0 +1,78 @@
+/*
+ * Vote arrows.
+ *
+ * The active colours are the ones this pattern is universally read with —
+ * orange up, periwinkle down. Both are darkened from the originals: an icon is
+ * a graphical object and needs 3:1 against its background, and the stock
+ * periwinkle sits at 2.6:1. The score text darkens further, because 13px bold
+ * text needs 4.5:1 and neither hue clears that at full saturation.
+ */
+.vote-control {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.05rem;
+  user-select: none;
+}
+.vote-control-horizontal {
+  flex-direction: row;
+  gap: 0.1rem;
+  padding: 0.15rem;
+  border-radius: 999px;
+  background: #f1f2f3;
+}
+.vote-button {
+  display: grid;
+  width: 1.6rem;
+  height: 1.6rem;
+  place-items: center;
+  border: 0;
+  border-radius: 0.3rem;
+  color: #767676;
+  background: transparent;
+  cursor: pointer;
+  transition:
+    color 0.12s ease,
+    background 0.12s ease;
+}
+.vote-button svg {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+.vote-button:hover:not(:disabled) {
+  color: #1c1c1c;
+  background: #e4e6e7;
+}
+.vote-button:disabled {
+  cursor: progress;
+  opacity: 0.55;
+}
+.vote-button:focus-visible {
+  outline: 2px solid #1c1c1c;
+  outline-offset: 1px;
+}
+.vote-button-active,
+.vote-button-active:hover:not(:disabled) {
+  color: #ff4500;
+  background: rgb(255 69 0 / 0.1);
+}
+.vote-button-active-down,
+.vote-button-active-down:hover:not(:disabled) {
+  color: #5e7be2;
+  background: rgb(94 123 226 / 0.12);
+}
+.vote-score {
+  min-width: 1.5rem;
+  padding: 0.05rem 0;
+  color: #1c1c1c;
+  font-size: 0.8rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.vote-score-positive {
+  color: #c2410c;
+}
+.vote-score-negative {
+  color: #3b5bc0;
+}

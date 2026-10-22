@@ -1,0 +1,122 @@
+@if (searchable()) {
+  <input
+    #searchTrigger
+    type="text"
+    class="select-trigger select-search"
+    [class.select-trigger-compact]="compact()"
+    [class.select-trigger-dense]="dense()"
+    role="combobox"
+    aria-autocomplete="list"
+    aria-haspopup="listbox"
+    autocomplete="off"
+    [attr.aria-label]="ariaLabel()"
+    [attr.aria-expanded]="open()"
+    [attr.aria-controls]="open() ? menuId : null"
+    [attr.aria-activedescendant]="activeOptionId()"
+    [placeholder]="open() ? placeholder() : displayLabel() || placeholder()"
+    [value]="open() ? query() : displayLabel()"
+    [disabled]="disabled()"
+    (click)="openMenu()"
+    (input)="search(searchTrigger.value)"
+  />
+} @else {
+  <button
+    #trigger
+    type="button"
+    class="select-trigger"
+    [class.select-trigger-compact]="compact()"
+    [class.select-trigger-dense]="dense()"
+    [class.select-trigger-normal]="textWeight() === 'normal'"
+    role="combobox"
+    aria-haspopup="listbox"
+    [attr.aria-label]="ariaLabel()"
+    [attr.aria-expanded]="open()"
+    [attr.aria-controls]="menuId"
+    [attr.aria-activedescendant]="activeOptionId()"
+    [disabled]="disabled()"
+    (click)="toggle()"
+  >
+    <span class="min-w-0 flex-1 truncate text-left">
+      {{ selectedOption()?.label ?? placeholder() }}
+    </span>
+    <svg
+      viewBox="0 0 20 20"
+      fill="none"
+      class="h-4 w-4 shrink-0"
+      [class.rotate-180]="open()"
+      aria-hidden="true"
+    >
+      <path
+        d="m6 8 4 4 4-4"
+        stroke="currentColor"
+        stroke-width="1.5"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+    </svg>
+  </button>
+}
+
+@if (open()) {
+  <ul
+    [id]="menuId"
+    class="select-menu workspace-floating-menu"
+    [class.select-menu-compact]="compact()"
+    [class.select-menu-dense]="dense()"
+    role="listbox"
+    [attr.aria-label]="ariaLabel()"
+    [style.top.px]="menuPosition().top"
+    [style.left.px]="menuPosition().left"
+    [style.width.px]="menuPosition().width"
+    [style.max-height.px]="menuPosition().maxHeight"
+  >
+    @for (option of visibleOptions(); track option.value; let index = $index) {
+      <li role="presentation">
+        <button
+          [id]="menuId + '-option-' + index"
+          type="button"
+          class="select-option"
+          role="option"
+          tabindex="-1"
+          [class.select-option-active]="activeIndex() === index"
+          [class.select-option-selected]="option.value === value()"
+          [attr.aria-selected]="option.value === value()"
+          [disabled]="option.disabled"
+          (mouseenter)="setActiveIndex(index)"
+          (mousedown)="$event.preventDefault()"
+          (click)="select(option)"
+        >
+          <span class="min-w-0 flex-1 text-left">
+            <span
+              class="block truncate"
+              [attr.title]="option.label"
+              [class.font-medium]="textWeight() === 'medium'"
+              [class.font-normal]="textWeight() === 'normal'"
+              >{{ option.label }}</span
+            >
+            @if (option.description) {
+              <span
+                class="mt-0.5 block truncate text-[11px] text-ink-muted"
+                [attr.title]="option.description"
+                >{{ option.description }}</span
+              >
+            }
+          </span>
+          @if (option.value === value()) {
+            <svg viewBox="0 0 20 20" fill="none" class="h-4 w-4 shrink-0" aria-hidden="true">
+              <path
+                d="m5 10 3 3 7-7"
+                stroke="currentColor"
+                stroke-width="1.6"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          }
+        </button>
+      </li>
+    } @empty {
+      <li role="presentation" class="px-3 py-5 text-sm text-ink-muted">{{ emptyText() }}</li>
+    }
+  </ul>
+}

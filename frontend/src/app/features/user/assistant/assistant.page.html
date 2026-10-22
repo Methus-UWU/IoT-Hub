@@ -1,0 +1,125 @@
+<div class="assistant-page">
+  <header class="assistant-header">
+    <div class="assistant-heading">
+      <p class="eyebrow">AI ADVISOR</p>
+      <h1>ผู้ช่วย IoT</h1>
+      <p class="description">
+        ถามเรื่องการเลือกอุปกรณ์ การต่อวงจรกับ ESP32 / Arduino และโค้ดตัวอย่าง หรือวาง error จาก
+        Arduino IDE / PlatformIO ให้ช่วยวิเคราะห์
+      </p>
+    </div>
+    <div class="header-actions">
+      <div class="mode-toggle" role="group" aria-label="โหมดผู้ช่วย">
+        <button
+          type="button"
+          [attr.aria-pressed]="mode() === 'advice'"
+          [class.active]="mode() === 'advice'"
+          [disabled]="sending()"
+          (click)="setMode('advice')"
+        >
+          ถามผู้ช่วย
+        </button>
+        <button
+          type="button"
+          [attr.aria-pressed]="mode() === 'error'"
+          [class.active]="mode() === 'error'"
+          [disabled]="sending()"
+          (click)="setMode('error')"
+        >
+          วิเคราะห์ Error
+        </button>
+      </div>
+      @if (messages().length) {
+        <button
+          type="button"
+          class="new-chat"
+          (click)="startOver()"
+          aria-label="เริ่มบทสนทนาใหม่"
+          title="เริ่มบทสนทนาใหม่"
+        >
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path
+              d="M13.5 5.5H6a2 2 0 0 0-2 2V18a2 2 0 0 0 2 2h10.5a2 2 0 0 0 2-2v-7.5M16 4l4 4M10 14l1-4L18 3l4 4-7 7-5 1Z"
+            />
+          </svg>
+        </button>
+      }
+    </div>
+  </header>
+
+  <section class="assistant-card" aria-label="บทสนทนา">
+    <div class="thread" #thread aria-live="polite">
+      @if (messages().length === 0) {
+        @if (mode() === 'advice') {
+          <div class="empty-state">
+            <p>ถามเรื่องอุปกรณ์ การต่อวงจร หรือโค้ดที่ต้องการได้เลย</p>
+            <div class="suggestions">
+              @for (suggestion of suggestions; track suggestion.label) {
+                <button type="button" (click)="sendDraft(suggestion.prompt)">
+                  {{ suggestion.label }}<span aria-hidden="true">↗</span>
+                </button>
+              }
+            </div>
+          </div>
+        } @else {
+          <div class="empty-state">
+            <p>วางข้อความ error จาก Arduino IDE หรือ PlatformIO ในช่องด้านล่างได้เลย</p>
+            <p>ระบุบอร์ดและแนบโค้ดส่วนที่เกี่ยวข้อง เพื่อให้ช่วยวิเคราะห์ได้ตรงจุด</p>
+          </div>
+        }
+      }
+
+      @for (message of messages(); track $index) {
+        <article class="message" [class.from-user]="message.role === 'user'">
+          <span class="sr-only">{{ message.role === 'user' ? 'คุณ' : 'ผู้ช่วย' }}:</span>
+          @if (message.role === 'user') {
+            <p class="user-text">{{ message.content }}</p>
+          } @else {
+            <div class="markdown-content" [innerHTML]="message.content | markdown"></div>
+          }
+        </article>
+      }
+
+      @if (sending()) {
+        <p class="typing" role="status">ผู้ช่วยกำลังคิด…</p>
+      }
+      @if (error(); as message) {
+        <p class="thread-error" role="alert">{{ message }}</p>
+      }
+    </div>
+
+    <form class="composer" (submit)="$event.preventDefault(); sendDraft()">
+      <label class="sr-only" for="advisor-draft">ข้อความถึงผู้ช่วย</label>
+      <textarea
+        id="advisor-draft"
+        rows="2"
+        maxlength="12000"
+        [placeholder]="
+          mode() === 'error' ? 'วางข้อความ error หรือถามต่อที่นี่…' : 'ถามอะไรก็ได้เกี่ยวกับ IoT…'
+        "
+        aria-describedby="composer-hint privacy-hint"
+        [value]="draft()"
+        (input)="updateDraft($event)"
+        (keydown)="onDraftKeydown($event)"
+      ></textarea>
+      <div class="composer-actions">
+        <span id="composer-hint">Enter เพื่อส่ง · Shift+Enter ขึ้นบรรทัดใหม่</span>
+        <button
+          type="submit"
+          class="send-button"
+          [disabled]="sending() || !draft().trim()"
+          aria-label="ส่งข้อความ"
+          title="ส่งข้อความ"
+        >
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M12 19V5m-6 6 6-6 6 6" />
+          </svg>
+        </button>
+      </div>
+    </form>
+  </section>
+  <p class="assistant-note" id="privacy-hint">
+    ลบรหัส Wi-Fi, token และ API key ก่อนส่ง ข้อความจะถูกส่งไปยังผู้ให้บริการ AI<br />
+    คำตอบจาก AI อาจผิดพลาดได้ ตรวจสอบแรงดันไฟและการต่อสายก่อนจ่ายไฟจริงทุกครั้ง บทสนทนาไม่ถูกบันทึก
+  </p>
+</div>

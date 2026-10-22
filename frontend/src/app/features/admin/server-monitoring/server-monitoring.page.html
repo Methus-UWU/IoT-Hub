@@ -1,0 +1,161 @@
+<div class="min-h-full bg-gray-50 px-4 py-6 sm:px-6 lg:px-8">
+  <div class="mx-auto max-w-[90rem] space-y-5">
+    <header class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+      <div>
+        <h1 class="text-2xl font-semibold tracking-tight text-gray-900">สถานะเซิร์ฟเวอร์</h1>
+        <p class="mt-1 text-sm text-gray-500">
+          ทรัพยากรของ NestJS process ดิสก์ และ PostgreSQL
+        </p>
+      </div>
+      @if (store.lastUpdated(); as updated) {
+        <p class="text-xs text-gray-500">อัปเดตล่าสุด {{ updated | date: 'HH:mm:ss' }} น.</p>
+      }
+    </header>
+
+    @if (store.error(); as error) {
+      <div
+        role="alert"
+        class="flex items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+      >
+        <span>{{ error }}</span>
+        <button
+          type="button"
+          class="rounded-lg px-3 py-1.5 font-semibold hover:bg-red-100"
+          (click)="store.retry()"
+        >
+          ลองใหม่
+        </button>
+      </div>
+    }
+
+    @if (store.loading() && !store.snapshot()) {
+      <div class="grid gap-4 sm:grid-cols-3" aria-hidden="true">
+        @for (item of [1, 2, 3]; track item) {
+          <div class="h-36 animate-pulse rounded-2xl border border-gray-200 bg-white"></div>
+        }
+      </div>
+    } @else if (store.snapshot(); as snapshot) {
+      <section aria-label="ทรัพยากรระบบ" class="grid gap-3 sm:grid-cols-3">
+        <article class="resource-card">
+          <p class="text-xs font-medium text-gray-500">CPU ของ API process</p>
+          <p class="mt-2 text-2xl font-semibold tabular-nums">{{ snapshot.cpu.usedPercent }}%</p>
+          <div class="mt-4 h-1.5 overflow-hidden rounded-full bg-gray-100">
+            <div
+              class="h-full rounded-full"
+              [class]="usageTone(snapshot.cpu.usedPercent)"
+              [style.width.%]="snapshot.cpu.usedPercent"
+            ></div>
+          </div>
+          <p class="mt-2 text-xs text-gray-400">
+            โหลดเฉลี่ย: {{ snapshot.detail.loadAverage.join(' / ') }}
+          </p>
+        </article>
+        <article class="resource-card">
+          <p class="text-xs font-medium text-gray-500">หน่วยความจำของ API process</p>
+          <p class="mt-2 text-2xl font-semibold">{{ snapshot.memory.usedBytes | fileSize }}</p>
+          <div class="mt-4 h-1.5 overflow-hidden rounded-full bg-gray-100">
+            <div
+              class="h-full rounded-full"
+              [class]="usageTone(snapshot.memory.usedPercent)"
+              [style.width.%]="snapshot.memory.usedPercent"
+            ></div>
+          </div>
+          <p class="mt-2 text-xs text-gray-400">
+            {{ snapshot.memory.usedPercent }}% ของขีดจำกัด process/container
+          </p>
+        </article>
+        <article class="resource-card">
+          <p class="text-xs font-medium text-gray-500">พื้นที่ดิสก์</p>
+          @if (snapshot.disk; as disk) {
+            <p class="mt-2 text-2xl font-semibold">{{ disk.usedBytes | fileSize }}</p>
+            <div class="mt-4 h-1.5 overflow-hidden rounded-full bg-gray-100">
+              <div
+                class="h-full rounded-full"
+                [class]="usageTone(disk.usedPercent)"
+                [style.width.%]="disk.usedPercent"
+              ></div>
+            </div>
+            <p class="mt-2 text-xs text-gray-400">
+              {{ disk.usedPercent }}% จาก {{ disk.totalBytes | fileSize }}
+            </p>
+          } @else {
+            <p class="mt-2 text-sm font-medium text-amber-700">ระบบปฏิบัติการไม่เปิดเผยข้อมูลนี้</p>
+          }
+        </article>
+      </section>
+
+      <section class="grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(20rem,0.6fr)]">
+        <article class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+          <h2 class="text-sm font-semibold text-gray-900">ประวัติการใช้ทรัพยากร</h2>
+          <p class="mt-1 text-xs text-gray-500">30 จุดล่าสุด อัปเดตทุก 5 วินาที</p>
+          <div class="mt-5">
+            <app-line-chart
+              [series]="resourceSeries()"
+              [labels]="historyLabels()"
+              [max]="100"
+              [normalize]="false"
+            />
+          </div>
+        </article>
+
+        <article class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+          <h2 class="text-sm font-semibold text-gray-900">การทำงานของ process</h2>
+          <dl class="mt-4 space-y-3 text-sm">
+            <div class="flex justify-between gap-3">
+              <dt class="text-gray-500">ทำงานต่อเนื่อง</dt>
+              <dd class="font-medium">{{ snapshot.detail.uptimeSeconds | uptime }}</dd>
+            </div>
+            <div class="flex justify-between gap-3">
+              <dt class="text-gray-500">รหัส process (PID)</dt>
+              <dd class="font-mono text-xs">{{ snapshot.detail.processId }}</dd>
+            </div>
+            <div class="flex justify-between gap-3">
+              <dt class="text-gray-500">เวลาตอบสนองฐานข้อมูล</dt>
+              <dd class="font-medium">
+                {{
+                  snapshot.database.latencyMs === null
+                    ? 'ไม่พร้อมใช้งาน'
+                    : snapshot.database.latencyMs + ' ms'
+                }}
+              </dd>
+            </div>
+            <div class="flex justify-between gap-3">
+              <dt class="text-gray-500">การเชื่อมต่อฐานข้อมูล</dt>
+              <dd class="font-medium">{{ snapshot.database.activeConnections ?? '—' }}</dd>
+            </div>
+          </dl>
+        </article>
+      </section>
+
+      <section
+        class="rounded-2xl border border-gray-200 bg-white shadow-sm"
+        aria-labelledby="services-heading"
+      >
+        <div class="border-b border-gray-100 px-5 py-4">
+          <h2 id="services-heading" class="text-sm font-semibold text-gray-900">
+            บริการที่ตรวจวัดได้จากแอป
+          </h2>
+          <p class="mt-1 text-xs text-gray-500">
+            แสดงเฉพาะบริการที่ backend ตรวจสอบได้จริง ไม่มีปุ่มสั่ง container โดยจำลอง
+          </p>
+        </div>
+        <ul class="divide-y divide-gray-100">
+          @for (service of snapshot.services; track service.name) {
+            <li
+              class="flex flex-col gap-2 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <div>
+                <p class="text-sm font-medium text-gray-900">{{ service.name }}</p>
+                <p class="mt-1 text-xs text-gray-500">{{ service.detail }}</p>
+              </div>
+              <app-status-badge
+                [label]="serviceStateLabel(service.state)"
+                [tone]="serviceTones[service.state]"
+              />
+            </li>
+          }
+        </ul>
+      </section>
+    }
+  </div>
+</div>

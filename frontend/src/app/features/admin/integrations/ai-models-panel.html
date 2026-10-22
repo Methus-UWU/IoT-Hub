@@ -1,0 +1,159 @@
+<section
+  class="rounded-2xl border border-border bg-surface p-5 sm:p-6"
+  aria-labelledby="ai-models-title"
+>
+  <header class="mb-6">
+    <h2 id="ai-models-title" class="text-sm font-medium text-gray-900">โมเดล AI หลักและสำรอง</h2>
+    <p class="mt-1 text-xs leading-relaxed text-ink-muted">
+      เลือกโมเดลสำหรับผู้ช่วยในโปรเจกต์และผู้ช่วย IoT พร้อมโมเดลสำรองเมื่อบริการไม่พร้อม
+    </p>
+    @if (settings().catalog.stale) {
+      <p class="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+        ดึงแคตตาล็อกจาก OpenRouter ไม่สำเร็จ รายการอาจไม่ครบ
+      </p>
+    }
+  </header>
+
+  <div class="mb-5 rounded-xl bg-surface-soft p-4">
+    <div class="grid gap-3 sm:grid-cols-2">
+      <div class="grid gap-2 text-xs">
+        <span class="font-medium text-ink-muted">ราคา</span>
+        <app-custom-select
+          textWeight="normal"
+          [compact]="true"
+          ariaLabel="กรองราคา"
+          [options]="priceOptions"
+          [value]="priceFilter()"
+          (valueChange)="priceFilter.set($event)"
+        />
+      </div>
+      <div class="grid gap-2 text-xs">
+        <span class="font-medium text-ink-muted">เรียงลำดับ</span>
+        <app-custom-select
+          textWeight="normal"
+          [compact]="true"
+          ariaLabel="เรียงลำดับโมเดล"
+          [options]="sortOptions()"
+          [value]="sort()"
+          (valueChange)="sort.set($event)"
+        />
+      </div>
+    </div>
+    <p class="mt-3 text-xs leading-relaxed text-ink-muted" role="status">
+      {{ options().length }} โมเดล · ราคา USD ต่อ 1 ล้าน tokens (เรียงจากราคาเข้าและออกเฉลี่ย)
+    </p>
+    @if (!settings().catalog.latencyOrder?.length) {
+      <p class="mt-1 text-xs text-ink-muted">ยังไม่มีข้อมูลจัดอันดับ latency</p>
+    } @else if (sort().startsWith('latency')) {
+      <p class="mt-1 text-xs leading-relaxed text-ink-muted">
+        อิงลำดับ latency จาก OpenRouter · มากไปน้อยแสดงลำดับย้อนกลับ
+        ซึ่งอาจรวมโมเดลที่ยังไม่มีค่าที่วัดได้
+      </p>
+    }
+  </div>
+
+  <div class="grid gap-2 text-xs">
+    <span class="font-medium text-gray-700">โมเดลหลัก</span>
+    <app-custom-select
+      textWeight="normal"
+      [compact]="true"
+      ariaLabel="โมเดลหลัก"
+      [searchable]="true"
+      placeholder="พิมพ์ชื่อโมเดล เช่น Gemini, Llama, Qwen"
+      [options]="primaryOptions()"
+      [value]="primary()"
+      [selectedLabel]="primaryLabel()"
+      (valueChange)="setPrimary($event)"
+    />
+    <p class="text-xs text-ink-muted">คลิกเพื่อเลือกหรือพิมพ์ค้นหาโมเดล</p>
+  </div>
+
+  @if (primary()) {
+    <div class="mt-5">
+      <h3 class="text-sm font-medium text-gray-700">
+        โมเดลสำรอง (ตามลำดับ สูงสุด {{ maxFallbacks }} ตัว)
+      </h3>
+      @if (fallbacks().length === 0) {
+        <p class="mt-1 text-xs text-gray-500">ยังไม่มีโมเดลสำรอง</p>
+      } @else {
+        <ol class="mt-2 space-y-2">
+          @for (id of fallbacks(); track id; let index = $index) {
+            <li
+              class="flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-xs"
+            >
+              <span class="font-mono text-xs text-gray-500">{{ index + 1 }}</span>
+              <span class="min-w-0 flex-1 break-all text-gray-800">{{ label(id) }}</span>
+              <button
+                type="button"
+                class="rounded-md border border-border px-2 py-1 text-xs text-ink enabled:hover:bg-surface-soft disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-ink-muted disabled:opacity-40"
+                [disabled]="index === 0"
+                [attr.aria-label]="'เลื่อน ' + id + ' ขึ้น'"
+                (click)="moveFallback(index, -1)"
+              >
+                ↑
+              </button>
+              <button
+                type="button"
+                class="rounded-md border border-border px-2 py-1 text-xs text-ink enabled:hover:bg-surface-soft disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-ink-muted disabled:opacity-40"
+                [disabled]="index === fallbacks().length - 1"
+                [attr.aria-label]="'เลื่อน ' + id + ' ลง'"
+                (click)="moveFallback(index, 1)"
+              >
+                ↓
+              </button>
+              <button
+                type="button"
+                class="rounded-md px-2 py-1 text-xs text-red-700 hover:bg-red-50"
+                [attr.aria-label]="'ลบ ' + id"
+                (click)="removeFallback(index)"
+              >
+                ลบ
+              </button>
+            </li>
+          }
+        </ol>
+      }
+      @if (fallbacks().length < maxFallbacks) {
+        <div class="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]">
+          <app-custom-select
+            textWeight="normal"
+            [compact]="true"
+            ariaLabel="เลือกโมเดลสำรองที่จะเพิ่ม"
+            [searchable]="true"
+            placeholder="พิมพ์ค้นหาโมเดลสำรอง…"
+            [options]="fallbackOptions()"
+            [value]="candidate()"
+            (valueChange)="candidate.set($event)"
+          />
+          <button
+            type="button"
+            class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50"
+            [disabled]="!candidate()"
+            (click)="addFallback()"
+          >
+            เพิ่มเป็นสำรอง
+          </button>
+        </div>
+      }
+    </div>
+  }
+
+  <footer class="mt-6 flex flex-wrap justify-end gap-2 border-t border-border pt-4">
+    <button
+      type="button"
+      class="rounded-lg px-3 py-2 text-xs text-gray-600 hover:bg-gray-50"
+      [disabled]="!dirty() || saving()"
+      (click)="reset()"
+    >
+      ยกเลิก
+    </button>
+    <button
+      type="button"
+      class="rounded-lg bg-gray-900 px-4 py-2 text-xs font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+      [disabled]="!dirty() || saving()"
+      (click)="save()"
+    >
+      {{ saving() ? 'กำลังบันทึก…' : 'บันทึกโมเดล' }}
+    </button>
+  </footer>
+</section>

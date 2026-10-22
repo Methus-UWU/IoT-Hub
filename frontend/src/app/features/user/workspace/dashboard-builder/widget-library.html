@@ -1,0 +1,131 @@
+<aside class="library" aria-label="Widget library">
+  <header class="library-header">
+    <div>
+      <span class="library-kicker">Dashboard</span>
+      <h2>Add widget</h2>
+    </div>
+    <button
+      type="button"
+      class="close-panel"
+      aria-label="Close widget library"
+      (click)="closeRequested.emit()"
+    >
+      <app-dashboard-icon name="close" />
+    </button>
+  </header>
+
+  <div class="search-field">
+    <label class="sr-only" for="widget-search">Search widgets</label>
+    <app-dashboard-icon name="search" />
+    <input
+      id="widget-search"
+      type="search"
+      autocomplete="off"
+      placeholder="Search widgets"
+      [value]="query()"
+      (input)="setQuery($event)"
+    />
+    @if (query()) {
+      <button type="button" aria-label="Clear widget search" (click)="clearQuery()">
+        <app-dashboard-icon name="close" />
+      </button>
+    }
+  </div>
+
+  <div class="library-filters" role="group" aria-label="Filter widget library">
+    <button
+      type="button"
+      [class.filter-active]="isFilterActive('All')"
+      [attr.aria-pressed]="isFilterActive('All')"
+      (click)="selectFilter('All')"
+    >
+      All
+    </button>
+    <button
+      type="button"
+      [class.filter-active]="isFilterActive('Favorites')"
+      [attr.aria-pressed]="isFilterActive('Favorites')"
+      (click)="selectFilter('Favorites')"
+    >
+      <app-dashboard-icon name="star" />
+      Favorites
+    </button>
+  </div>
+
+  <div class="library-scroll">
+    @if (visibleDefinitions().length === 0) {
+      <div class="library-empty">
+        <span><app-dashboard-icon name="search" /></span>
+        <strong>No widgets found</strong>
+        <p>Try a different name or view all widget types.</p>
+        <button type="button" (click)="clearQuery(); selectFilter('All')">Show all widgets</button>
+      </div>
+    } @else {
+      @for (category of availableCategories(); track category) {
+        <section class="widget-group">
+          <button
+            type="button"
+            class="group-heading"
+            [attr.aria-expanded]="!categoryCollapsed(category)"
+            (click)="toggleCategory(category)"
+          >
+            <span>{{ category }}</span>
+            <small>{{ definitionsFor(category).length }}</small>
+            <app-dashboard-icon
+              name="chevron"
+              [class.chevron-open]="!categoryCollapsed(category)"
+            />
+          </button>
+
+          @if (!categoryCollapsed(category)) {
+            <div class="widget-list">
+              @for (definition of definitionsFor(category); track definition.type) {
+                <article class="widget-library-item">
+                  <button
+                    type="button"
+                    class="widget-add-target"
+                    [attr.aria-label]="'Add ' + definition.title + ' widget'"
+                    [attr.title]="'Add ' + definition.title"
+                    (click)="addWidget(definition.type)"
+                  >
+                    <span class="widget-library-icon">
+                      <app-dashboard-icon [name]="definition.icon" />
+                    </span>
+                    <span class="widget-library-copy">
+                      <strong>{{ definition.title }}</strong>
+                      <small>{{ definition.description }}</small>
+                    </span>
+                    <span class="add-indicator" aria-hidden="true">
+                      <app-dashboard-icon name="plus" />
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    class="favorite-button"
+                    [class.favorite-active]="isFavorite(definition.type)"
+                    [attr.aria-label]="
+                      (isFavorite(definition.type) ? 'Remove ' : 'Add ') +
+                      definition.title +
+                      (isFavorite(definition.type) ? ' from favorites' : ' to favorites')
+                    "
+                    [attr.aria-pressed]="isFavorite(definition.type)"
+                    (click)="toggleFavorite($event, definition.type)"
+                  >
+                    <app-dashboard-icon
+                      [name]="isFavorite(definition.type) ? 'star-filled' : 'star'"
+                    />
+                  </button>
+                </article>
+              }
+            </div>
+          }
+        </section>
+      }
+    }
+  </div>
+
+  <footer class="library-footer">
+    <app-dashboard-icon name="plus" />
+    <span>Select a widget to add it to the dashboard.</span>
+  </footer>
+</aside>

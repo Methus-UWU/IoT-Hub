@@ -1,0 +1,84 @@
+<section class="crop-editor" aria-labelledby="crop-heading">
+  <header class="section-heading">
+    <h3 id="crop-heading">ปรับรูปโปรไฟล์</h3>
+    <p id="crop-help" class="settings-help">
+      ลากรูปเพื่อจัดตำแหน่ง หรือใช้แถบเลื่อนด้านล่าง รูปในกรอบคือตัวอย่างที่จะบันทึก
+    </p>
+  </header>
+  <div class="crop-layout">
+    <div
+      class="crop-frame"
+      (pointerdown)="startDrag($event)"
+      (pointermove)="moveDrag($event)"
+      (pointerup)="endDrag()"
+      (pointercancel)="endDrag()"
+      (lostpointercapture)="endDrag()"
+    >
+      <canvas
+        #canvas
+        width="256"
+        height="256"
+        role="img"
+        aria-label="ตัวอย่างรูปโปรไฟล์หลังครอป"
+        aria-describedby="crop-help"
+      ></canvas>
+      <div class="crop-grid" aria-hidden="true"></div>
+    </div>
+    <fieldset class="crop-controls" [disabled]="disabled()">
+      <legend class="sr-only">ตำแหน่งและขนาดรูป</legend>
+      <label for="avatar-zoom"
+        >ซูม <span>{{ zoomLabel() }}</span></label
+      >
+      <input
+        id="avatar-zoom"
+        #zoomInput
+        type="range"
+        min="1"
+        max="3"
+        step="0.01"
+        [value]="zoom()"
+        (input)="adjust('zoom', $event)"
+      />
+      <label for="avatar-horizontal">ตำแหน่งแนวนอน</label>
+      <input
+        id="avatar-horizontal"
+        type="range"
+        min="0"
+        max="100"
+        step="1"
+        [value]="horizontal()"
+        (input)="adjust('horizontal', $event)"
+      />
+      <label for="avatar-vertical">ตำแหน่งแนวตั้ง</label>
+      <input
+        id="avatar-vertical"
+        type="range"
+        min="0"
+        max="100"
+        step="1"
+        [value]="vertical()"
+        (input)="adjust('vertical', $event)"
+      />
+      <button type="button" class="settings-button secondary" (click)="reset()">
+        คืนค่าการครอป
+      </button>
+    </fieldset>
+  </div>
+  @if (error()) {
+    <p class="settings-error" role="alert">{{ error() }}</p>
+  }
+  <footer class="settings-footer">
+    <p class="settings-help">รูปสี่เหลี่ยม · 256 × 256 พิกเซล</p>
+    <button
+      type="button"
+      class="settings-button secondary"
+      [disabled]="disabled()"
+      (click)="cancelled.emit()"
+    >
+      ยกเลิก
+    </button>
+    <button type="button" class="settings-button" [disabled]="disabled()" (click)="confirm()">
+      {{ disabled() ? 'กำลังบันทึก…' : 'บันทึกรูป' }}
+    </button>
+  </footer>
+</section>

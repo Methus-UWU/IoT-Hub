@@ -1,0 +1,12 @@
+{
+  "devices": [
+    { "instanceId": "board", "deviceId": "esp32-devkit-v1" },
+    { "instanceId": "sensor", "deviceId": "ir-obstacle" },
+    { "instanceId": "display", "deviceId": "tm1637-display" }
+  ],
+  "wires": [
+    ["board", "3V3", "sensor", "VCC"], ["board", "GND-L", "sensor", "GND"], ["board", "GPIO27", "sensor", "OUT"],
+    ["board", "VIN", "display", "VCC"], ["board", "GND-L", "display", "GND"],
+    ["board", "GPIO18", "display", "CLK"], ["board", "GPIO19", "display", "DIO"]
+  ]
+}

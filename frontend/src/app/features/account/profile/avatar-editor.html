@@ -1,0 +1,63 @@
+<div class="avatar-editor">
+  <span class="profile-avatar"><app-account-avatar [initials]="initials()" /></span>
+  <div class="avatar-actions">
+    <h3>รูปโปรไฟล์</h3>
+    <p class="settings-help">JPG, PNG หรือ WebP ไม่เกิน 5 MB · เลื่อนและซูมรูปก่อนบันทึกได้</p>
+    <input
+      #fileInput
+      type="file"
+      accept="image/jpeg,image/png,image/webp"
+      class="sr-only"
+      tabindex="-1"
+      aria-label="เลือกรูปโปรไฟล์"
+      [disabled]="preparing() || avatar.busy()"
+      (change)="choose($event)"
+    />
+    <div class="avatar-buttons">
+      <button
+        #chooseButton
+        type="button"
+        class="settings-button secondary"
+        [disabled]="preparing() || avatar.busy()"
+        (click)="fileInput.click()"
+      >
+        {{ preparing() ? 'กำลังเตรียมรูป…' : 'เปลี่ยนรูปโปรไฟล์' }}
+      </button>
+      @if (avatar.url() && !image()) {
+        <button
+          type="button"
+          class="settings-button secondary"
+          [disabled]="preparing() || avatar.busy()"
+          (click)="edit()"
+        >
+          ปรับครอปรูปเดิม
+        </button>
+        <button
+          type="button"
+          class="settings-button text-button"
+          [disabled]="preparing() || avatar.busy()"
+          (click)="remove()"
+        >
+          {{ avatar.busy() ? 'กำลังลบ…' : 'ลบรูป' }}
+        </button>
+      }
+    </div>
+    @if (avatar.loadError()) {
+      <p class="settings-help" role="status">โหลดรูปเดิมไม่ได้ คุณยังเลือกรูปใหม่ได้</p>
+    }
+    @if (error()) {
+      <p class="settings-error" role="alert">{{ error() }}</p>
+    }
+    @if (success()) {
+      <p class="settings-help" role="status">{{ success() }}</p>
+    }
+  </div>
+</div>
+@if (image(); as bitmap) {
+  <app-avatar-cropper
+    [image]="bitmap"
+    [busy]="avatar.busy()"
+    (confirmed)="save($event)"
+    (cancelled)="cancelCrop()"
+  />
+}

@@ -1,0 +1,13 @@
+{
+  "devices": [
+    { "instanceId": "board", "deviceId": "esp32-devkit-v1" },
+    { "instanceId": "rtc", "deviceId": "rtc-ds1307" },
+    { "instanceId": "display", "deviceId": "tm1637-display" }
+  ],
+  "wires": [
+    ["board", "VIN", "rtc", "VCC"], ["board", "GND-L", "rtc", "GND"],
+    ["board", "GPIO21", "rtc", "SDA"], ["board", "GPIO22", "rtc", "SCL"],
+    ["board", "VIN", "display", "VCC"], ["board", "GND-L", "display", "GND"],
+    ["board", "GPIO18", "display", "CLK"], ["board", "GPIO19", "display", "DIO"]
+  ]
+}

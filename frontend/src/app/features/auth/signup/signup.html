@@ -1,0 +1,406 @@
+<div
+  class="rounded-3xl border border-gray-100 bg-white/80 p-8 shadow-xl shadow-gray-900/5 ring-1 ring-gray-900/5 backdrop-blur-xl"
+>
+  <div class="mb-5 flex flex-col items-center text-center">
+    <div
+      class="mb-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-linear-to-br from-primary to-primary-dark shadow-lg shadow-primary/30"
+    >
+      <svg viewBox="0 0 24 24" fill="none" class="h-4.5 w-4.5 text-white" aria-hidden="true">
+        <circle cx="9" cy="8.5" r="3.2" stroke="currentColor" stroke-width="1.7" />
+        <path
+          d="M3 19c0-3.31 2.69-6 6-6s6 2.69 6 6"
+          stroke="currentColor"
+          stroke-width="1.7"
+          stroke-linecap="round"
+        />
+        <path d="M18 8v6M15 11h6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
+      </svg>
+    </div>
+    <h1 class="text-xl font-semibold tracking-tight text-gray-900">สมัครสมาชิก</h1>
+    <p class="mt-1.5 text-sm text-gray-500">เข้าร่วมแพลตฟอร์มเพื่อจัดการระบบ IoT</p>
+  </div>
+
+  <form class="space-y-4" novalidate (submit)="$event.preventDefault(); onSubmit()">
+    <div class="space-y-1.5">
+      <label for="username" class="ml-1 text-xs font-semibold text-gray-700">ชื่อผู้ใช้งาน</label>
+      <div class="group relative">
+        <span
+          class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-gray-400 group-focus-within:text-primary"
+        >
+          <svg viewBox="0 0 24 24" fill="none" class="h-5 w-5" aria-hidden="true">
+            <circle cx="12" cy="8" r="3.2" stroke="currentColor" stroke-width="1.6" />
+            <path
+              d="M5 20c0-3.87 3.13-7 7-7s7 3.13 7 7"
+              stroke="currentColor"
+              stroke-width="1.6"
+              stroke-linecap="round"
+            />
+          </svg>
+        </span>
+        <input
+          [formField]="signupForm.username"
+          id="username"
+          type="text"
+          autocomplete="username"
+          placeholder="กรอกชื่อผู้ใช้งาน"
+          class="h-11 w-full rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-10 text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all focus:border-primary focus:bg-white focus:ring-4 focus:ring-primary/10"
+          [attr.aria-invalid]="
+            signupForm.username().touched() && signupForm.username().invalid() ? true : null
+          "
+          [attr.aria-describedby]="
+            signupForm.username().touched() && signupForm.username().invalid()
+              ? 'username-error'
+              : null
+          "
+        />
+        <span class="absolute inset-y-0 right-3 flex items-center">
+          @switch (fieldCheckStatus(signupForm.username())) {
+            @case ('checking') {
+              <span
+                class="block h-5 w-5 animate-spin rounded-full border-2 border-gray-300 border-t-gray-500"
+                role="status"
+                aria-label="กำลังตรวจสอบชื่อผู้ใช้งาน"
+              ></span>
+            }
+            @case ('valid') {
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                class="h-5 w-5 text-emerald-500"
+                aria-hidden="true"
+              >
+                <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6" />
+                <path
+                  d="m8 12.5 2.5 2.5L16 9.5"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            }
+            @case ('invalid') {
+              <svg viewBox="0 0 24 24" fill="none" class="h-5 w-5 text-error" aria-hidden="true">
+                <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6" />
+                <path
+                  d="m9.5 9.5 5 5m0-5-5 5"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                  stroke-linecap="round"
+                />
+              </svg>
+            }
+          }
+        </span>
+      </div>
+      @if (signupForm.username().touched() && signupForm.username().invalid()) {
+        <app-field-error
+          id="username-error"
+          [message]="signupForm.username().errors()[0]?.message ?? ''"
+        />
+      }
+    </div>
+
+    <div class="space-y-1.5">
+      <label for="email" class="ml-1 text-xs font-semibold text-gray-700">อีเมล</label>
+      <div class="group relative">
+        <span
+          class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-gray-400 group-focus-within:text-primary"
+        >
+          <svg viewBox="0 0 24 24" fill="none" class="h-5 w-5" aria-hidden="true">
+            <rect
+              x="3.5"
+              y="5.5"
+              width="17"
+              height="13"
+              rx="2"
+              stroke="currentColor"
+              stroke-width="1.6"
+            />
+            <path
+              d="m4.5 7 7.5 6 7.5-6"
+              stroke="currentColor"
+              stroke-width="1.6"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </span>
+        <input
+          [formField]="signupForm.email"
+          id="email"
+          type="email"
+          autocomplete="email"
+          placeholder="กรอกอีเมลของคุณ"
+          class="h-11 w-full rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-10 text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all focus:border-primary focus:bg-white focus:ring-4 focus:ring-primary/10"
+          [attr.aria-invalid]="
+            signupForm.email().touched() && signupForm.email().invalid() ? true : null
+          "
+          [attr.aria-describedby]="
+            signupForm.email().touched() && signupForm.email().invalid() ? 'email-error' : null
+          "
+        />
+        <span class="absolute inset-y-0 right-3 flex items-center">
+          @switch (fieldCheckStatus(signupForm.email())) {
+            @case ('checking') {
+              <span
+                class="block h-5 w-5 animate-spin rounded-full border-2 border-gray-300 border-t-gray-500"
+                role="status"
+                aria-label="กำลังตรวจสอบอีเมล"
+              ></span>
+            }
+            @case ('valid') {
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                class="h-5 w-5 text-emerald-500"
+                aria-hidden="true"
+              >
+                <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6" />
+                <path
+                  d="m8 12.5 2.5 2.5L16 9.5"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            }
+            @case ('invalid') {
+              <svg viewBox="0 0 24 24" fill="none" class="h-5 w-5 text-error" aria-hidden="true">
+                <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6" />
+                <path
+                  d="m9.5 9.5 5 5m0-5-5 5"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                  stroke-linecap="round"
+                />
+              </svg>
+            }
+          }
+        </span>
+      </div>
+      @if (signupForm.email().touched() && signupForm.email().invalid()) {
+        <app-field-error
+          id="email-error"
+          [message]="signupForm.email().errors()[0]?.message ?? ''"
+        />
+      }
+    </div>
+
+    <div class="space-y-1.5">
+      <label for="password" class="ml-1 text-xs font-semibold text-gray-700">รหัสผ่าน</label>
+      <div class="group relative">
+        <span
+          class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-gray-400 group-focus-within:text-primary"
+        >
+          <svg viewBox="0 0 24 24" fill="none" class="h-5 w-5" aria-hidden="true">
+            <path
+              d="M6 11V8a6 6 0 1 1 12 0v3M5 11h14v9a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-9Z"
+              stroke="currentColor"
+              stroke-width="1.6"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </span>
+        <input
+          [formField]="signupForm.password"
+          id="password"
+          [type]="showPassword() ? 'text' : 'password'"
+          autocomplete="new-password"
+          placeholder="••••••••"
+          (focus)="showPasswordRules()"
+          class="h-11 w-full rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-10 text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all focus:border-primary focus:bg-white focus:ring-4 focus:ring-primary/10"
+          [attr.aria-invalid]="
+            signupForm.password().touched() && signupForm.password().invalid() ? true : null
+          "
+        />
+        <button
+          type="button"
+          (mousedown)="$event.preventDefault()"
+          (click)="togglePasswordVisibility()"
+          class="absolute inset-y-0 right-0 flex items-center pr-3.5 text-gray-400 outline-none transition-colors hover:text-gray-600"
+          [attr.aria-label]="showPassword() ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'"
+          [attr.aria-pressed]="showPassword()"
+        >
+          @if (showPassword()) {
+            <svg viewBox="0 0 24 24" fill="none" class="h-5 w-5" aria-hidden="true">
+              <path
+                d="m3 3 18 18M10.6 10.6a2 2 0 0 0 2.8 2.8M9.4 5.5A10.6 10.6 0 0 1 12 5c5 0 9 4 10 7a12.6 12.6 0 0 1-3 4.1M6.3 6.9A12.9 12.9 0 0 0 2 12c1 3 5 7 10 7 1.4 0 2.7-.3 3.9-.8"
+                stroke="currentColor"
+                stroke-width="1.6"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          } @else {
+            <svg viewBox="0 0 24 24" fill="none" class="h-5 w-5" aria-hidden="true">
+              <path
+                d="M2 12c1-3 5-7 10-7s9 4 10 7c-1 3-5 7-10 7s-9-4-10-7Z"
+                stroke="currentColor"
+                stroke-width="1.6"
+                stroke-linejoin="round"
+              />
+              <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.6" />
+            </svg>
+          }
+        </button>
+      </div>
+    </div>
+
+    <div class="space-y-1.5">
+      <label for="confirmPassword" class="ml-1 text-xs font-semibold text-gray-700"
+        >ยืนยันรหัสผ่าน</label
+      >
+      <div class="group relative">
+        <span
+          class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-gray-400 group-focus-within:text-primary"
+        >
+          <svg viewBox="0 0 24 24" fill="none" class="h-5 w-5" aria-hidden="true">
+            <path
+              d="M6 11V8a6 6 0 0 1 11.3-2.8"
+              stroke="currentColor"
+              stroke-width="1.6"
+              stroke-linecap="round"
+            />
+            <path
+              d="M17.3 3v3.5h-3.5"
+              stroke="currentColor"
+              stroke-width="1.6"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+            <path
+              d="M5 11h14v9a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-9Z"
+              stroke="currentColor"
+              stroke-width="1.6"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </span>
+        <input
+          [formField]="signupForm.confirmPassword"
+          id="confirmPassword"
+          [type]="showConfirmPassword() ? 'text' : 'password'"
+          autocomplete="new-password"
+          placeholder="••••••••"
+          (focus)="showPasswordRules()"
+          class="h-11 w-full rounded-xl border border-gray-200 bg-gray-50 pl-10 pr-10 text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all focus:border-primary focus:bg-white focus:ring-4 focus:ring-primary/10"
+          [attr.aria-invalid]="
+            signupForm.confirmPassword().touched() && signupForm.confirmPassword().invalid()
+              ? true
+              : null
+          "
+        />
+        <button
+          type="button"
+          (mousedown)="$event.preventDefault()"
+          (click)="toggleConfirmPasswordVisibility()"
+          class="absolute inset-y-0 right-0 flex items-center pr-3.5 text-gray-400 outline-none transition-colors hover:text-gray-600"
+          [attr.aria-label]="showConfirmPassword() ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'"
+          [attr.aria-pressed]="showConfirmPassword()"
+        >
+          @if (showConfirmPassword()) {
+            <svg viewBox="0 0 24 24" fill="none" class="h-5 w-5" aria-hidden="true">
+              <path
+                d="m3 3 18 18M10.6 10.6a2 2 0 0 0 2.8 2.8M9.4 5.5A10.6 10.6 0 0 1 12 5c5 0 9 4 10 7a12.6 12.6 0 0 1-3 4.1M6.3 6.9A12.9 12.9 0 0 0 2 12c1 3 5 7 10 7 1.4 0 2.7-.3 3.9-.8"
+                stroke="currentColor"
+                stroke-width="1.6"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          } @else {
+            <svg viewBox="0 0 24 24" fill="none" class="h-5 w-5" aria-hidden="true">
+              <path
+                d="M2 12c1-3 5-7 10-7s9 4 10 7c-1 3-5 7-10 7s-9-4-10-7Z"
+                stroke="currentColor"
+                stroke-width="1.6"
+                stroke-linejoin="round"
+              />
+              <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.6" />
+            </svg>
+          }
+        </button>
+      </div>
+    </div>
+
+    @if (passwordRulesVisible()) {
+      <div class="grid grid-cols-2 gap-x-3 gap-y-2 px-1">
+        @for (rule of passwordRules(); track rule.label) {
+          <div class="flex items-center gap-2 text-[13px]">
+            @switch (rule.status) {
+              @case ('valid') {
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  class="h-3.5 w-3.5 shrink-0 text-emerald-500"
+                  aria-hidden="true"
+                >
+                  <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8" />
+                  <path
+                    d="m8 12.5 2.5 2.5L16 9.5"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+                <p class="text-[10px] font-medium leading-none text-emerald-500">
+                  {{ rule.label }}
+                </p>
+              }
+              @case ('invalid') {
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  class="h-3.5 w-3.5 shrink-0 text-error"
+                  aria-hidden="true"
+                >
+                  <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8" />
+                  <path
+                    d="M12 8v5M12 16h.01"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                  />
+                </svg>
+                <p class="text-[10px] font-medium leading-none text-error">{{ rule.label }}</p>
+              }
+              @default {
+                <span
+                  class="block h-1.5 w-1.5 shrink-0 rounded-full bg-gray-300"
+                  aria-hidden="true"
+                ></span>
+                <p class="text-[10px] font-medium leading-none text-gray-400">{{ rule.label }}</p>
+              }
+            }
+          </div>
+        }
+      </div>
+    }
+
+    @if (submitError(); as message) {
+      <app-field-error role="alert" [message]="message" />
+    }
+
+    <button
+      type="submit"
+      [disabled]="submitting() || signupForm().invalid()"
+      class="mt-2 h-11 w-full rounded-xl bg-linear-to-r from-primary to-primary-dark text-sm font-semibold text-white shadow-lg shadow-primary/25 transition-colors enabled:hover:from-primary/90 enabled:hover:to-primary-dark/90 focus-visible:outline focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none"
+    >
+      {{ submitting() ? 'กำลังสร้างบัญชี...' : 'สมัครสมาชิก' }}
+    </button>
+  </form>
+
+  <p class="mt-6 text-center text-xs text-gray-500">
+    มีบัญชีอยู่แล้ว?
+    <a
+      routerLink="/auth/login"
+      class="ml-1 font-semibold text-primary hover:text-primary/80 hover:underline"
+      >เข้าสู่ระบบ</a
+    >
+  </p>
+</div>

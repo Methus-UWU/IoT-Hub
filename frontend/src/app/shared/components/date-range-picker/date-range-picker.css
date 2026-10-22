@@ -1,0 +1,219 @@
+.date-trigger {
+  display: flex;
+  width: 100%;
+  min-height: 2.5rem;
+  align-items: center;
+  gap: 0.625rem;
+  border: 1px solid #e1e1e1;
+  border-radius: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  color: #545454;
+  background: #ffffff;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  transition: 140ms ease;
+}
+
+.date-trigger:hover,
+.date-trigger[aria-expanded='true'] {
+  border-color: #afafaf;
+  color: #2b2b2b;
+}
+
+.date-trigger:focus-visible,
+.nav-button:focus-visible,
+.day-button:focus-visible,
+.clear-button:focus-visible,
+.apply-button:focus-visible {
+  outline: 2px solid rgb(175 175 175 / 0.5);
+  outline-offset: 2px;
+}
+
+.date-panel {
+  position: absolute;
+  z-index: 60;
+  top: calc(100% + 0.375rem);
+  right: 0;
+  width: 19.5rem;
+  max-width: calc(100vw - 1.5rem);
+  border: 1px solid #e1e1e1;
+  border-radius: 0.875rem;
+  padding: 0.75rem;
+  color: #2b2b2b;
+  background: #ffffff;
+  box-shadow: 0 14px 36px rgb(43 43 43 / 0.12);
+}
+
+.range-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.375rem;
+  border-radius: 0.625rem;
+  padding: 0.55rem 0.625rem;
+  background: #f5f5f5;
+}
+
+.range-summary span,
+.range-summary strong {
+  display: block;
+}
+
+.range-summary span {
+  color: #808080;
+  font-size: 0.5625rem;
+  font-weight: 600;
+}
+
+.range-summary strong {
+  margin-top: 0.125rem;
+  overflow: hidden;
+  color: #2b2b2b;
+  font-size: 0.625rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.calendar-header {
+  display: grid;
+  grid-template-columns: 2rem 1fr 2rem;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.625rem;
+}
+
+.calendar-header p {
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.nav-button {
+  display: grid;
+  width: 1.75rem;
+  height: 1.75rem;
+  place-items: center;
+  border-radius: 0.45rem;
+  color: #808080;
+}
+
+.nav-button:hover {
+  color: #2b2b2b;
+  background: #f1f1f1;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.0625rem;
+  margin-top: 0.3rem;
+}
+
+.weekday {
+  display: grid;
+  height: 1.35rem;
+  place-items: center;
+  color: #afafaf;
+  font-size: 0.5625rem;
+  font-weight: 700;
+}
+
+.day-button {
+  position: relative;
+  display: grid;
+  height: 1.95rem;
+  min-width: 0;
+  place-items: center;
+  border-radius: 0.45rem;
+  color: #545454;
+  font-size: 0.625rem;
+  font-weight: 600;
+}
+
+.day-button:hover {
+  color: #2b2b2b;
+  background: #f1f1f1;
+}
+
+.day-outside {
+  color: #c8c8c8;
+}
+
+.day-in-range {
+  border-radius: 0;
+  color: #2b2b2b;
+  background: #f1f1f1;
+}
+
+.day-selected,
+.day-selected:hover {
+  border-radius: 0.45rem;
+  color: #ffffff;
+  background: #2b2b2b;
+}
+
+.day-today:not(.day-selected)::after {
+  position: absolute;
+  bottom: 0.18rem;
+  width: 0.2rem;
+  height: 0.2rem;
+  border-radius: 999px;
+  background: #808080;
+  content: '';
+}
+
+.selection-hint {
+  min-height: 0.875rem;
+  margin-top: 0.25rem;
+  color: #808080;
+  font-size: 0.625rem;
+  text-align: center;
+}
+
+.panel-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid #e1e1e1;
+}
+
+.clear-button,
+.apply-button {
+  min-height: 1.875rem;
+  border-radius: 0.5rem;
+  padding-inline: 0.625rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+
+.clear-button {
+  color: #808080;
+}
+
+.clear-button:hover {
+  color: #2b2b2b;
+  background: #f5f5f5;
+}
+
+.apply-button {
+  color: #ffffff;
+  background: #2b2b2b;
+}
+
+.apply-button:hover {
+  background: #545454;
+}
+
+.apply-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .date-trigger {
+    transition: none;
+  }
+}

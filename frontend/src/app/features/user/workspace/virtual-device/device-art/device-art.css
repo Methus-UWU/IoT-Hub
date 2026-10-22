@@ -1,0 +1,29 @@
+/*
+ * Artwork styling.
+ *
+ * Almost nothing lives here: a part's colours come from its own shape list, so
+ * the drawing looks identical wherever it is rendered and does not depend on a
+ * stylesheet travelling with it. Only the caption — which is chrome, not part of
+ * the component — is styled in CSS, because it is the one thing that should
+ * follow the page rather than the hardware.
+ */
+
+:host * {
+  /* Stroke widths are authored in millimetres; scaling them with the zoom is
+     the point, so this must stay off. */
+  vector-effect: none;
+}
+
+.device-caption {
+  fill: #4b5563;
+  stroke: #f5f5f5;
+  stroke-width: 3px;
+  paint-order: stroke fill;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+:host-context(.theme-dark) .device-caption {
+  fill: #cbd5e1;
+  stroke: #111827;
+}
