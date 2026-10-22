@@ -1,0 +1,813 @@
+// Schema source of truth — see docs/adr/ADR-001-database-access.md.
+//
+// Prisma owns the `public` schema only. Supabase owns `auth`, `storage`, and
+// `realtime`; Prisma must never see them, or `migrate` will propose dropping them.
+//
+// RLS policies, functions, and triggers cannot be expressed here. They live as raw
+// SQL inside the migration files, and every migration that adds a table needing a
+// policy adds the policy in the same migration.
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+  schemas  = ["public"]
+}
+
+/// Platform-wide role, distinct from a per-workspace role. Used only to gate the
+/// admin console.
+model Role {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  users User[]
+
+  @@map("roles")
+  @@schema("public")
+}
+
+/// Application profile for a Supabase Auth user.
+///
+/// `id` is the same uuid as `auth.users.id`. The foreign key and the trigger that
+/// creates this row on sign-up live in SQL, because Prisma cannot reference another
+/// schema without the multiSchema preview and must not manage Supabase's tables.
+///
+/// There is deliberately no password column: Supabase Auth owns credentials.
+model User {
+  id          String   @id @db.Uuid
+  username    String   @unique
+  displayName String?  @map("display_name") @db.VarChar(60)
+  bio         String?  @db.VarChar(280)
+  email       String   @unique
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  roleId String @map("role_id") @db.Uuid
+  role   Role   @relation(fields: [roleId], references: [id])
+
+  memberships     WorkspaceMember[]
+  subscription    UserSubscription?
+  ownedWorkspaces Workspace[]       @relation("WorkspaceOwner")
+
+  communityPosts    CommunityPost[]
+  communityComments CommunityComment[]
+  communityVotes    CommunityVote[]
+
+  loginEvents   LoginEvent[]
+  searchHistory SearchHistoryEntry[]
+  buildJobs     BuildJob[]
+
+  dashboardTemplates        DashboardTemplate[]
+  dashboardTemplateVersions DashboardTemplateVersion[]
+
+  aiProfiles       AiProfile[]
+  aiConversations  AiConversation[]
+  devicesCreated   Device[]
+  aiCreditOverride AiCreditOverride?
+  aiUsageEvents    AiUsageEvent[]
+
+  @@index([roleId])
+  @@map("users")
+  @@schema("public")
+}
+
+/// Ownership boundary for every user-owned resource.
+model Workspace {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  ownerId String @map("owner_id") @db.Uuid
+  owner   User   @relation("WorkspaceOwner", fields: [ownerId], references: [id])
+
+  members            WorkspaceMember[]
+  projects           Project[]
+  dashboardTemplates DashboardTemplate[]
+
+  @@index([ownerId])
+  @@map("workspaces")
+  @@schema("public")
+}
+
+/// Explicit membership. Authorization reads this, never a role claim on a token.
+model WorkspaceMember {
+  id        String   @id @default(uuid()) @db.Uuid
+  role      String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  workspaceId String    @map("workspace_id") @db.Uuid
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
+  @@map("workspace_members")
+  @@schema("public")
+}
+
+/// A user project inside a workspace. Ownership is the workspace's, so access is
+/// resolved by membership rather than by any field on this row.
+model Project {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String
+  slug        String
+  description String   @default("")
+  board       String   @default("")
+  framework   String   @default("")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  workspaceId String    @map("workspace_id") @db.Uuid
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  files       ProjectFile[]
+  components  ProjectComponent[]
+  connections ProjectConnection[]
+  buildJobs   BuildJob[]
+  datastreams ProjectDatastream[]
+  dashboard   ProjectDashboard?
+
+  aiConversations AiConversation[]
+  devices         Device[]
+
+  @@unique([workspaceId, slug])
+  @@index([workspaceId])
+  @@map("projects")
+  @@schema("public")
+}
+
+/// One row per file. The project source tree is never a single JSON document, so a
+/// save touches only the file that changed.
+model ProjectFile {
+  id          String   @id @default(uuid()) @db.Uuid
+  path        String
+  content     String
+  contentHash String   @map("content_hash")
+  sizeBytes   Int      @map("size_bytes")
+  /// Optimistic concurrency: a write states the version it read.
+  version     Int      @default(1)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  projectId String  @map("project_id") @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, path])
+  @@index([projectId])
+  @@map("project_files")
+  @@schema("public")
+}
+
+/// A subscription tier. Limits live in PlanLimit rows so adjusting one is a data
+/// change rather than a deploy.
+model Plan {
+  id        String   @id @default(uuid()) @db.Uuid
+  code      String   @unique
+  name      String
+  rank      Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  limits        PlanLimit[]
+  subscriptions UserSubscription[]
+
+  @@map("plans")
+  @@schema("public")
+}
+
+/// One ceiling for one plan. A value of -1 means unlimited.
+model PlanLimit {
+  id        String   @id @default(uuid()) @db.Uuid
+  key       String
+  value     Int
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  planId String @map("plan_id") @db.Uuid
+  plan   Plan   @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, key])
+  @@map("plan_limits")
+  @@schema("public")
+}
+
+/// Which plan a user is on. Exactly one row per user, assigned at sign-up.
+model UserSubscription {
+  id        String   @id @default(uuid()) @db.Uuid
+  status    String   @default("active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  userId String @unique @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  planId String @map("plan_id") @db.Uuid
+  plan   Plan   @relation(fields: [planId], references: [id])
+
+  @@index([planId])
+  @@map("user_subscriptions")
+  @@schema("public")
+}
+
+/// One component placed in a project.
+///
+/// The catalog definition (what an ESP32 is) lives in code and is shared by every
+/// project; this row is only where a particular one sits in a particular project.
+model ProjectComponent {
+  id           String   @id @default(uuid()) @db.Uuid
+  /// Catalog key, e.g. "esp32-devkit-v1". Not a relation: the catalog is code.
+  definitionId String   @map("definition_id")
+  label        String   @default("")
+  x            Float    @default(0)
+  y            Float    @default(0)
+  rotation     Int      @default(0)
+  /// Property overrides only; defaults come from the definition.
+  state        Json     @default("{}")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  projectId String  @map("project_id") @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  outgoing    ProjectConnection[] @relation("ConnectionFrom")
+  incoming    ProjectConnection[] @relation("ConnectionTo")
+  datastreams ProjectDatastream[]
+
+  @@index([projectId])
+  @@map("project_components")
+  @@schema("public")
+}
+
+/// A wire between two component pins.
+///
+/// Endpoints are pins, never coordinates, so moving a component preserves its
+/// wires. Only hand-placed bends are stored; the rest of the path is routed at
+/// render time.
+model ProjectConnection {
+  id        String   @id @default(uuid()) @db.Uuid
+  fromPinId String   @map("from_pin_id")
+  toPinId   String   @map("to_pin_id")
+  color     String   @default("#2563eb")
+  kind      String   @default("signal")
+  waypoints Json     @default("[]")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  projectId String  @map("project_id") @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  fromComponentId String           @map("from_component_id") @db.Uuid
+  fromComponent   ProjectComponent @relation("ConnectionFrom", fields: [fromComponentId], references: [id], onDelete: Cascade)
+
+  toComponentId String           @map("to_component_id") @db.Uuid
+  toComponent   ProjectComponent @relation("ConnectionTo", fields: [toComponentId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([fromComponentId])
+  @@index([toComponentId])
+  @@map("project_connections")
+  @@schema("public")
+}
+
+/// One firmware build of a project, from queue to result.
+///
+/// `source` is the snapshot taken when the build was requested, so the worker
+/// compiles exactly what the user saw rather than whatever autosave wrote later.
+/// It is cleared once the build finishes. See docs/adr/ADR-002-build-isolation.md.
+model BuildJob {
+  id             String    @id @default(uuid()) @db.Uuid
+  status         String    @default("queued")
+  /// Board catalog id, e.g. "esp32-devkit-v1".
+  boardId        String    @map("board_id")
+  platform       String
+  platformBoard  String    @map("platform_board")
+  source         Json?
+  sourceHash     String    @map("source_hash")
+  failureReason  String?   @map("failure_reason")
+  log            String    @default("")
+  durationMs     Int?      @map("duration_ms")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  startedAt      DateTime? @map("started_at")
+  finishedAt     DateTime? @map("finished_at")
+  leaseExpiresAt DateTime? @map("lease_expires_at")
+
+  projectId String  @map("project_id") @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  /// Nullable so deleting an account does not erase the project's build history.
+  requestedBy String? @map("requested_by") @db.Uuid
+  requester   User?   @relation(fields: [requestedBy], references: [id], onDelete: SetNull)
+
+  artifacts BuildArtifact[]
+
+  @@index([projectId, createdAt(sort: Desc)])
+  @@index([requestedBy, createdAt])
+  @@index([status, createdAt])
+  @@map("build_jobs")
+  @@schema("public")
+}
+
+/// A flashable image produced by a successful build.
+///
+/// Images are a few hundred kilobytes to about 1.5 MB and only the newest
+/// successful build of each project keeps them, so they live in Postgres, where
+/// they cascade with the project, rather than in Storage, where they would not.
+model BuildArtifact {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String
+  /// Flash address for ESP32 images; null for an AVR hex file, which carries its own.
+  flashOffset Int?     @map("flash_offset")
+  sizeBytes   Int      @map("size_bytes")
+  sha256      String
+  content     Bytes
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  buildJobId String   @map("build_job_id") @db.Uuid
+  buildJob   BuildJob @relation(fields: [buildJobId], references: [id], onDelete: Cascade)
+
+  @@unique([buildJobId, name])
+  @@map("build_artifacts")
+  @@schema("public")
+}
+
+/// A curated tag for community posts.
+///
+/// Tags are a catalog rather than free text: an open tag space fills with
+/// near-duplicates and spam, and moderating it later is far more work than
+/// seeding it now. New tags are added by a migration, not by a post.
+model CommunityTag {
+  id          String   @id @default(uuid()) @db.Uuid
+  slug        String   @unique
+  name        String
+  description String   @default("")
+  /// Denormalised; maintained by a trigger, see the community migration.
+  postCount   Int      @default(0) @map("post_count")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  posts CommunityPostTag[]
+
+  @@map("community_tags")
+  @@schema("public")
+}
+
+/// A question, discussion, or showcase in the community feed.
+///
+/// `score`, `commentCount`, and `postCount` on tags are denormalised counters kept
+/// by database triggers. The feed sorts and paginates on them, and recomputing an
+/// aggregate per row would make the first page cost a full scan of every vote.
+model CommunityPost {
+  id             String   @id @default(uuid()) @db.Uuid
+  kind           String   @default("question")
+  title          String
+  /// Unicode-safe, derived from the title with a random suffix. Thai titles keep
+  /// their own letters rather than collapsing to an empty slug.
+  slug           String   @unique
+  body           String
+  status         String   @default("published")
+  score          Int      @default(0)
+  commentCount   Int      @default(0) @map("comment_count")
+  viewCount      Int      @default(0) @map("view_count")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+  /// Bumped when an answer arrives, so "active" sorting does not need a join.
+  lastActivityAt DateTime @default(now()) @map("last_activity_at")
+
+  authorId String @map("author_id") @db.Uuid
+  author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  /// The answer the asker marked as the one that solved it.
+  acceptedCommentId String?           @unique @map("accepted_comment_id") @db.Uuid
+  acceptedComment   CommunityComment? @relation("AcceptedAnswer", fields: [acceptedCommentId], references: [id], onDelete: SetNull)
+
+  tags     CommunityPostTag[]
+  comments CommunityComment[] @relation("PostComments")
+  votes    CommunityVote[]
+
+  @@index([createdAt(sort: Desc), id(sort: Desc)])
+  @@index([score(sort: Desc), id(sort: Desc)])
+  @@index([lastActivityAt(sort: Desc), id(sort: Desc)])
+  @@index([authorId])
+  @@map("community_posts")
+  @@schema("public")
+}
+
+/// An answer or a reply to one. Nesting stops at one level, enforced by the service.
+model CommunityComment {
+  id        String   @id @default(uuid()) @db.Uuid
+  body      String
+  score     Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  postId String        @map("post_id") @db.Uuid
+  post   CommunityPost @relation("PostComments", fields: [postId], references: [id], onDelete: Cascade)
+
+  authorId String @map("author_id") @db.Uuid
+  author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  parentId String?            @map("parent_id") @db.Uuid
+  parent   CommunityComment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies  CommunityComment[] @relation("CommentReplies")
+
+  acceptedBy CommunityPost?  @relation("AcceptedAnswer")
+  votes      CommunityVote[]
+
+  @@index([postId, createdAt])
+  @@index([authorId])
+  @@index([parentId])
+  @@map("community_comments")
+  @@schema("public")
+}
+
+/// Which tags a post carries.
+model CommunityPostTag {
+  postId String        @map("post_id") @db.Uuid
+  post   CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  tagId String       @map("tag_id") @db.Uuid
+  tag   CommunityTag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@id([postId, tagId])
+  @@index([tagId])
+  @@map("community_post_tags")
+  @@schema("public")
+}
+
+/// One user's vote on exactly one post or one comment.
+///
+/// A single table rather than one per target keeps the score trigger and the
+/// "what did I vote" lookup in one place. A CHECK constraint enforces that
+/// exactly one of the two targets is set.
+model CommunityVote {
+  id        String   @id @default(uuid()) @db.Uuid
+  /// -1 or 1. Clearing a vote deletes the row rather than storing a zero.
+  value     Int      @db.SmallInt
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  postId String?        @map("post_id") @db.Uuid
+  post   CommunityPost? @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  commentId String?           @map("comment_id") @db.Uuid
+  comment   CommunityComment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+  @@unique([userId, commentId])
+  @@index([postId])
+  @@index([commentId])
+  @@map("community_votes")
+  @@schema("public")
+}
+
+/// One sign-in: a Supabase session the user started, and where it came from.
+///
+/// `sessionId` is unique, so the client may report the current session on every
+/// start without creating duplicates; only a new sign-in adds a row. Written and
+/// read only through NestJS — RLS is enabled with no policy and no grant.
+model LoginEvent {
+  id        String   @id @default(uuid()) @db.Uuid
+  sessionId String   @unique @map("session_id") @db.Uuid
+  ipAddress String   @default("") @map("ip_address")
+  userAgent String   @default("") @map("user_agent")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("login_events")
+  @@schema("public")
+}
+
+/// A search the user ran, per scope. Repeating a query moves it to the top
+/// instead of adding a row; the repository keeps only the newest entries.
+model SearchHistoryEntry {
+  id        String   @id @default(uuid()) @db.Uuid
+  scope     String
+  query     String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, scope, query])
+  @@index([userId, scope, createdAt(sort: Desc)])
+  @@map("search_history")
+  @@schema("public")
+}
+
+/// A named value a project's firmware sends or receives — what a dashboard widget binds
+/// to. Blynk calls these datastreams; `key` is what the sketch and the widget share.
+model ProjectDatastream {
+  id        String   @id @default(uuid()) @db.Uuid
+  key       String
+  name      String
+  /// "number" | "boolean" | "string"
+  dataType  String   @map("data_type")
+  unit      String   @default("")
+  min       Float?
+  max       Float?
+  /// Component property that produces the value, e.g. "temperature". Empty for a
+  /// value the sketch computes itself.
+  source    String   @default("")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  projectId String  @map("project_id") @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  /// The part the value comes from. Kept when the part is removed, unbound.
+  componentId String?           @map("component_id") @db.Uuid
+  component   ProjectComponent? @relation(fields: [componentId], references: [id], onDelete: SetNull)
+
+  @@unique([projectId, key])
+  @@index([componentId])
+  @@map("project_datastreams")
+  @@schema("public")
+}
+
+/// The project's dashboard: widgets and their per-breakpoint layout, one document.
+///
+/// A document rather than a row per widget because a layout is edited and saved as a
+/// whole — a drag moves several widgets at once — and `version` guards the whole.
+model ProjectDashboard {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  document  Json
+  version   Int      @default(1)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  projectId String  @unique @map("project_id") @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  /// The template it was created from. The document is a copy: editing it never
+  /// changes the template, and deleting the template keeps the dashboard.
+  templateId      String?            @map("template_id") @db.Uuid
+  template        DashboardTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  templateVersion Int?               @map("template_version")
+
+  @@index([templateId])
+  @@map("project_dashboards")
+  @@schema("public")
+}
+
+/// A reusable dashboard and its datastreams, applied to any number of projects.
+model DashboardTemplate {
+  id            String   @id @default(uuid()) @db.Uuid
+  name          String
+  description   String   @default("")
+  /// Board catalog id the template was made for, e.g. "esp32-devkit-v1".
+  boardId       String   @map("board_id")
+  /// "private" (its creator) | "workspace" (every member)
+  visibility    String   @default("private")
+  latestVersion Int      @default(1) @map("latest_version")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  workspaceId String    @map("workspace_id") @db.Uuid
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  createdBy String? @map("created_by") @db.Uuid
+  creator   User?   @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+
+  versions   DashboardTemplateVersion[]
+  dashboards ProjectDashboard[]
+
+  @@index([workspaceId, updatedAt(sort: Desc)])
+  @@index([createdBy])
+  @@map("dashboard_templates")
+  @@schema("public")
+}
+
+/// One immutable revision of a template. Editing a template adds a version, so a
+/// project made from version 2 can still see exactly what version 2 was.
+model DashboardTemplateVersion {
+  version     Int
+  document    Json
+  datastreams Json
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  templateId String            @map("template_id") @db.Uuid
+  template   DashboardTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  createdBy String? @map("created_by") @db.Uuid
+  creator   User?   @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+
+  @@id([templateId, version])
+  @@index([createdBy])
+  @@map("dashboard_template_versions")
+  @@schema("public")
+}
+
+/// A reusable assistant setup: which model, how deep it reasons, and extra
+/// instructions. Separate from conversations, so switching profile keeps the history.
+/// `ownerId` null is a system profile: managed by platform admins, offered to everyone.
+model AiProfile {
+  id           String   @id @default(uuid()) @db.Uuid
+  name         String
+  description  String   @default("")
+  /// Explicit catalog model id; null lets the server rank the catalog for `tier`.
+  model        String?
+  /// "auto" | "balanced" | "deep"
+  tier         String   @default("auto")
+  /// Added to the platform's system prompt, never replacing it.
+  instructions String   @default("")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  ownerId String? @map("owner_id") @db.Uuid
+  owner   User?   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  conversations AiConversation[]
+
+  @@index([ownerId])
+  @@map("ai_profiles")
+  @@schema("public")
+}
+
+/// One chat with the project assistant. Private to the user who started it and tied
+/// to one project, so history never crosses projects or members.
+model AiConversation {
+  id        String   @id @default(uuid()) @db.Uuid
+  title     String   @default("")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  projectId String  @map("project_id") @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  profileId String?    @map("profile_id") @db.Uuid
+  profile   AiProfile? @relation(fields: [profileId], references: [id], onDelete: SetNull)
+
+  messages AiMessage[]
+
+  @@index([userId, projectId, updatedAt(sort: Desc)])
+  @@index([projectId])
+  @@index([profileId])
+  @@map("ai_conversations")
+  @@schema("public")
+}
+
+/// A turn in a conversation. An assistant turn may carry the plan it proposed and
+/// whether the user applied it.
+model AiMessage {
+  id        String   @id @default(uuid()) @db.Uuid
+  /// "user" | "assistant"
+  role      String
+  content   String
+  plan      Json?
+  /// "pending" | "applied" | "failed" | "dismissed"
+  planState String?  @map("plan_state")
+  planError String?  @map("plan_error")
+  /// Model that wrote an assistant turn.
+  model     String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  conversationId String         @map("conversation_id") @db.Uuid
+  conversation   AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@map("ai_messages")
+  @@schema("public")
+}
+
+/// A physical board that reports to a project: Blynk's "device". It authenticates
+/// with a token whose SHA-256 alone is stored; the token is shown once.
+model Device {
+  id         String    @id @default(uuid()) @db.Uuid
+  name       String
+  /// SHA-256 (hex) of the device token. The token itself is never stored.
+  tokenHash  String    @unique @map("token_hash")
+  /// Last four characters of the token, so a user can tell tokens apart.
+  tokenHint  String    @map("token_hint")
+  lastSeenAt DateTime? @map("last_seen_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  projectId String  @map("project_id") @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  createdBy String? @map("created_by") @db.Uuid
+  creator   User?   @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+
+  values DeviceValue[]
+  points TelemetryPoint[]
+
+  @@index([projectId])
+  @@index([createdBy])
+  @@map("devices")
+  @@schema("public")
+}
+
+/// The latest value of each datastream on a device, from the device or from the app.
+model DeviceValue {
+  key       String
+  value     Json
+  /// "device" (reported) | "app" (set from a dashboard control)
+  source    String
+  updatedAt DateTime @default(now()) @map("updated_at")
+
+  deviceId String @map("device_id") @db.Uuid
+  device   Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@id([deviceId, key])
+  @@map("device_values")
+  @@schema("public")
+}
+
+/// Reported history, for charts. Numbers and booleans in `value`; text in `text`.
+model TelemetryPoint {
+  id         BigInt   @id @default(autoincrement())
+  key        String
+  value      Float?
+  text       String?
+  recordedAt DateTime @default(now()) @map("recorded_at")
+
+  deviceId String @map("device_id") @db.Uuid
+  device   Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@index([deviceId, key, recordedAt(sort: Desc)])
+  @@index([recordedAt])
+  @@map("telemetry_points")
+  @@schema("public")
+}
+
+/// Platform AI settings, one row (id = 1), edited by admins on the integrations page.
+/// Models: the primary and the ordered fallbacks the assistants try. Credits: what each
+/// user may spend; -1 means unlimited. One AI message is one credit.
+model AiSettings {
+  id             Int      @id @default(1) @db.SmallInt
+  primaryModel   String?  @map("primary_model")
+  fallbackModels String[] @default([]) @map("fallback_models")
+  dailyCredits   Int      @default(-1) @map("daily_credits")
+  weeklyCredits  Int      @default(-1) @map("weekly_credits")
+  monthlyCredits Int      @default(-1) @map("monthly_credits")
+  dailyResetMinute Int @default(0) @map("daily_reset_minute") @db.SmallInt
+  weeklyResetMinute Int @default(0) @map("weekly_reset_minute") @db.SmallInt
+  weeklyResetDay Int @default(0) @map("weekly_reset_day") @db.SmallInt
+  monthlyResetMinute Int @default(0) @map("monthly_reset_minute") @db.SmallInt
+  monthlyResetDay Int @default(1) @map("monthly_reset_day") @db.SmallInt
+  updatedAt      DateTime @updatedAt @map("updated_at")
+  updatedBy      String?  @map("updated_by") @db.Uuid
+
+  @@map("ai_settings")
+  @@schema("public")
+}
+
+/// Credit limits for one user that replace the defaults. NULL keeps the default;
+/// -1 is unlimited.
+model AiCreditOverride {
+  dailyCredits   Int?     @map("daily_credits")
+  weeklyCredits  Int?     @map("weekly_credits")
+  monthlyCredits Int?     @map("monthly_credits")
+  note           String   @default("")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  userId String @id @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("ai_credit_overrides")
+  @@schema("public")
+}
+
+/// One answered AI request and the credits it cost.
+model AiUsageEvent {
+  id           BigInt   @id @default(autoincrement())
+  /// "project" | "advisor"
+  feature      String
+  model        String
+  credits      Int      @default(1)
+  inputTokens  Int?     @map("input_tokens")
+  outputTokens Int?     @map("output_tokens")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  userId String @map("user_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([createdAt])
+  @@map("ai_usage_events")
+  @@schema("public")
+}
