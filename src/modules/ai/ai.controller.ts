@@ -13,9 +13,10 @@ import { AiChatDto } from './dto/ai-chat.dto';
 export class AiController {
   constructor(private readonly aiService: AiService) {}
 
-  @Get('providers')
-  getProviders() {
-    return this.aiService.listProviders();
+  /** Task profiles plus the live OpenRouter catalog grouped by vendor. */
+  @Get('catalog')
+  getCatalog() {
+    return this.aiService.listCatalog();
   }
 
   @Throttle(THROTTLE_OVERRIDES.ai)

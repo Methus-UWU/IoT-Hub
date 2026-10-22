@@ -1,4 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 
 /**
  * Path safety for project files.
@@ -81,4 +82,9 @@ export function assertFileWithinSizeLimit(content: string): number {
   }
 
   return sizeBytes;
+}
+
+/** The stored `content_hash`: SHA-256 of the UTF-8 content, hex encoded. */
+export function hashFileContent(content: string): string {
+  return createHash('sha256').update(content, 'utf8').digest('hex');
 }

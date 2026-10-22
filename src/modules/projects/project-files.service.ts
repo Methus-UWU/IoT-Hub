@@ -1,17 +1,19 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { createHash } from 'node:crypto';
 
 import {
   MAX_PROJECT_BYTES,
   MAX_PROJECT_FILES,
   assertFileWithinSizeLimit,
+  hashFileContent,
   normalizeProjectFilePath,
 } from './project-file-path';
 import {
+  ProjectFileContent,
   ProjectFileRepository,
   ProjectFileSummary,
 } from './project.repository';
@@ -30,10 +32,6 @@ export interface SaveFileOutcome extends ProjectFileSummary {
   created: boolean;
 }
 
-function hashOf(content: string): string {
-  return createHash('sha256').update(content, 'utf8').digest('hex');
-}
-
 /**
  * Project file operations.
  *
@@ -48,6 +46,11 @@ export class ProjectFilesService {
 
   list(projectId: string): Promise<ProjectFileSummary[]> {
     return this.files.list(projectId);
+  }
+
+  /** Every file with content, read-after-write safe. */
+  readAll(projectId: string): Promise<ProjectFileContent[]> {
+    return this.files.readAll(projectId);
   }
 
   async read(projectId: string, rawPath: string) {
@@ -77,7 +80,7 @@ export class ProjectFilesService {
   ): Promise<SaveFileOutcome> {
     const path = normalizeProjectFilePath(request.path);
     const sizeBytes = assertFileWithinSizeLimit(request.content);
-    const contentHash = hashOf(request.content);
+    const contentHash = hashFileContent(request.content);
 
     if (request.expectedVersion === undefined) {
       await this.assertQuotaAllowsNewFile(projectId, sizeBytes);
@@ -180,6 +183,67 @@ export class ProjectFilesService {
     }
 
     return { path, deleted: true as const };
+  }
+
+  /**
+   * Writes whole folders at once — an installed library and its dependencies —
+   * replacing what was in them. All or nothing: a library half written would not
+   * compile, so a broken path, an oversized file, or the project quota stops every
+   * folder. Each file must lie inside one of `folders` (`lib/Name/`).
+   */
+  async replaceFolders(
+    projectId: string,
+    folders: string[],
+    files: { path: string; content: string }[],
+  ): Promise<void> {
+    const prefixes = folders.map(
+      (folder) => `${normalizeProjectFilePath(folder)}/`,
+    );
+    const rows = files.map((file) => {
+      const path = normalizeProjectFilePath(file.path);
+      if (!prefixes.some((prefix) => path.startsWith(prefix))) {
+        throw new BadRequestException({
+          code: 'INVALID_FILE_PATH',
+          message: 'A file lies outside the folders being written',
+        });
+      }
+      return {
+        path,
+        content: file.content,
+        contentHash: hashFileContent(file.content),
+        sizeBytes: assertFileWithinSizeLimit(file.content),
+      };
+    });
+
+    const exceeded = await this.files.replaceFolders(
+      projectId,
+      prefixes,
+      rows,
+      {
+        maxFiles: MAX_PROJECT_FILES,
+        maxBytes: MAX_PROJECT_BYTES,
+      },
+    );
+    if (exceeded === 'files') {
+      throw new ConflictException({
+        code: 'PROJECT_FILE_LIMIT_REACHED',
+        message: `Projects are limited to ${MAX_PROJECT_FILES} files`,
+      });
+    }
+    if (exceeded === 'bytes') {
+      throw new ConflictException({
+        code: 'PROJECT_SIZE_LIMIT_REACHED',
+        message: `Projects are limited to ${MAX_PROJECT_BYTES} bytes in total`,
+      });
+    }
+  }
+
+  /** Deletes a folder and everything in it; returns how many files went. */
+  deleteFolder(projectId: string, folder: string): Promise<number> {
+    return this.files.deleteFolder(
+      projectId,
+      `${normalizeProjectFilePath(folder)}/`,
+    );
   }
 
   private async assertQuotaAllowsNewFile(

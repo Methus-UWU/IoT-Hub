@@ -184,4 +184,17 @@ describe('SupabaseAuthGuard', () => {
       ServiceUnavailableException,
     );
   });
+
+  it('answers 503, not 401, when the key set cannot be fetched', async () => {
+    // A 401 here would sign the user out over a network fault; the token may be fine.
+    globalThis.fetch = jest.fn(() =>
+      Promise.reject(new TypeError('fetch failed')),
+    );
+    const valid = await token({ sub: 'user-1' });
+    const { context } = contextFor({ authorization: `Bearer ${valid}` });
+
+    await expect(guard().canActivate(context)).rejects.toBeInstanceOf(
+      ServiceUnavailableException,
+    );
+  });
 });

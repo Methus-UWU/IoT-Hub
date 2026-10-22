@@ -4,6 +4,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import {
   AdminUserView,
   UpdateAdminUserInput,
+  UpdateUserProfileInput,
   UserProfile,
   UserRepository,
 } from './user.repository';
@@ -20,6 +21,8 @@ const ADMIN_VIEW_SELECT = {
 const PROFILE_SELECT = {
   id: true,
   username: true,
+  displayName: true,
+  bio: true,
   email: true,
   isActive: true,
   role: { select: { name: true } },
@@ -81,10 +84,13 @@ export class PrismaUserRepository extends UserRepository {
     return user !== null;
   }
 
-  updateUsername(id: string, username: string): Promise<UserProfile> {
+  updateProfile(
+    id: string,
+    input: UpdateUserProfileInput,
+  ): Promise<UserProfile> {
     return this.prisma.db.user.update({
       where: { id },
-      data: { username },
+      data: input,
       select: PROFILE_SELECT,
     });
   }

@@ -12,14 +12,17 @@ import {
   ValidateNested,
 } from 'class-validator';
 
-export enum AiProviderId {
-  OpenAi = 'openai',
-  Anthropic = 'anthropic',
-  Gemini = 'gemini',
-  Gemma = 'gemma',
-  DeepSeek = 'deepseek',
-  Meta = 'meta',
-  Nvidia = 'nvidia',
+/**
+ * What the conversation needs from a model, not which model to use.
+ *
+ * `Auto` lets the server infer the profile from the conversation itself; the
+ * concrete profiles are for an administrator who wants to force the trade-off.
+ */
+export enum AiTaskProfile {
+  Auto = 'auto',
+  Fast = 'fast',
+  Balanced = 'balanced',
+  Deep = 'deep',
 }
 
 export class AiChatMessageDto {
@@ -32,13 +35,16 @@ export class AiChatMessageDto {
 }
 
 export class AiChatDto {
-  @IsEnum(AiProviderId)
-  provider!: AiProviderId;
-
+  /** Legacy admin clients may send this; admin chat uses the shared IDE policy. */
   @IsOptional()
   @IsString()
-  @MaxLength(120)
+  @MaxLength(160)
   model?: string;
+
+  /** Accepted for older clients; ignored by admin chat. */
+  @IsOptional()
+  @IsEnum(AiTaskProfile)
+  profile?: AiTaskProfile;
 
   @IsArray()
   @ArrayMinSize(1)

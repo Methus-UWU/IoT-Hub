@@ -12,6 +12,8 @@
 export interface UserProfile {
   id: string;
   username: string;
+  displayName: string | null;
+  bio: string | null;
   email: string;
   isActive: boolean;
   role: { name: string };
@@ -33,6 +35,12 @@ export interface UpdateAdminUserInput {
   isActive?: boolean;
 }
 
+export interface UpdateUserProfileInput {
+  username: string;
+  displayName?: string | null;
+  bio?: string | null;
+}
+
 export abstract class UserRepository {
   abstract findProfileById(id: string): Promise<UserProfile | null>;
 
@@ -49,7 +57,10 @@ export abstract class UserRepository {
 
   abstract existsByUsername(username: string): Promise<boolean>;
 
-  abstract updateUsername(id: string, username: string): Promise<UserProfile>;
+  abstract updateProfile(
+    id: string,
+    input: UpdateUserProfileInput,
+  ): Promise<UserProfile>;
 
   abstract count(): Promise<number>;
 

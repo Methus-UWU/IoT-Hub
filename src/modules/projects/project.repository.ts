@@ -42,6 +42,14 @@ export interface ProjectFileContent extends ProjectFileSummary {
   content: string;
 }
 
+/** A file written in the same transaction that creates its project. */
+export interface CreateFileInput {
+  path: string;
+  content: string;
+  contentHash: string;
+  sizeBytes: number;
+}
+
 export interface ProjectUsage {
   fileCount: number;
   totalBytes: number;
@@ -68,6 +76,13 @@ export abstract class ProjectFileRepository {
   ): Promise<ProjectFileContent | null>;
 
   abstract usage(projectId: string): Promise<ProjectUsage>;
+
+  /**
+   * Every file with its content, read from the primary. Used for a build snapshot,
+   * which is requested straight after an autosave and must not see a lagging
+   * replica. Bounded by the project quota (MAX_PROJECT_FILES, MAX_PROJECT_BYTES).
+   */
+  abstract readAll(projectId: string): Promise<ProjectFileContent[]>;
 
   /**
    * Creates the file. Rejects with a duplicate-path error if it already exists —
@@ -99,6 +114,22 @@ export abstract class ProjectFileRepository {
   abstract delete(projectId: string, path: string): Promise<boolean>;
 
   abstract exists(projectId: string, path: string): Promise<boolean>;
+
+  /**
+   * Replaces whole folders in one transaction: every file under each `folders`
+   * prefix (`lib/Name/`) is deleted, `files` are created, and the quota is checked
+   * against the result before commit. Returns the limit the result would break and
+   * writes nothing in that case, or null once committed.
+   */
+  abstract replaceFolders(
+    projectId: string,
+    folders: string[],
+    files: CreateFileInput[],
+    quota: { maxFiles: number; maxBytes: number },
+  ): Promise<'files' | 'bytes' | null>;
+
+  /** Deletes every file under the `folder` prefix; returns how many. */
+  abstract deleteFolder(projectId: string, folder: string): Promise<number>;
 }
 
 export interface ProjectComponent {
@@ -121,6 +152,7 @@ export interface CreateComponentInput {
 }
 
 export interface UpdateComponentInput {
+  definitionId?: string;
   label?: string;
   x?: number;
   y?: number;
@@ -138,6 +170,11 @@ export abstract class ProjectComponentRepository {
 
   abstract count(projectId: string): Promise<number>;
 
+  abstract countByDefinitionIds(
+    projectId: string,
+    definitionIds: readonly string[],
+  ): Promise<number>;
+
   abstract create(
     projectId: string,
     input: CreateComponentInput,
@@ -152,16 +189,20 @@ export abstract class ProjectComponentRepository {
   abstract delete(projectId: string, componentId: string): Promise<boolean>;
 
   /**
-   * Creates the project and its board component together.
+   * Creates the project, its board, selected peripherals and starter files
+   * together.
    *
    * One transaction, because a project whose board failed to save would open to
    * an empty canvas after the user had already chosen a board — exactly the
-   * behaviour this flow exists to prevent.
+   * behaviour this flow exists to prevent. The same holds for a project that
+   * opens without the `platformio.ini` and sketch it was promised.
    */
   abstract createProjectWithBoard(
     project: CreateProjectInput,
     board: CreateComponentInput,
-  ): Promise<{ project: Project; component: ProjectComponent }>;
+    devices?: readonly CreateComponentInput[],
+    files?: readonly CreateFileInput[],
+  ): Promise<{ project: Project; components: ProjectComponent[] }>;
 }
 
 export interface ConnectionEndpoint {

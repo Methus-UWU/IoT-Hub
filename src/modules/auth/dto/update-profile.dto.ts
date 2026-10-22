@@ -1,4 +1,10 @@
-import { IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import {
+  IsOptional,
+  IsString,
+  Matches,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 
 /**
  * Email is deliberately absent: Supabase Auth owns the address, and changing it
@@ -15,4 +21,14 @@ export class UpdateProfileDto {
       'Username may contain only letters, numbers, dots, underscores, and hyphens',
   })
   username!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  displayName?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(280)
+  bio?: string | null;
 }

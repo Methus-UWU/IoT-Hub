@@ -28,6 +28,12 @@ class FakePlanRepository extends PlanRepository {
   usageForUser(): Promise<AccountUsage> {
     return Promise.resolve(this.usage);
   }
+
+  buildMillis = 0;
+
+  buildMillisSince(): Promise<number> {
+    return Promise.resolve(this.buildMillis);
+  }
 }
 
 describe('EntitlementService', () => {
@@ -167,14 +173,58 @@ describe('EntitlementService', () => {
     });
 
     it('never invents usage for unmetered resources', async () => {
-      // Build minutes and AI credits are not metered yet. Reporting 0 is honest;
-      // a sample number would be exactly the fabricated data this work removes.
+      // AI credits are not metered yet. Reporting 0 is honest; a sample number
+      // would be exactly the fabricated data this work removes.
+      const report = await service.usageReport('user-1');
+      const ai = report.metrics.find(
+        (metric) => metric.key === LIMIT_KEYS.maxAiRequests,
+      );
+
+      expect(ai?.used).toBe(0);
+    });
+
+    it('reports build minutes rounded up', async () => {
+      plans.buildMillis = 61_000;
       const report = await service.usageReport('user-1');
       const build = report.metrics.find(
         (metric) => metric.key === LIMIT_KEYS.maxBuildMinutes,
       );
 
-      expect(build?.used).toBe(0);
+      expect(build?.used).toBe(2);
+    });
+  });
+
+  describe('assertCanStartBuild', () => {
+    it('allows a build while minutes remain', async () => {
+      plans.buildMillis = 119 * 60_000;
+
+      await expect(
+        service.assertCanStartBuild('user-1'),
+      ).resolves.toBeUndefined();
+    });
+
+    it('refuses once the monthly minutes are spent', async () => {
+      plans.buildMillis = 120 * 60_000;
+
+      await expect(service.assertCanStartBuild('user-1')).rejects.toMatchObject(
+        {
+          response: { code: 'BUILD_MINUTES_EXHAUSTED', limit: 120, used: 120 },
+        },
+      );
+    });
+
+    it('counts from the first of the month in UTC', async () => {
+      const since = jest.spyOn(plans, 'buildMillisSince');
+
+      await service.assertCanStartBuild(
+        'user-1',
+        new Date('2026-10-17T05:00:00Z'),
+      );
+
+      expect(since).toHaveBeenCalledWith(
+        'user-1',
+        new Date('2026-10-01T00:00:00Z'),
+      );
     });
   });
 });

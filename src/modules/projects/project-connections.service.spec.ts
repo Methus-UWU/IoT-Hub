@@ -99,6 +99,10 @@ class FakePlanRepository extends PlanRepository {
   usageForUser(): Promise<AccountUsage> {
     return Promise.resolve({ projectCount: 0, storageBytes: 0 });
   }
+
+  buildMillisSince(): Promise<number> {
+    return Promise.resolve(0);
+  }
 }
 
 function wire(pin = 'GPIO23'): CreateConnectionInput {

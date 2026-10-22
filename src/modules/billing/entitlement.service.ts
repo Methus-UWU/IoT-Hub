@@ -2,8 +2,10 @@ import {
   ConflictException,
   Injectable,
   InternalServerErrorException,
+  Optional,
 } from '@nestjs/common';
 
+import { AiCreditsService } from '../ai-credits/ai-credits.service';
 import {
   LIMIT_KEYS,
   LimitKey,
@@ -34,6 +36,12 @@ export interface AccountUsageReport {
 }
 
 const BYTES_PER_MB = 1024 * 1024;
+const MS_PER_MINUTE = 60_000;
+
+/** Build minutes are a monthly allowance, counted from the first of the month in UTC. */
+export function buildPeriodStart(now: Date): Date {
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+}
 
 /**
  * The one place a plan limit is evaluated.
@@ -47,7 +55,10 @@ const BYTES_PER_MB = 1024 * 1024;
  */
 @Injectable()
 export class EntitlementService {
-  constructor(private readonly plans: PlanRepository) {}
+  constructor(
+    private readonly plans: PlanRepository,
+    @Optional() private readonly aiCredits?: AiCreditsService,
+  ) {}
 
   async planFor(userId: string): Promise<PlanSummary> {
     const plan = await this.plans.findPlanForUser(userId);
@@ -94,10 +105,40 @@ export class EntitlementService {
     });
   }
 
+  /**
+   * Refuses a build once this month's build minutes are spent.
+   *
+   * A build that is already running finishes even if it crosses the line; the
+   * allowance is checked when a build is requested, not metered mid-compile.
+   */
+  async assertCanStartBuild(userId: string, now = new Date()): Promise<void> {
+    const plan = await this.planFor(userId);
+    const limit = this.limitOf(plan, LIMIT_KEYS.maxBuildMinutes);
+    if (isUnlimited(limit)) return;
+
+    const usedMs = await this.plans.buildMillisSince(
+      userId,
+      buildPeriodStart(now),
+    );
+    if (usedMs < limit * MS_PER_MINUTE) return;
+
+    throw new ConflictException({
+      code: 'BUILD_MINUTES_EXHAUSTED',
+      message: `Your ${plan.name} plan includes ${limit} build minutes a month, and they are used up.`,
+      limit,
+      used: Math.ceil(usedMs / MS_PER_MINUTE),
+      planCode: plan.code,
+    });
+  }
+
   /** Everything the usage panel needs, from real data. */
   async usageReport(userId: string): Promise<AccountUsageReport> {
     const plan = await this.planFor(userId);
-    const usage = await this.plans.usageForUser(userId);
+    const [usage, buildMs, credits] = await Promise.all([
+      this.plans.usageForUser(userId),
+      this.plans.buildMillisSince(userId, buildPeriodStart(new Date())),
+      this.aiCredits?.usageFor(userId),
+    ]);
 
     const storageLimitMb = this.limitOf(plan, LIMIT_KEYS.maxStorageMb);
     const storageUsedMb =
@@ -117,22 +158,21 @@ export class EntitlementService {
         storageLimitMb,
         'MB',
       ),
-      // Build minutes and AI requests are not metered yet: no build worker runs
-      // (Phase 4) and AI usage is not recorded per user. Reporting 0 is honest;
-      // inventing a number would put fabricated data back on this page, which is
-      // the very thing this change removes.
+      // Rounded up: a 20-second build has used part of a minute, not none.
       this.metric(
         LIMIT_KEYS.maxBuildMinutes,
         'BUILD MINUTES',
-        0,
+        Math.ceil(buildMs / MS_PER_MINUTE),
         this.limitOf(plan, LIMIT_KEYS.maxBuildMinutes),
         'min',
       ),
+      // This month's AI messages against the admin's monthly credit limit
+      // (integrations page), which supersedes the plan's max_ai_requests.
       this.metric(
         LIMIT_KEYS.maxAiRequests,
         'AI CREDITS',
-        0,
-        this.limitOf(plan, LIMIT_KEYS.maxAiRequests),
+        credits?.monthly.used ?? 0,
+        credits?.monthly.limit ?? this.limitOf(plan, LIMIT_KEYS.maxAiRequests),
       ),
     ];
 

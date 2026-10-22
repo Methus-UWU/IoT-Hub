@@ -10,6 +10,7 @@ import {
   PrismaProjectFileRepository,
   PrismaProjectRepository,
 } from './prisma-project.repository';
+import { ProjectCircuitService } from './project-circuit.service';
 import { ProjectComponentsService } from './project-components.service';
 import { ProjectConnectionsService } from './project-connections.service';
 import { ProjectFilesService } from './project-files.service';
@@ -30,6 +31,7 @@ import { ProjectsService } from './projects.service';
     ProjectFilesService,
     ProjectComponentsService,
     ProjectConnectionsService,
+    ProjectCircuitService,
     { provide: ProjectRepository, useClass: PrismaProjectRepository },
     { provide: ProjectFileRepository, useClass: PrismaProjectFileRepository },
     {
@@ -46,6 +48,7 @@ import { ProjectsService } from './projects.service';
     ProjectFilesService,
     ProjectComponentsService,
     ProjectConnectionsService,
+    ProjectCircuitService,
   ],
 })
 export class ProjectsModule {}

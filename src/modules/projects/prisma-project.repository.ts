@@ -1,7 +1,9 @@
 import { ConflictException, Injectable } from '@nestjs/common';
 
+import type { PrismaClient } from '../../generated/prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
+  CreateFileInput,
   CreateProjectInput,
   Project,
   ProjectFileContent,
@@ -122,6 +124,18 @@ export class PrismaProjectFileRepository extends ProjectFileRepository {
     });
   }
 
+  readAll(projectId: string): Promise<ProjectFileContent[]> {
+    // Transactions use the primary even when ordinary reads use a replica.
+    const database = this.prisma.db as Pick<PrismaClient, '$transaction'>;
+    return database.$transaction((tx) =>
+      tx.projectFile.findMany({
+        where: { projectId },
+        orderBy: { path: 'asc' },
+        select: { ...FILE_SUMMARY_SELECT, content: true },
+      }),
+    );
+  }
+
   async usage(projectId: string): Promise<ProjectUsage> {
     const result = await this.prisma.db.projectFile.aggregate({
       where: { projectId },
@@ -202,5 +216,72 @@ export class PrismaProjectFileRepository extends ProjectFileRepository {
       select: { id: true },
     });
     return file !== null;
+  }
+
+  async replaceFolders(
+    projectId: string,
+    folders: string[],
+    files: CreateFileInput[],
+    quota: { maxFiles: number; maxBytes: number },
+  ): Promise<'files' | 'bytes' | null> {
+    const database = this.prisma.db as Pick<PrismaClient, '$transaction'>;
+    try {
+      await database.$transaction(async (tx) => {
+        const existing = await tx.projectFile.findMany({
+          where: { projectId },
+          select: { path: true },
+        });
+        // Matched here, not with LIKE: `_` in a folder name is a LIKE wildcard.
+        const replaced = existing
+          .map((file) => file.path)
+          .filter((path) => folders.some((folder) => path.startsWith(folder)));
+        if (replaced.length) {
+          await tx.projectFile.deleteMany({
+            where: { projectId, path: { in: replaced } },
+          });
+        }
+        const usage = await tx.projectFile.aggregate({
+          where: { projectId },
+          _count: { _all: true },
+          _sum: { sizeBytes: true },
+        });
+        const addedBytes = files.reduce((sum, file) => sum + file.sizeBytes, 0);
+        if (usage._count._all + files.length > quota.maxFiles) {
+          throw new QuotaExceeded('files');
+        }
+        if ((usage._sum.sizeBytes ?? 0) + addedBytes > quota.maxBytes) {
+          throw new QuotaExceeded('bytes');
+        }
+        await tx.projectFile.createMany({
+          data: files.map((file) => ({ projectId, ...file })),
+        });
+      });
+      return null;
+    } catch (error: unknown) {
+      if (error instanceof QuotaExceeded) return error.limit;
+      throw error;
+    }
+  }
+
+  async deleteFolder(projectId: string, folder: string): Promise<number> {
+    const existing = await this.prisma.db.projectFile.findMany({
+      where: { projectId },
+      select: { path: true },
+    });
+    const paths = existing
+      .map((file) => file.path)
+      .filter((path) => path.startsWith(folder));
+    if (!paths.length) return 0;
+    const result = await this.prisma.db.projectFile.deleteMany({
+      where: { projectId, path: { in: paths } },
+    });
+    return result.count;
+  }
+}
+
+/** Thrown inside the transaction so the deletes roll back with it. */
+class QuotaExceeded extends Error {
+  constructor(readonly limit: 'files' | 'bytes') {
+    super(`project ${limit} quota exceeded`);
   }
 }

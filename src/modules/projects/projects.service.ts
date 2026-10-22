@@ -1,8 +1,14 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 
 import { EntitlementService } from '../billing/entitlement.service';
 import { findBoard } from './board-catalog';
+import { findDevice } from './catalog/device-catalog';
 import { ProjectComponentsService } from './project-components.service';
+import { starterFilesFor } from './project-starter-files';
 import { CreateProjectDto } from './dto/project.dto';
 import {
   Project,
@@ -68,7 +74,7 @@ export class ProjectsService {
     await this.entitlements.assertCanCreateProject(userId);
 
     const board = findBoard(body.boardId);
-    if (!board) {
+    if (!board || !findDevice(board.id)?.isBoard) {
       throw new NotFoundException({
         code: 'BOARD_NOT_FOUND',
         message: 'Unknown board definition',
@@ -76,11 +82,24 @@ export class ProjectsService {
     }
 
     const name = body.name.trim();
+    const framework = body.framework?.trim() || board.defaultFramework;
+    if (!name || !board.frameworks.includes(framework)) {
+      throw new BadRequestException({
+        code: 'INVALID_PROJECT_SETUP',
+        message:
+          'Enter a project name and choose a framework the board supports',
+      });
+    }
+    const deviceIds = body.deviceIds ?? [];
+    const devices = await this.componentsService.initialDevicePlacements(
+      userId,
+      deviceIds,
+    );
     const slug = await this.uniqueSlug(workspaceId, name);
 
-    // Project and board commit together. A project that opened to an empty
-    // canvas after the user had already picked a board is the exact failure
-    // this flow exists to prevent.
+    // Project, board and starter files commit together. A project that opened
+    // to an empty canvas after the user had already picked a board is the exact
+    // failure this flow exists to prevent.
     const created = await this.components.createProjectWithBoard(
       {
         workspaceId,
@@ -88,12 +107,14 @@ export class ProjectsService {
         slug,
         description: body.description?.trim(),
         board: board.name,
-        framework: body.framework?.trim() || board.defaultFramework,
+        framework,
       },
       this.componentsService.boardPlacement(board.id, board.name),
+      devices,
+      starterFilesFor(board, framework, deviceIds),
     );
 
-    return { ...created.project, components: [created.component] };
+    return { ...created.project, components: created.components };
   }
 
   async delete(workspaceId: string, projectId: string): Promise<void> {

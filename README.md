@@ -27,23 +27,24 @@
 
 ## AI Assistant API
 
-The admin-only AI gateway keeps provider credentials on the backend and exposes one contract for OpenAI, Anthropic, Gemini, and DeepSeek.
+The admin-only AI gateway keeps the credential on the backend and reaches every vendor through OpenRouter's OpenAI-compatible endpoint, so there is one key and one request shape.
 
-1. Copy `.env.example` to `.env` and set at least one provider key.
+No model id is pinned in the code. `ModelCatalogService` fetches the live OpenRouter catalog (`GET /models`, cached for `AI_CATALOG_TTL_MS`), and `ModelSelectorService` ranks it per request against the task profile. A caller may still override the pick with any id the catalog contains.
+
+1. Copy `.env.example` to `.env` and set `OPENROUTER_API_KEY`.
 2. Start the API and authenticate with an account whose JWT role is `admin`.
 3. Set `useMockApi: false` in the Angular environment when connecting the UI to this API.
 
 Endpoints:
 
-- `GET /api/admin/ai/providers` returns enabled models and provider configuration status.
-- `POST /api/admin/ai/chat` sends a multi-turn conversation to the selected provider.
+- `GET /api/admin/ai/catalog` returns the task profiles (with the model each one currently resolves to) and the live catalog grouped by vendor.
+- `POST /api/admin/ai/chat` sends a multi-turn conversation, choosing the model unless one is given.
 
 Example request:
 
 ```json
 {
-  "provider": "openai",
-  "model": "gpt-5.4-mini",
+  "profile": "auto",
   "messages": [
     { "role": "user", "content": "Summarize the current system health" }
   ],
@@ -51,7 +52,18 @@ Example request:
 }
 ```
 
-The live context is read-only and contains runtime health plus non-secret application counts. To add another provider, implement `AiProviderAdapter`, register it in `AiModule`, and include it in `AiService`.
+### Task profiles
+
+| Profile    | Chosen for                                               | Ranking bias                                    |
+| ---------- | -------------------------------------------------------- | ----------------------------------------------- |
+| `auto`     | default; inferred from prompt length, turns, and wording | delegates to one of the three below             |
+| `fast`     | short lookups and summaries                              | small active parameter count, low price         |
+| `balanced` | general admin question answering                         | capability and context, moderate speed and cost |
+| `deep`     | root-cause analysis over long logs                       | reasoning support, capability, large context    |
+
+Parameter counts come from the model id (`120b-a12b`), since OpenRouter does not publish them; an id without a size scores neutral rather than tiny. Paid models are excluded from the ranking unless `AI_ALLOW_PAID_MODELS=true`, and an explicit override of a paid model is rejected under the same rule.
+
+The live context is read-only and contains runtime health plus non-secret application counts. To change how models are chosen, edit `PROFILE_RULES` in `model-selector.service.ts`; adding a vendor needs no code change, because the catalog is fetched at runtime.
 
 ## Project setup
 

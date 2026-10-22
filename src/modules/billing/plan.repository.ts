@@ -28,4 +28,7 @@ export abstract class PlanRepository {
 
   /** Projects and stored bytes across every workspace the user belongs to. */
   abstract usageForUser(userId: string): Promise<AccountUsage>;
+
+  /** Total duration of the builds this user requested since `since`. */
+  abstract buildMillisSince(userId: string, since: Date): Promise<number>;
 }

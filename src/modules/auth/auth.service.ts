@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -38,6 +39,13 @@ export class AuthService {
   }
 
   async updateMe(userId: string, body: UpdateProfileDto): Promise<UserProfile> {
+    const current = await this.getMe(userId);
+    if (!current.isActive) {
+      throw new ForbiddenException({
+        code: 'ACCOUNT_SUSPENDED',
+        message: 'This account is suspended',
+      });
+    }
     const username = body.username.trim();
 
     const duplicateId = await this.users.findOtherIdByUsernameOrEmail(userId, {
@@ -50,7 +58,13 @@ export class AuthService {
       });
     }
 
-    return this.users.updateUsername(userId, username);
+    return this.users.updateProfile(userId, {
+      username,
+      ...(body.displayName !== undefined
+        ? { displayName: body.displayName?.trim() || null }
+        : {}),
+      ...(body.bio !== undefined ? { bio: body.bio?.trim() || null } : {}),
+    });
   }
 
   async checkExists(body: CheckExistDto): Promise<{ exists: boolean }> {

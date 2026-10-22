@@ -1,9 +1,14 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
+  ParseUUIDPipe,
   Patch,
+  Post,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -14,6 +19,7 @@ import {
 } from '../auth/supabase-auth.guard';
 import { PlatformAdminGuard } from '../authorization/platform-admin.guard';
 import { AdminUsersService } from './admin-users.service';
+import { CreateAdminUserDto } from './dto/create-admin-user.dto';
 import { UpdateAdminUserDto } from './dto/update-admin-user.dto';
 
 /**
@@ -33,6 +39,20 @@ export class AdminUsersController {
   @Get('roles')
   listRoles() {
     return this.adminUsersService.listRoles();
+  }
+
+  @Post()
+  create(@Body() body: CreateAdminUserDto) {
+    return this.adminUsersService.create(body);
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async delete(
+    @Req() request: AuthenticatedRequest,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<void> {
+    await this.adminUsersService.delete(request.user.id, id);
   }
 
   @Patch(':id')

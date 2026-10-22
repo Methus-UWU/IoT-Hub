@@ -1,4 +1,5 @@
 import { Type } from 'class-transformer';
+import { Transform } from 'class-transformer';
 import {
   ArrayMaxSize,
   ArrayMinSize,
@@ -55,6 +56,14 @@ export class SaveProjectFilesDto {
 }
 
 export class CreateProjectDto {
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(49)
+  @IsString({ each: true })
+  @MaxLength(64, { each: true })
+  @Matches(/^[a-z0-9][a-z0-9._-]*$/, { each: true })
+  deviceIds?: string[];
+
   /**
    * Catalog id of the board this project starts with, e.g. 'esp32-devkit-v1'.
    * Required: a project without a board would open to an empty canvas after the
@@ -68,6 +77,9 @@ export class CreateProjectDto {
   @IsString()
   @MinLength(1)
   @MaxLength(80)
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
   name!: string;
 
   @IsOptional()
@@ -127,6 +139,13 @@ export class CreateComponentDto {
 }
 
 export class UpdateComponentDto {
+  /** Switches the part to another variant, e.g. a common-anode RGB LED. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  @Matches(/^[a-z0-9][a-z0-9._-]*$/)
+  definitionId?: string;
+
   @IsOptional()
   @IsString()
   @MaxLength(80)

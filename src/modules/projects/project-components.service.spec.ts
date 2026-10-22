@@ -1,4 +1,8 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 
 import { LIMIT_KEYS, PlanSummary, UNLIMITED } from '../billing/entitlement';
 import { EntitlementService } from '../billing/entitlement.service';
@@ -43,6 +47,18 @@ class FakeComponentRepository extends ProjectComponentRepository {
     );
   }
 
+  countByDefinitionIds(
+    projectId: string,
+    definitionIds: readonly string[],
+  ): Promise<number> {
+    const ids = new Set(definitionIds);
+    return Promise.resolve(
+      [...this.rows.values()].filter(
+        (row) => row.projectId === projectId && ids.has(row.definitionId),
+      ).length,
+    );
+  }
+
   create(
     projectId: string,
     input: CreateComponentInput,
@@ -82,7 +98,7 @@ class FakeComponentRepository extends ProjectComponentRepository {
 
   createProjectWithBoard(): Promise<{
     project: Project;
-    component: ProjectComponent;
+    components: ProjectComponent[];
   }> {
     throw new Error('not used in these tests');
   }
@@ -101,6 +117,10 @@ class FakePlanRepository extends PlanRepository {
 
   usageForUser(): Promise<AccountUsage> {
     return Promise.resolve({ projectCount: 0, storageBytes: 0 });
+  }
+
+  buildMillisSince(): Promise<number> {
+    return Promise.resolve(0);
   }
 }
 
@@ -129,6 +149,29 @@ describe('ProjectComponentsService', () => {
       expect(() => service.boardPlacement('not-a-board', 'Nope')).toThrow(
         NotFoundException,
       );
+    });
+
+    it('allows only one board in a project', async () => {
+      await service.add('user-1', PROJECT, { definitionId: 'esp32-devkit-v1' });
+
+      const response = await service
+        .add('user-1', PROJECT, { definitionId: 'arduino-uno-r3' })
+        .catch((error: ConflictException) => error.getResponse());
+
+      expect(response).toMatchObject({
+        code: 'BOARD_LIMIT_REACHED',
+        limit: 1,
+        used: 1,
+      });
+    });
+
+    it('does not count ordinary components toward the board limit', async () => {
+      await service.add('user-1', PROJECT, { definitionId: 'led' });
+      await service.add('user-1', PROJECT, { definitionId: 'dht22' });
+
+      await expect(
+        service.add('user-1', PROJECT, { definitionId: 'esp32-devkit-v1' }),
+      ).resolves.toBeDefined();
     });
   });
 
@@ -226,6 +269,47 @@ describe('ProjectComponentsService', () => {
       await expect(
         service.add('user-1', PROJECT, { definitionId: 'led' }),
       ).resolves.toBeDefined();
+    });
+  });
+
+  describe('variant change', () => {
+    it('switches a peripheral to another catalog peripheral in place', async () => {
+      const placed = await service.add('user-1', PROJECT, {
+        definitionId: 'rgb-led-common-cathode',
+      });
+
+      await service.update(PROJECT, placed.id, {
+        definitionId: 'rgb-led-common-anode',
+      });
+
+      const stored = await components.findById(PROJECT, placed.id);
+      expect(stored).toMatchObject({ definitionId: 'rgb-led-common-anode' });
+    });
+
+    it('refuses a definition that is not in the catalog', async () => {
+      const placed = await service.add('user-1', PROJECT, {
+        definitionId: 'led',
+      });
+
+      const response = await service
+        .update(PROJECT, placed.id, { definitionId: 'not-a-part' })
+        .catch((error: BadRequestException) => error.getResponse());
+
+      expect(response).toMatchObject({ code: 'INVALID_DEFINITION_CHANGE' });
+    });
+
+    it('never turns a board into something else, or a part into a board', async () => {
+      const board = await service.add('user-1', PROJECT, {
+        definitionId: 'esp32-devkit-v1',
+      });
+      const led = await service.add('user-1', PROJECT, { definitionId: 'led' });
+
+      await expect(
+        service.update(PROJECT, board.id, { definitionId: 'led' }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      await expect(
+        service.update(PROJECT, led.id, { definitionId: 'arduino-uno-r3' }),
+      ).rejects.toBeInstanceOf(BadRequestException);
     });
   });
 

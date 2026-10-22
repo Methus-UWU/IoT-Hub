@@ -1,7 +1,7 @@
 import { Controller, Get, UseGuards } from '@nestjs/common';
 
 import { SupabaseAuthGuard } from '../auth/supabase-auth.guard';
-import { BOARD_DEFINITIONS } from './board-catalog';
+import { CREATABLE_BOARD_DEFINITIONS } from './board-catalog';
 
 /**
  * Boards a project can be created with.
@@ -15,6 +15,6 @@ import { BOARD_DEFINITIONS } from './board-catalog';
 export class BoardsController {
   @Get()
   list() {
-    return BOARD_DEFINITIONS;
+    return CREATABLE_BOARD_DEFINITIONS;
   }
 }

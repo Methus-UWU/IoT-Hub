@@ -83,7 +83,7 @@ class FakeUserRepository extends UserRepository {
     return Promise.resolve(false);
   }
 
-  updateUsername(): Promise<UserProfile> {
+  updateProfile(): Promise<UserProfile> {
     throw new Error('not used');
   }
 
@@ -111,6 +111,8 @@ function profile(
   return {
     id,
     username: id,
+    displayName: null,
+    bio: null,
     email: `${id}@example.com`,
     isActive: true,
     role: { name: 'user' },

@@ -4,15 +4,11 @@ import {
   Delete,
   Get,
   Param,
-  Post,
   Put,
   Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { Throttle } from '@nestjs/throttler';
-
-import { THROTTLE_OVERRIDES } from '../../common/config/security.config';
 import {
   SupabaseAuthGuard,
   type AuthenticatedRequest,
@@ -22,7 +18,6 @@ import {
   SaveWorkspaceFileDto,
   WorkspaceFilePathDto,
 } from './dto/workspace.dto';
-import { WorkspaceFirmwareService } from './workspace-firmware.service';
 import { WorkspaceService } from './workspace.service';
 
 /**
@@ -39,7 +34,6 @@ import { WorkspaceService } from './workspace.service';
 export class WorkspaceController {
   constructor(
     private readonly workspace: WorkspaceService,
-    private readonly firmware: WorkspaceFirmwareService,
     private readonly authorization: AuthorizationService,
   ) {}
 
@@ -85,37 +79,5 @@ export class WorkspaceController {
   ) {
     await this.authorization.requireActiveAccount(request.user.id);
     return this.workspace.deleteFile(request.user.id, projectId, query.path);
-  }
-
-  @Get('toolchain')
-  toolchainStatus() {
-    return this.firmware.toolchainStatus();
-  }
-
-  @Throttle(THROTTLE_OVERRIDES.build)
-  @Post('build')
-  build() {
-    return this.firmware.build();
-  }
-
-  @Get('devices')
-  listDevices() {
-    return this.firmware.listDevices();
-  }
-
-  @Throttle(THROTTLE_OVERRIDES.build)
-  @Post('serial/start')
-  startSerialMonitor() {
-    return this.firmware.startMonitor();
-  }
-
-  @Get('serial/output')
-  serialOutput() {
-    return this.firmware.monitorOutput();
-  }
-
-  @Post('serial/stop')
-  stopSerialMonitor() {
-    return this.firmware.stopMonitor();
   }
 }

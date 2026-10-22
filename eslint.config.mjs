@@ -7,7 +7,17 @@ import tseslint from 'typescript-eslint';
 export default tseslint.config(
   {
     // src/generated is Prisma output, not authored source, and is gitignored.
-    ignores: ['eslint.config.mjs', 'src/generated/**', 'dist/**'],
+    // The device catalog and the datasheets are likewise generated — by the exporters in
+    // `frontend/scripts/` — and are committed only so a change shows up in review.
+    // Letting Prettier reformat them would mean every regeneration produced a diff
+    // against the formatter rather than against the content.
+    ignores: [
+      'eslint.config.mjs',
+      'src/generated/**',
+      'src/modules/projects/catalog/device-catalog.generated.ts',
+      'src/modules/projects/catalog/device-datasheets.generated.ts',
+      'dist/**',
+    ],
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,

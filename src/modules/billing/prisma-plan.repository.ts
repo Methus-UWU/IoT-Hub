@@ -53,4 +53,12 @@ export class PrismaPlanRepository extends PlanRepository {
       storageBytes: storage._sum.sizeBytes ?? 0,
     };
   }
+
+  async buildMillisSince(userId: string, since: Date): Promise<number> {
+    const result = await this.prisma.db.buildJob.aggregate({
+      where: { requestedBy: userId, createdAt: { gte: since } },
+      _sum: { durationMs: true },
+    });
+    return result._sum.durationMs ?? 0;
+  }
 }

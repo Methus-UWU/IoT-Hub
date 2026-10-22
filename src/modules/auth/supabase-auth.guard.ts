@@ -6,7 +6,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import type { Request } from 'express';
-import { createRemoteJWKSet, jwtVerify, type JWTPayload } from 'jose';
+import { createRemoteJWKSet, errors, jwtVerify, type JWTPayload } from 'jose';
 
 import { SupabaseConfig } from '../../common/config/supabase.config';
 
@@ -90,12 +90,31 @@ export class SupabaseAuthGuard implements CanActivate {
         },
       );
       return payload;
-    } catch {
+    } catch (error) {
+      // Failing to reach the key set says nothing about the token. Answering 401
+      // would tell the client its session is gone, and the client signs the user
+      // out; 503 still refuses the request but lets the client retry.
+      if (isKeySetUnavailable(error)) {
+        throw new ServiceUnavailableException({
+          code: 'AUTH_KEYS_UNAVAILABLE',
+          message: 'Token verification is temporarily unavailable',
+        });
+      }
       // The reason is deliberately not surfaced: expired, malformed, and
       // wrong-signature must be indistinguishable to a caller.
       throw new UnauthorizedException('Invalid or expired access token');
     }
   }
+}
+
+/**
+ * A JWKS fetch that timed out or never completed. Every verdict about the token
+ * itself — expired, bad signature, unknown key id — is a JOSEError other than a
+ * timeout; a failed `fetch` surfaces as a plain error instead.
+ */
+function isKeySetUnavailable(error: unknown): boolean {
+  if (error instanceof errors.JWKSTimeout) return true;
+  return !(error instanceof errors.JOSEError);
 }
 
 function bearerToken(request: Request): string | null {

@@ -4,6 +4,7 @@ import type { Prisma } from '../../generated/prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
   CreateComponentInput,
+  CreateFileInput,
   CreateProjectInput,
   Project,
   ProjectComponent,
@@ -92,6 +93,15 @@ export class PrismaProjectComponentRepository extends ProjectComponentRepository
     return this.prisma.db.projectComponent.count({ where: { projectId } });
   }
 
+  countByDefinitionIds(
+    projectId: string,
+    definitionIds: readonly string[],
+  ): Promise<number> {
+    return this.prisma.db.projectComponent.count({
+      where: { projectId, definitionId: { in: [...definitionIds] } },
+    });
+  }
+
   async create(
     projectId: string,
     input: CreateComponentInput,
@@ -121,6 +131,9 @@ export class PrismaProjectComponentRepository extends ProjectComponentRepository
     const result = await this.prisma.db.projectComponent.updateMany({
       where: { id: componentId, projectId },
       data: {
+        ...(input.definitionId !== undefined
+          ? { definitionId: input.definitionId }
+          : {}),
         ...(input.label !== undefined ? { label: input.label } : {}),
         ...(input.x !== undefined ? { x: input.x } : {}),
         ...(input.y !== undefined ? { y: input.y } : {}),
@@ -145,10 +158,12 @@ export class PrismaProjectComponentRepository extends ProjectComponentRepository
   async createProjectWithBoard(
     project: CreateProjectInput,
     board: CreateComponentInput,
-  ): Promise<{ project: Project; component: ProjectComponent }> {
+    devices: readonly CreateComponentInput[] = [],
+    files: readonly CreateFileInput[] = [],
+  ): Promise<{ project: Project; components: ProjectComponent[] }> {
     try {
-      // Nested write: Prisma runs both in one transaction, so a project can
-      // never exist without the board the user selected for it.
+      // Nested write: Prisma runs all of it in one transaction, so a project can
+      // never exist without the board and starter files chosen for it.
       const created = await this.prisma.db.project.create({
         data: {
           workspaceId: project.workspaceId,
@@ -158,14 +173,22 @@ export class PrismaProjectComponentRepository extends ProjectComponentRepository
           board: project.board ?? '',
           framework: project.framework ?? '',
           components: {
-            create: {
-              definitionId: board.definitionId,
-              label: board.label ?? '',
-              x: board.x,
-              y: board.y,
-              rotation: board.rotation ?? 0,
-              state: (board.state ?? {}) as Prisma.InputJsonValue,
-            },
+            create: [board, ...devices].map((component) => ({
+              definitionId: component.definitionId,
+              label: component.label ?? '',
+              x: component.x,
+              y: component.y,
+              rotation: component.rotation ?? 0,
+              state: (component.state ?? {}) as Prisma.InputJsonValue,
+            })),
+          },
+          files: {
+            create: files.map((file) => ({
+              path: file.path,
+              content: file.content,
+              contentHash: file.contentHash,
+              sizeBytes: file.sizeBytes,
+            })),
           },
         },
         select: { ...PROJECT_SELECT, components: { select: COMPONENT_SELECT } },
@@ -183,7 +206,7 @@ export class PrismaProjectComponentRepository extends ProjectComponentRepository
           createdAt: created.createdAt,
           updatedAt: created.updatedAt,
         },
-        component: toComponent(created.components[0]),
+        components: created.components.map(toComponent),
       };
     } catch (error: unknown) {
       if (

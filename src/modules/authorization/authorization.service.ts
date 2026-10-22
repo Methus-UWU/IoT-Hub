@@ -91,6 +91,17 @@ export class AuthorizationService {
     }
   }
 
+  /**
+   * Non-throwing form, for deciding whether an action is moderation rather than
+   * ownership — deleting someone else's community post, for instance.
+   */
+  async isPlatformAdmin(userId: string): Promise<boolean> {
+    const user = await this.users.findProfileById(userId);
+    return (
+      user !== null && user.isActive && user.role.name.toLowerCase() === 'admin'
+    );
+  }
+
   /** Asserts the account is active; a suspended user keeps a valid token. */
   async requireActiveAccount(userId: string): Promise<void> {
     const user = await this.users.findProfileById(userId);
